@@ -36,6 +36,25 @@ app.get('/', (req, res) => {
   res.render('index', { session: req.session });
 });
 
+// --- Logged In Welcome Site ---
+app.get('/dashboard', async (req, res) => {
+  const userId = req.session.userId;
+  if (!userId) return res.redirect('/login');
+
+  try {
+    const [children] = await db.query('SELECT * FROM Children WHERE user_id = ?', [userId]);
+    const [rides] = await db.query(`
+      SELECT Rides.*, Users.name AS driver_name
+      FROM Rides JOIN Users ON Rides.user_id = Users.id
+    `);
+
+    res.render('dashboard', { session: req.session, children, rides });
+  } catch (err) {
+    console.error('Dashboard error:', err);
+    res.status(500).send('Error loading dashboard.');
+  }
+});
+
 // --- Register ---
 app.get('/register', (req, res) => {
   res.render('register', { session: req.session });
@@ -59,6 +78,27 @@ app.post('/register', async (req, res) => {
     res.status(500).render('register', { session: req.session });
   }
 });
+
+// --- EditChild Dashboard ---
+app.post('/edit-child/:id', async (req, res) => {
+  const childId = req.params.id;
+  const { name, school, club } = req.body;
+  const userId = req.session.userId;
+
+  try {
+    await db.query(
+      'UPDATE Children SET name = ?, school = ?, club = ? WHERE id = ? AND user_id = ?',
+      [name, school, club || null, childId, userId]
+    );
+    res.redirect('/dashboard');
+  } catch (err) {
+    console.error('Edit child error:', err);
+    res.status(500).send('Error updating child.');
+  }
+});
+
+
+
 
 // --- Login ---
 app.get('/login', (req, res) => {
@@ -86,7 +126,7 @@ app.post('/login', async (req, res) => {
 
     req.session.userId = user.id;
     req.session.userName = user.name;
-    res.redirect('/view-rides');
+    res.redirect('/dashboard');
   } catch (err) {
     console.error(err);
     res.status(500).send('Login failed.');
