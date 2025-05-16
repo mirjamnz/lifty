@@ -63,7 +63,13 @@ app.get('/dashboard', async (req, res) => {
 
     // Fetch this user's offers and requests for context (optional)
     const [offers] = await db.query(`SELECT * FROM RideOffers WHERE user_id = ?`, [userId]);
-    const [requests] = await db.query(`SELECT * FROM RideRequests WHERE user_id = ?`, [userId]);
+    const [requests] = await db.query(`
+  SELECT RideRequests.*, Users.name AS user_name
+  FROM RideRequests
+  JOIN Users ON RideRequests.user_id = Users.id
+  ORDER BY RideRequests.created_at DESC
+`);
+    
 
     // Render the dashboard view
     res.render('dashboard', {
@@ -106,20 +112,25 @@ app.post('/offer-ride', async (req, res) => {
 // --- Ride Request ---
 app.post('/request-ride', async (req, res) => {
   const userId = req.session.userId;
-  const { pickup_location, dropoff_location, note } = req.body;
-  if (!pickup_location || !dropoff_location) return res.status(400).send('Pickup and dropoff are required.');
+  const { pickup_location, dropoff_location, pickup_time, child_id, note } = req.body;
+
+  if (!pickup_location || !pickup_time || !child_id) {
+    return res.status(400).send('Pickup location, time, and child are required.');
+  }
 
   try {
     await db.query(`
-      INSERT INTO RideRequests (user_id, pickup_location, dropoff_location, note)
-      VALUES (?, ?, ?, ?)
-    `, [userId, pickup_location, dropoff_location, note || null]);
+      INSERT INTO RideRequests (user_id, pickup_location, dropoff_location, pickup_time, child_id, note)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, [userId, pickup_location, dropoff_location || null, pickup_time, child_id, note || null]);
+
     res.redirect('/dashboard');
   } catch (err) {
     console.error('Request ride error:', err);
     res.status(500).send('Could not request ride.');
   }
 });
+
 
 app.get('/view-rides', async (req, res) => {
   const userId = req.session.userId;

@@ -61,9 +61,11 @@
   flatpickr("input[name='pickup_time']", {
     enableTime: true,
     dateFormat: "Y-m-d H:i",
+    defaultDate: new Date(),  // 👈 this sets today as the default
     minDate: "today"
   });
 </script>
+
 
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
