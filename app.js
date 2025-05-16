@@ -47,11 +47,49 @@ app.get('/dashboard', async (req, res) => {
       SELECT Rides.*, Users.name AS driver_name
       FROM Rides JOIN Users ON Rides.user_id = Users.id
     `);
+    const [offers] = await db.query(`SELECT * FROM RideOffers WHERE user_id = ?`, [userId]);
+    const [requests] = await db.query(`SELECT * FROM RideRequests WHERE user_id = ?`, [userId]);
 
-    res.render('dashboard', { session: req.session, children, rides });
+    res.render('dashboard', { session: req.session, children, rides, offers, requests });
   } catch (err) {
     console.error('Dashboard error:', err);
     res.status(500).send('Error loading dashboard.');
+  }
+});
+
+// --- Ride Offer ---
+app.post('/offer-ride', async (req, res) => {
+  const userId = req.session.userId;
+  const { location, available_seats, note } = req.body;
+  if (!location || !available_seats) return res.status(400).send('Location and available seats are required.');
+
+  try {
+    await db.query(`
+      INSERT INTO RideOffers (user_id, location, available_seats, note)
+      VALUES (?, ?, ?, ?)
+    `, [userId, location, available_seats, note || null]);
+    res.redirect('/dashboard');
+  } catch (err) {
+    console.error('Offer ride error:', err);
+    res.status(500).send('Could not offer ride.');
+  }
+});
+
+// --- Ride Request ---
+app.post('/request-ride', async (req, res) => {
+  const userId = req.session.userId;
+  const { pickup_location, dropoff_location, note } = req.body;
+  if (!pickup_location || !dropoff_location) return res.status(400).send('Pickup and dropoff are required.');
+
+  try {
+    await db.query(`
+      INSERT INTO RideRequests (user_id, pickup_location, dropoff_location, note)
+      VALUES (?, ?, ?, ?)
+    `, [userId, pickup_location, dropoff_location, note || null]);
+    res.redirect('/dashboard');
+  } catch (err) {
+    console.error('Request ride error:', err);
+    res.status(500).send('Could not request ride.');
   }
 });
 
@@ -109,66 +147,6 @@ app.post('/login', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).send('Login failed.');
-  }
-});
-
-// --- View Rides ---
-app.get('/view-rides', async (req, res) => {
-  try {
-    const [rides] = await db.query(`
-      SELECT Rides.*, Users.name AS driver_name
-      FROM Rides JOIN Users ON Rides.user_id = Users.id
-    `);
-    res.render('rides', { rides, session: req.session });
-  } catch (err) {
-    res.status(500).send(err.message);
-  }
-});
-
-// --- Add Child ---
-app.post('/add-child', async (req, res) => {
-  const user_id = req.session.userId;
-  const { name, school, club } = req.body;
-  try {
-    await db.query(
-      'INSERT INTO Children (user_id, name, school, club) VALUES (?, ?, ?, ?)',
-      [user_id, name, school, club || null]
-    );
-    res.redirect('/dashboard');
-  } catch (err) {
-    res.status(500).send(err.message);
-  }
-});
-
-// --- Edit Child ---
-app.post('/edit-child/:id', async (req, res) => {
-  const childId = req.params.id;
-  const { name, school, club } = req.body;
-  const userId = req.session.userId;
-
-  try {
-    await db.query(
-      'UPDATE Children SET name = ?, school = ?, club = ? WHERE id = ? AND user_id = ?',
-      [name, school, club || null, childId, userId]
-    );
-    res.redirect('/dashboard');
-  } catch (err) {
-    console.error('Edit child error:', err);
-    res.status(500).send('Error updating child.');
-  }
-});
-
-// --- Delete Child ---
-app.get('/delete-child/:id', async (req, res) => {
-  const childId = req.params.id;
-  const userId = req.session.userId;
-
-  try {
-    await db.query('DELETE FROM Children WHERE id = ? AND user_id = ?', [childId, userId]);
-    res.redirect('/dashboard');
-  } catch (err) {
-    console.error('Delete child error:', err);
-    res.status(500).send('Error deleting child.');
   }
 });
 
