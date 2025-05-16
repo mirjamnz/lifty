@@ -62,72 +62,89 @@
   </div>
 
   <!-- Rides Section -->
-  <div class="mb-5">
-    <h4>Available Rides</h4>
-    <% if (rides.length > 0) { %>
-      <table class="table table-striped">
-        <thead>
-          <tr>
-            <th>Driver</th>
-            <th>Pickup</th>
-            <th>Dropoff</th>
-            <th>Time</th>
-            <th>Seats</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% rides.forEach(ride => { %>
-            <tr>
-              <td><%= ride.driver_name %></td>
-              <td><%= ride.pickup_location %></td>
-              <td><%= ride.dropoff_location %></td>
-              <td><%= new Date(ride.pickup_time).toLocaleString() %></td>
-              <td><%= ride.seats_available %></td>
-            </tr>
-          <% }) %>
-        </tbody>
-      </table>
-    <% } else { %>
-      <p class="text-muted">No rides available right now.</p>
-    <% } %>
-  </div>
+  <<!-- Ride Sharing Section -->
+<div class="mb-5">
+  <h4 class="mb-3">🚗 Ride Sharing</h4>
 
-  <!-- Ride Offer / Request Section -->
-  <div class="mb-5">
-    <h4 class="mb-3">🚗 Ride Sharing</h4>
-    <div class="row">
-      <div class="col-md-6">
-        <h5>Offer a Ride</h5>
-        <form action="/offer-ride" method="POST" class="mb-4">
-          <div class="mb-2">
-            <input type="text" name="pickup_location" class="form-control" placeholder="Pickup Location" required>
-          </div>
-          <div class="mb-2">
-            <input type="text" name="dropoff_location" class="form-control" placeholder="Dropoff Location" required>
-          </div>
-          <div class="mb-2">
-            <input type="number" name="seats_available" class="form-control" placeholder="Seats Available" min="1" required>
-          </div>
-          <button type="submit" class="btn btn-primary">🚗 Offer Ride</button>
-        </form>
-      </div>
-      <div class="col-md-6">
-        <h5>Request a Pickup</h5>
-        <form action="/request-ride" method="POST">
-          <div class="mb-2">
-            <input type="text" name="pickup_location" class="form-control" placeholder="Pickup Location" required>
-          </div>
-          <div class="mb-2">
-            <input type="text" name="dropoff_location" class="form-control" placeholder="Dropoff Location (optional)">
-          </div>
-          <div class="mb-2">
-            <textarea name="note" class="form-control" placeholder="Additional details... (optional)"></textarea>
-          </div>
-          <button type="submit" class="btn btn-outline-success">📣 Request Pickup</button>
-        </form>
-      </div>
+  <!-- Currently Available Rides -->
+  <% if (rideOffers && rideOffers.length > 0) { %>
+    <h5>Currently Available Ride Offers</h5>
+    <table class="table table-bordered mb-4">
+      <thead>
+        <tr>
+          <th>Driver</th>
+          <th>School</th>
+          <th>Pickup Time</th>
+          <th>Seats</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% rideOffers.forEach(offer => { %>
+          <tr>
+            <td><%= offer.driver_name %></td>
+            <td><%= offer.school %></td>
+            <td><%= new Date(offer.pickup_time).toLocaleString() %></td>
+            <td><%= offer.available_seats %></td>
+            <td><%= offer.notes || '—' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <% } else { %>
+    <p class="text-muted">No current ride offers.</p>
+  <% } %>
+
+  <div class="row">
+    <!-- Offer a Ride -->
+    <div class="col-md-6">
+      <h5>Offer a Ride</h5>
+      <form action="/offer-ride" method="POST">
+        <div class="mb-2">
+          <input type="text" name="school" class="form-control" placeholder="School Name" required>
+        </div>
+        <div class="mb-2">
+          <input type="number" name="available_seats" class="form-control" placeholder="Seats Available" min="1" required>
+        </div>
+        <div class="mb-2">
+          <input type="datetime-local" name="pickup_time" class="form-control" required>
+        </div>
+        <div class="mb-2">
+          <textarea name="notes" class="form-control" placeholder="Optional notes..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">🚗 Offer Ride</button>
+      </form>
+    </div>
+
+    <!-- Request a Ride -->
+    <div class="col-md-6">
+      <h5>Request a Pickup</h5>
+      <form action="/request-ride" method="POST">
+        <div class="mb-2">
+          <input type="text" name="pickup_location" class="form-control" placeholder="Pickup Location" required>
+        </div>
+        <div class="mb-2">
+          <input type="text" name="dropoff_location" class="form-control" placeholder="Dropoff Location (optional)">
+        </div>
+        <div class="mb-2">
+          <input type="datetime-local" name="pickup_time" class="form-control" required>
+        </div>
+        <div class="mb-2">
+          <select name="child_id" class="form-select" required>
+            <option value="" disabled selected>Select Your Child</option>
+            <% children.forEach(child => { %>
+              <option value="<%= child.id %>"><%= child.name %> – <%= child.school %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="mb-2">
+          <textarea name="note" class="form-control" placeholder="Additional details... (optional)"></textarea>
+        </div>
+        <button type="submit" class="btn btn-outline-success w-100">📣 Request Pickup</button>
+      </form>
     </div>
   </div>
 </div>
+
 
 <%- include('partials/footer1') %>

@@ -37,41 +37,69 @@ app.get('/', (req, res) => {
 });
 
 // --- Dashboard ---
+    // Add this inside your app.js
+
 app.get('/dashboard', async (req, res) => {
   const userId = req.session.userId;
   if (!userId) return res.redirect('/login');
 
   try {
+    // Fetch children for this user
     const [children] = await db.query('SELECT * FROM Children WHERE user_id = ?', [userId]);
+
+    // Fetch general ride listings
     const [rides] = await db.query(`
       SELECT Rides.*, Users.name AS driver_name
       FROM Rides JOIN Users ON Rides.user_id = Users.id
     `);
+
+    // Fetch currently available ride offers (from any user)
+    const [rideOffers] = await db.query(`
+      SELECT RideOffers.*, Users.name AS driver_name
+      FROM RideOffers
+      JOIN Users ON RideOffers.user_id = Users.id
+      ORDER BY pickup_time ASC
+    `);
+
+    // Fetch this user's offers and requests for context (optional)
     const [offers] = await db.query(`SELECT * FROM RideOffers WHERE user_id = ?`, [userId]);
     const [requests] = await db.query(`SELECT * FROM RideRequests WHERE user_id = ?`, [userId]);
 
-    res.render('dashboard', { session: req.session, children, rides, offers, requests });
+    // Render the dashboard view
+    res.render('dashboard', {
+      session: req.session,
+      children,
+      rides,
+      rideOffers,
+      offers,
+      requests
+    });
   } catch (err) {
     console.error('Dashboard error:', err);
     res.status(500).send('Error loading dashboard.');
   }
 });
 
+
 // --- Ride Offer ---
 app.post('/offer-ride', async (req, res) => {
-  const userId = req.session.userId;
-  const { location, available_seats, note } = req.body;
-  if (!location || !available_seats) return res.status(400).send('Location and available seats are required.');
+  const user_id = req.session.userId;
+  const { school, available_seats, pickup_time, notes } = req.body;
+
+  if (!user_id || !school || !available_seats || !pickup_time) {
+    return res.status(400).send('School, pickup time, and available seats are required.');
+  }
 
   try {
-    await db.query(`
-      INSERT INTO RideOffers (user_id, location, available_seats, note)
-      VALUES (?, ?, ?, ?)
-    `, [userId, location, available_seats, note || null]);
+    await db.query(
+      `INSERT INTO RideOffers (user_id, school, available_seats, pickup_time, notes)
+       VALUES (?, ?, ?, ?, ?)`,
+      [user_id, school, available_seats, pickup_time, notes || null]
+    );
     res.redirect('/dashboard');
   } catch (err) {
-    console.error('Offer ride error:', err);
-    res.status(500).send('Could not offer ride.');
+    console.error('Offer Ride Error:', err);
+    res.status(500).send('Error offering ride.');
   }
 });
 
@@ -90,6 +118,31 @@ app.post('/request-ride', async (req, res) => {
   } catch (err) {
     console.error('Request ride error:', err);
     res.status(500).send('Could not request ride.');
+  }
+});
+
+app.get('/view-rides', async (req, res) => {
+  const userId = req.session.userId;
+  if (!userId) return res.redirect('/login');
+
+  try {
+    const [children] = await db.query('SELECT * FROM Children WHERE user_id = ?', [userId]);
+
+    const [rideOffers] = await db.query(`
+      SELECT RideOffers.*, Users.name AS driver_name
+      FROM RideOffers
+      JOIN Users ON RideOffers.user_id = Users.id
+      ORDER BY pickup_time ASC
+    `);
+
+    res.render('rides', {
+      session: req.session,
+      children,
+      rideOffers
+    });
+  } catch (err) {
+    console.error('View Rides Error:', err);
+    res.status(500).send('Failed to load rides.');
   }
 });
 
