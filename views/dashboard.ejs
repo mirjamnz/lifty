@@ -62,7 +62,6 @@
   </div>
 
   <!-- Rides Section -->
-  <<!-- Ride Sharing Section -->
 <div class="mb-5">
   <h4 class="mb-3">🚗 Ride Sharing</h4>
 
@@ -113,7 +112,7 @@
       <% requests.forEach(request => { %>
         <tr>
           <td><%= request.user_name || 'Unknown' %></td>
-          <td><%= request.child_id || 'Unknown' %></td>
+          <td><%= request.child_name || 'Unknown' %></td>
           <td><%= request.pickup_location %></td>
           <td><%= request.dropoff_location || '—' %></td>
           <td><%= request.note || '—' %></td>

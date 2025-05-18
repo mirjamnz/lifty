@@ -1,12 +1,14 @@
 <%- include('partials/header1') %>
 <%- include('partials/navbar1') %>
 
-<!-- Rides Table -->
 <div class="container py-5">
-  <h2 class="mb-4">🚗 Your Rides <%= session.userName %>!</h2>
+  <h2 class="mb-4">🚗  My rides <%= session.userName %>!</h2>
+
+  
+  <!-- My Rides Section -->
 
 
-  <!-- Currently Offer Available Rides -->
+  <!-- Currently Offers Available Rides -->
   <% if (rideOffers && rideOffers.length > 0) { %>
     <h5>Currently Available Ride Offers</h5>
     <table class="table table-bordered mb-4">
@@ -35,13 +37,14 @@
     <p class="text-muted">No current ride offers.</p>
   <% } %>
 
-  <!-- Currently Requetsed Rides -->
+  <!-- Currently Requested Rides -->
   <% if (requests && requests.length > 0) { %>
   <h5 class="mt-5">Requested Pickups</h5>
   <table class="table table-bordered">
     <thead>
       <tr>
         <th>Requested By</th>
+        <th>For</th>
         <th>Pickup Location</th>
         <th>Dropoff Location</th>
         <th>Note</th>
@@ -52,6 +55,7 @@
       <% requests.forEach(request => { %>
         <tr>
           <td><%= request.user_name || 'Unknown' %></td>
+          <td><%= request.child_name || 'Unknown' %></td>
           <td><%= request.pickup_location %></td>
           <td><%= request.dropoff_location || '—' %></td>
           <td><%= request.note || '—' %></td>
@@ -115,8 +119,6 @@
     </div>
   </div>
 </div>
-
-
 
 
 <%- include('partials/footer1') %>
