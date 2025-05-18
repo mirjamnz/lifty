@@ -40,30 +40,31 @@
   <!-- Currently Requested Rides -->
   <% if (requests && requests.length > 0) { %>
   <h5 class="mt-5">Requested Pickups</h5>
-  <table class="table table-bordered">
-    <thead>
+<table class="table table-bordered">
+  <thead>
+    <tr>
+      <th>Request for</th>
+      <th>Pickup Location</th>
+      <th>Dropoff Location</th>
+      <th>Note</th>
+      <th>Requested At</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% requests.forEach(request => { %>
       <tr>
-        <th>Requested By</th>
-        <th>For</th>
-        <th>Pickup Location</th>
-        <th>Dropoff Location</th>
-        <th>Note</th>
-        <th>Requested At</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% requests.forEach(request => { %>
-        <tr>
-          <td><%= request.user_name || 'Unknown' %></td>
-          <td><%= request.child_name || 'Unknown' %></td>
-          <td><%= request.pickup_location %></td>
-          <td><%= request.dropoff_location || '—' %></td>
-          <td><%= request.note || '—' %></td>
-          <td><%= new Date(request.created_at).toLocaleString() %></td>
-        </tr>
-      <% }) %>
-    </tbody>
-  </table>
+        <td>
+          <strong><%= request.child_name || 'Unknown' %></strong><br>
+          <small class="text-muted">Requested by: <%= request.user_name || 'Unknown' %></small>
+        </td>
+        <td><%= request.pickup_location %></td>
+        <td><%= request.dropoff_location || '—' %></td>
+        <td><%= request.note || '—' %></td>
+        <td><%= new Date(request.created_at).toLocaleString() %></td>
+</tr>
+    <% }) %>
+  </tbody>
+</table>
 <% } else { %>
   <p class="text-muted">No ride requests found.</p>
 <% } %>
