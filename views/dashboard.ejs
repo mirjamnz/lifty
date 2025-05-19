@@ -95,9 +95,7 @@
   <% } %>
 
   <!-- Currently Requested Rides -->
- <!-- Currently Requested Rides -->
-  <% if (requests && requests.length > 0) { %>
-  <h5 class="mt-5">Requested Pickups</h5>
+<h5 class="mt-5">Requested Pickups</h5>
 <table class="table table-bordered">
   <thead>
     <tr>
@@ -106,6 +104,7 @@
       <th>Dropoff Location</th>
       <th>Note</th>
       <th>Requested At</th>
+      <th>Actions</th>
     </tr>
   </thead>
   <tbody>
@@ -119,13 +118,19 @@
         <td><%= request.dropoff_location || '—' %></td>
         <td><%= request.note || '—' %></td>
         <td><%= new Date(request.created_at).toLocaleString() %></td>
-</tr>
+        <td>
+          <% if (!request.assigned_user_id) { %>
+            <form action="/assign-request/<%= request.id %>" method="POST" style="display:inline;">
+              <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('Do you want to help with this pickup?');">I can help</button>
+            </form>
+          <% } else { %>
+            <span class="badge bg-secondary">Assigned</span>
+          <% } %>
+        </td>
+      </tr>
     <% }) %>
   </tbody>
 </table>
-<% } else { %>
-  <p class="text-muted">No ride requests found.</p>
-<% } %>
 
 
 
