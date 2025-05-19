@@ -4,11 +4,6 @@
 <div class="container py-5">
   <h2 class="mb-4">🚗  My rides <%= session.userName %>!</h2>
 
-  
-  <!-- My Rides Section -->
-
-
-  <!-- Currently Offers Available Rides -->
   <% if (rideOffers && rideOffers.length > 0) { %>
     <h5>Currently Available Ride Offers</h5>
     <table class="table table-bordered mb-4">
@@ -27,7 +22,7 @@
             <td><%= offer.driver_name %></td>
             <td><%= offer.school %></td>
             <td><%= new Date(offer.pickup_time).toLocaleString() %></td>
-            <td><%= offer.available_seats %></td>
+            <td><%= offer.seats_taken %> of <%= offer.seats_total %></td>
             <td><%= offer.notes || '—' %></td>
           </tr>
         <% }) %>
@@ -37,79 +32,69 @@
     <p class="text-muted">No current ride offers.</p>
   <% } %>
 
-  <!-- Currently Requested Rides -->
-  
   <h5 class="mt-5">Requested Pickups</h5>
-<table class="table table-bordered">
-  <thead>
-    <tr>
-      <th>Request for</th>
-      <th>Pickup Location</th>
-      <th>Dropoff Location</th>
-      <th>Note</th>
-      <th>Requested At</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
-  <tbody>
-    <% requests.forEach(request => { %>
+  <table class="table table-bordered">
+    <thead>
       <tr>
-        <td>
-          <strong><%= request.child_name || 'Unknown' %></strong><br>
-          <small class="text-muted">Requested by: <%= request.user_name || 'Unknown' %></small>
-        </td>
-        <td><%= request.pickup_location %></td>
-        <td><%= request.dropoff_location || '—' %></td>
-        <td><%= request.note || '—' %></td>
-        <td><%= new Date(request.created_at).toLocaleString() %></td>
-        <td>
-          <% if (request.user_id === session.userId || request.assigned_user_id === session.userId) { %>
-            <!-- Edit Button -->
-            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#editRequest<%= request.id %>">✏️ Edit</button>
-
-            <!-- Cancel Form -->
-            <form action="/cancel-request/<%= request.id %>" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to cancel this request?');">
-              <button type="submit" class="btn btn-sm btn-outline-danger">❌ Cancel</button>
-            </form>
-          <% } else if (!request.assigned_user_id) { %>
-            <!-- Assign to Me Button -->
-            <form action="/assign-request/<%= request.id %>" method="POST" class="d-inline">
-              <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('Do you want to help with this pickup?');">I can help</button>
-            </form>
-          <% } else { %>
-            <span class="badge bg-secondary">Assigned</span>
-          <% } %>
-        </td>
+        <th>Request for</th>
+        <th>Pickup Location</th>
+        <th>Dropoff Location</th>
+        <th>Note</th>
+        <th>Requested At</th>
+        <th>Actions</th>
       </tr>
-
-      <!-- Edit Form Row (Collapsible) -->
-      <% if (request.user_id === session.userId || request.assigned_user_id === session.userId) { %>
-        <tr class="collapse" id="editRequest<%= request.id %>">
-          <td colspan="6">
-            <form action="/edit-request/<%= request.id %>" method="POST" class="row g-2">
-              <div class="col-md-3">
-                <input type="text" name="pickup_location" value="<%= request.pickup_location %>" class="form-control" required>
-              </div>
-              <div class="col-md-3">
-                <input type="text" name="dropoff_location" value="<%= request.dropoff_location %>" class="form-control">
-              </div>
-              <div class="col-md-4">
-                <input type="text" name="note" value="<%= request.note %>" class="form-control" placeholder="Optional note">
-              </div>
-              <div class="col-md-2">
-                <button type="submit" class="btn btn-primary w-100">💾 Save</button>
-              </div>
-            </form>
+    </thead>
+    <tbody>
+      <% requests.forEach(request => { %>
+        <tr>
+          <td>
+            <strong><%= request.child_name || 'Unknown' %></strong><br>
+            <small class="text-muted">Requested by: <%= request.user_name || 'Unknown' %></small>
+          </td>
+          <td><%= request.pickup_location %></td>
+          <td><%= request.dropoff_location || '—' %></td>
+          <td><%= request.note || '—' %></td>
+          <td><%= new Date(request.created_at).toLocaleString() %></td>
+          <td>
+            <% if (request.user_id === session.userId || request.assigned_user_id === session.userId) { %>
+              <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#editRequest<%= request.id %>">✏️ Edit</button>
+              <form action="/cancel-request/<%= request.id %>" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to cancel this request?');">
+                <button type="submit" class="btn btn-sm btn-outline-danger">❌ Cancel</button>
+              </form>
+            <% } else if (!request.assigned_user_id) { %>
+              <form action="/assign-request/<%= request.id %>" method="POST" class="d-inline">
+                <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('Do you want to help with this pickup?');">I can help</button>
+              </form>
+            <% } else { %>
+              <span class="badge bg-secondary">Assigned</span>
+            <% } %>
           </td>
         </tr>
-      <% } %>
-    <% }) %>
-  </tbody>
-</table>
+        <% if (request.user_id === session.userId || request.assigned_user_id === session.userId) { %>
+          <tr class="collapse" id="editRequest<%= request.id %>">
+            <td colspan="6">
+              <form action="/edit-request/<%= request.id %>" method="POST" class="row g-2">
+                <div class="col-md-3">
+                  <input type="text" name="pickup_location" value="<%= request.pickup_location %>" class="form-control" required>
+                </div>
+                <div class="col-md-3">
+                  <input type="text" name="dropoff_location" value="<%= request.dropoff_location %>" class="form-control">
+                </div>
+                <div class="col-md-4">
+                  <input type="text" name="note" value="<%= request.note %>" class="form-control" placeholder="Optional note">
+                </div>
+                <div class="col-md-2">
+                  <button type="submit" class="btn btn-primary w-100">💾 Save</button>
+                </div>
+              </form>
+            </td>
+          </tr>
+        <% } %>
+      <% }) %>
+    </tbody>
+  </table>
 
-  
-  
-  <!-- Offer a Ride -->
+  <div class="row my-5">
     <div class="col-md-6">
       <h5>Offer a Ride</h5>
       <form action="/offer-ride" method="POST">
@@ -129,43 +114,33 @@
       </form>
     </div>
 
-    <!-- Request a Ride -->
-    <h5 class="mt-5">Requested Pickups</h5>
-<table class="table table-bordered">
-  <thead>
-    <tr>
-      <th>Request for</th>
-      <th>Pickup Location</th>
-      <th>Dropoff Location</th>
-      <th>Note</th>
-      <th>Requested At</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
-  <tbody>
-    <% requests.forEach(request => { %>
-      <tr>
-        <td>
-          <strong><%= request.child_name || 'Unknown' %></strong><br>
-          <small class="text-muted">Requested by: <%= request.user_name || 'Unknown' %></small>
-        </td>
-        <td><%= request.pickup_location %></td>
-        <td><%= request.dropoff_location || '—' %></td>
-        <td><%= request.note || '—' %></td>
-        <td><%= new Date(request.created_at).toLocaleString() %></td>
-        <td>
-          <% if (!request.assigned_user_id) { %>
-            <form action="/assign-request/<%= request.id %>" method="POST" style="display:inline;">
-              <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('Do you want to help with this pickup?');">I can help</button>
-            </form>
-          <% } else { %>
-            <span class="badge bg-secondary">Assigned</span>
-          <% } %>
-        </td>
-      </tr>
-    <% }) %>
-  </tbody>
-</table>
-
+    <div class="col-md-6">
+      <h5>Request a Pickup</h5>
+      <form action="/request-ride" method="POST">
+        <div class="mb-2">
+          <input type="text" name="pickup_location" class="form-control" placeholder="Pickup Location" required>
+        </div>
+        <div class="mb-2">
+          <input type="text" name="dropoff_location" class="form-control" placeholder="Dropoff Location (optional)">
+        </div>
+        <div class="mb-2">
+          <input type="datetime-local" name="pickup_time" class="form-control" required>
+        </div>
+        <div class="mb-2">
+          <select name="child_id" class="form-select" required>
+            <option value="" disabled selected>Select Your Child</option>
+            <% children.forEach(child => { %>
+              <option value="<%= child.id %>"><%= child.name %> – <%= child.school %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="mb-2">
+          <textarea name="note" class="form-control" placeholder="Additional details... (optional)"></textarea>
+        </div>
+        <button type="submit" class="btn btn-outline-success w-100">📣 Request Pickup</button>
+      </form>
+    </div>
+  </div>
+</div>
 
 <%- include('partials/footer1') %>

@@ -1,9 +1,8 @@
 // app.js
 require('dotenv').config();
 const express = require('express');
-const db = require('./db');
-const bcrypt = require('bcrypt');
 const session = require('express-session');
+const path = require('path');
 
 const app = express();
 
@@ -12,224 +11,28 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 app.set('view engine', 'ejs');
-app.set('views', './views');
+app.set('views', path.join(__dirname, 'views'));
 
-// --- Session ---
 app.use(session({
   secret: process.env.SESSION_SECRET || 'lifty_secret_key',
   resave: false,
   saveUninitialized: false
 }));
 
-// --- Logout ---
-app.get('/logout', (req, res) => {
-  req.session.destroy(err => {
-    if (err) return res.status(500).send('Logout failed.');
-    res.redirect('/login');
-  });
-});
+// --- Routes ---
+const authRoutes = require('./routes/auth');
+const dashboardRoutes = require('./routes/dashboard');
+const rideRequestRoutes = require('./routes/rideRequests');
+const rideRoutes = require('./routes/rides');
 
-// --- Home ---
+app.use('/', authRoutes);              // for login, register, logout
+app.use('/dashboard', dashboardRoutes);
+app.use('/requests', rideRequestRoutes);
+app.use('/rides', rideRoutes);
+
+// --- Home (optional redirect) ---
 app.get('/', (req, res) => {
-  res.render('index', { session: req.session });
-});
-
-// --- Dashboard ---
-app.get('/dashboard', async (req, res) => {
-  const userId = req.session.userId;
-  if (!userId) return res.redirect('/login');
-
-  try {
-    const [children] = await db.query('SELECT * FROM Children WHERE user_id = ?', [userId]);
-    const [rides] = await db.query('SELECT Rides.*, Users.name AS driver_name FROM Rides JOIN Users ON Rides.user_id = Users.id');
-    const [rideOffers] = await db.query('SELECT RideOffers.*, Users.name AS driver_name FROM RideOffers JOIN Users ON RideOffers.user_id = Users.id ORDER BY pickup_time ASC');
-    const [offers] = await db.query('SELECT * FROM RideOffers WHERE user_id = ?', [userId]);
-    const [requests] = await db.query(`
-      SELECT RideRequests.*, Users.name AS user_name, Children.name AS child_name
-      FROM RideRequests
-      JOIN Users ON RideRequests.user_id = Users.id
-      JOIN Children ON RideRequests.child_id = Children.id
-      ORDER BY RideRequests.created_at DESC
-    `);
-
-    res.render('dashboard', {
-      session: req.session,
-      children,
-      rides,
-      rideOffers,
-      offers,
-      requests
-    });
-  } catch (err) {
-    console.error('Dashboard error:', err);
-    res.status(500).send('Error loading dashboard.');
-  }
-});
-
-// --- Ride Offer ---
-app.post('/offer-ride', async (req, res) => {
-  const user_id = req.session.userId;
-  const { school, available_seats, pickup_time, notes } = req.body;
-  if (!user_id || !school || !available_seats || !pickup_time) {
-    return res.status(400).send('School, pickup time, and available seats are required.');
-  }
-
-  try {
-    await db.query('INSERT INTO RideOffers (user_id, school, available_seats, pickup_time, notes) VALUES (?, ?, ?, ?, ?)', [user_id, school, available_seats, pickup_time, notes || null]);
-    res.redirect('/dashboard');
-  } catch (err) {
-    console.error('Offer Ride Error:', err);
-    res.status(500).send('Error offering ride.');
-  }
-});
-
-// --- Ride Request ---
-app.post('/edit-request/:id', async (req, res) => {
-  const userId = req.session.userId;
-  const { pickup_location, dropoff_location, note } = req.body;
-  const requestId = req.params.id;
-
-  if (!userId) return res.redirect('/login');
-
-  try {
-    const [results] = await db.query(
-      `UPDATE RideRequests SET pickup_location = ?, dropoff_location = ?, note = ? 
-       WHERE id = ? AND user_id = ?`,
-      [pickup_location, dropoff_location || null, note || null, requestId, userId]
-    );
-
-    res.redirect('/dashboard');
-  } catch (err) {
-    console.error('Edit Ride Request Error:', err);
-    res.status(500).send('Could not update the request.');
-  }
-});
-// ---- Cancel Request -----
-app.post('/cancel-request/:id', async (req, res) => {
-  const userId = req.session.userId;
-  const requestId = req.params.id;
-
-  if (!userId) return res.redirect('/login');
-
-  try {
-    await db.query(
-      `DELETE FROM RideRequests WHERE id = ? AND user_id = ?`,
-      [requestId, userId]
-    );
-    res.redirect('/dashboard');
-  } catch (err) {
-    console.error('Cancel Ride Request Error:', err);
-    res.status(500).send('Could not cancel the request.');
-  }
-});
-
-// --- View Rides ---
-app.get('/view-rides', async (req, res) => {
-  const userId = req.session.userId;
-  if (!userId) return res.redirect('/login');
-
-  try {
-    // Load the user's children
-    const [children] = await db.query('SELECT * FROM Children WHERE user_id = ?', [userId]);
-
-    // Load the user's ride offers
-    const [rideOffers] = await db.query(`
-      SELECT RideOffers.*, Users.name AS driver_name
-      FROM RideOffers
-      JOIN Users ON RideOffers.user_id = Users.id
-      WHERE RideOffers.user_id = ?
-      ORDER BY pickup_time ASC
-    `, [userId]);
-
-    // Load the user's ride requests including child and user names
-    const [requests] = await db.query(`
-      SELECT 
-        RideRequests.*, 
-        Children.name AS child_name, 
-        Users.name AS user_name
-      FROM RideRequests
-      JOIN Children ON RideRequests.child_id = Children.id
-      JOIN Users ON RideRequests.user_id = Users.id
-      WHERE RideRequests.user_id = ?
-      ORDER BY RideRequests.created_at DESC
-    `, [userId]);
-
-    res.render('rides', {
-      session: req.session,
-      children,
-      rideOffers,
-      requests  // ✅ PASS requests
-    });
-  } catch (err) {
-    console.error('View Rides Error:', err);
-    res.status(500).send('Failed to load rides.');
-  }
-});
-
-
-// ----- assign rides -----
-app.post('/assign-request/:id', async (req, res) => {
-  const userId = req.session.userId;
-  const requestId = req.params.id;
-
-  if (!userId) return res.redirect('/login');
-
-  try {
-    await db.query(
-      `UPDATE RideRequests SET assigned_user_id = ? WHERE id = ?`,
-      [userId, requestId]
-    );
-    res.redirect('/dashboard');
-  } catch (err) {
-    console.error('Assign Ride Error:', err);
-    res.status(500).send('Could not assign yourself to this ride.');
-  }
-});
-
-// --- Register ---
-app.get('/register', (req, res) => {
-  res.render('register', { session: req.session });
-});
-
-app.post('/register', async (req, res) => {
-  const { name, email, password } = req.body;
-  if (!name || !email || !password) return res.status(400).send('All fields are required.');
-
-  try {
-    const hashedPassword = await bcrypt.hash(password, 10);
-    await db.query('INSERT INTO Users (name, email, password_hash) VALUES (?, ?, ?)', [name, email, hashedPassword]);
-    res.redirect('/login');
-  } catch (err) {
-    console.error('Register Error:', err);
-    res.status(500).render('register', { session: req.session });
-  }
-});
-
-// --- Login ---
-app.get('/login', (req, res) => {
-  res.render('login', { error: null, session: req.session });
-});
-
-app.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) return res.render('login', { error: 'Both fields are required.', session: req.session });
-
-  try {
-    const [users] = await db.query('SELECT * FROM Users WHERE email = ?', [email]);
-    const user = users[0];
-
-    if (!user) return res.render('login', { error: 'Invalid email or password.', session: req.session });
-    const isMatch = await bcrypt.compare(password, user.password_hash);
-
-    if (!isMatch) return res.render('login', { error: 'Invalid email or password.', session: req.session });
-
-    req.session.userId = user.id;
-    req.session.userName = user.name;
-    res.redirect('/dashboard');
-  } catch (err) {
-    console.error('Login Error:', err);
-    res.status(500).send('Login failed.');
-  }
+  res.redirect('/dashboard');
 });
 
 // --- Start Server ---
