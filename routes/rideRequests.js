@@ -3,6 +3,31 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
+// POST /request-ride
+router.post('/request-ride', async (req, res) => {
+  const userId = req.session.userId;
+  if (!userId) return res.redirect('/login');
+
+  const { pickup_location, dropoff_location, pickup_time, child_id, note } = req.body;
+  if (!pickup_location || !pickup_time || !child_id) {
+    return res.status(400).send('Pickup location, time, and child are required.');
+  }
+
+  try {
+    await db.query(
+      `INSERT INTO RideRequests 
+        (user_id, pickup_location, dropoff_location, pickup_time, child_id, note)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [userId, pickup_location, dropoff_location || null, pickup_time, child_id, note || null]
+    );
+    res.redirect('/dashboard');
+  } catch (err) {
+    console.error('❌ Error creating ride request:', err);
+    res.status(500).send('Failed to create ride request.');
+  }
+});
+
+
 // Edit Ride Request
 router.post('/edit-request/:id', async (req, res) => {
   const userId = req.session.userId;
@@ -31,13 +56,17 @@ router.post('/cancel-request/:id', async (req, res) => {
   if (!userId) return res.redirect('/login');
 
   try {
-    await db.query(`DELETE FROM RideRequests WHERE id = ? AND user_id = ?`, [requestId, userId]);
+    await db.query(
+      `DELETE FROM RideRequests WHERE id = ? AND user_id = ?`,
+      [requestId, userId]
+    );
     res.redirect('/dashboard');
   } catch (err) {
     console.error('Cancel Ride Request Error:', err);
     res.status(500).send('Could not cancel the request.');
   }
 });
+
 
 // Assign Yourself to a Ride Request
 router.post('/assign-request/:id', async (req, res) => {
