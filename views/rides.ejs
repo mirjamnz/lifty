@@ -2,33 +2,53 @@
 <%- include('partials/navbar1') %>
 
 <div class="container py-5">
-  <h2 class="mb-4">🚗  My rides <%= session.userName %>!</h2>
+  <h2 class="mb-4">🚗 My Rides, <%= session.userName %>!</h2>
 
-  <% if (rideOffers && rideOffers.length > 0) { %>
-    <h5>Currently Available Ride Offers</h5>
-    <table class="table table-bordered mb-4">
-      <thead>
+  <!-- FILTER + VIEW TOGGLE -->
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+    <div class="btn-group mb-2">
+      <a href="/rides?filter=all" class="btn btn-sm <%= filter === 'all' ? 'btn-primary' : 'btn-outline-primary' %>">All Requests</a>
+      <a href="/rides?filter=my" class="btn btn-sm <%= filter === 'my' ? 'btn-primary' : 'btn-outline-primary' %>">My Requests</a>
+      <a href="/rides?filter=others" class="btn btn-sm <%= filter === 'others' ? 'btn-primary' : 'btn-outline-primary' %>">Others'</a>
+    </div>
+    <div class="form-check form-switch">
+      <input class="form-check-input" type="checkbox" id="toggleView" onchange="toggleViewMode()">
+      <label class="form-check-label" for="toggleView">🗂️ Card View</label>
+    </div>
+  </div>
+
+  <!-- QUICK SEARCH -->
+  <div class="input-group mb-4">
+    <span class="input-group-text">🔎</span>
+    <input type="text" id="rideSearch" class="form-control" placeholder="Search rides or requests...">
+  </div>
+
+  <!-- RIDE OFFERS TABLE -->
+  <% if (rideOffers.length > 0) { %>
+    <h5>🚘 Ride Offers</h5>
+    <table class="table table-hover mb-4 ride-table">
+      <thead class="table-light">
         <tr>
           <th>Driver</th>
           <th>School</th>
-          <th>Pickup Time</th>
+          <th>Pickup</th>
           <th>Seats</th>
           <th>Notes</th>
-          <th>Actions</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
         <% rideOffers.forEach(offer => { %>
           <tr>
-            <td><%= offer.driver_name %></td>
+            <td><strong><%= offer.driver_name %></strong></td>
             <td><%= offer.school %></td>
-            <td><%= new Date(offer.pickup_time).toLocaleString() %></td>
-            <td><%= offer.seats_taken %> of <%= offer.seats_total %></td>
+            <td><span class="text-primary" data-time="<%= offer.pickup_time %>"><%= new Date(offer.pickup_time).toLocaleString() %></span></td>
+            <td><span class="badge bg-<%= offer.seats_taken < offer.seats_total ? 'success' : 'danger' %>"><%= offer.seats_taken %> / <%= offer.seats_total %></span></td>
             <td><%= offer.notes || '—' %></td>
             <td>
               <% if (offer.user_id === session.userId) { %>
-                <form action="/rides/cancel-offer/<%= offer.id %>" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to cancel this offer?');">
-                  <button type="submit" class="btn btn-sm btn-outline-danger">❌ Cancel</button>
+                <form action="/rides/cancel-offer/<%= offer.id %>" method="POST" class="d-inline" onsubmit="return confirm('Cancel this offer?');">
+                  <button class="btn btn-sm btn-outline-danger">❌</button>
                 </form>
               <% } %>
             </td>
@@ -40,115 +60,155 @@
     <p class="text-muted">No current ride offers.</p>
   <% } %>
 
-  <h5 class="mt-5">Requested Pickups</h5>
-  <table class="table table-bordered">
-    <thead>
+  <!-- REQUESTED PICKUPS -->
+  <h5 class="mt-5">📣 Ride Requests</h5>
+  <table class="table table-striped ride-table">
+    <thead class="table-light">
       <tr>
-        <th>Request for</th>
-        <th>Pickup Location</th>
-        <th>Dropoff Location</th>
+        <th>Child</th>
+        <th>From</th>
+        <th>To</th>
         <th>Note</th>
-        <th>Requested At</th>
-        <th>Actions</th>
+        <th>Time</th>
+        <th>Status</th>
+        <th></th>
       </tr>
     </thead>
     <tbody>
       <% requests.forEach(request => { %>
         <tr>
-          <td>
-            <strong><%= request.child_name || 'Unknown' %></strong><br>
-            <small class="text-muted">Requested by: <%= request.user_name || 'Unknown' %></small>
-          </td>
+          <td><%= request.child_name %> <br><small class="text-muted">by <%= request.user_name %></small></td>
           <td><%= request.pickup_location %></td>
           <td><%= request.dropoff_location || '—' %></td>
           <td><%= request.note || '—' %></td>
-          <td><%= new Date(request.created_at).toLocaleString() %></td>
+          <td><span class="text-info" data-time="<%= request.created_at %>"><%= new Date(request.created_at).toLocaleString() %></span></td>
+          <td>
+            <% if (!request.assigned_user_id) { %>
+              <span class="badge bg-warning text-dark">Waiting</span>
+            <% } else { %>
+              <span class="badge bg-success">Assigned to <%= request.assigned_driver_name %></span>
+            <% } %>
+          </td>
           <td>
             <% if (request.user_id === session.userId || request.assigned_user_id === session.userId) { %>
-              <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#editRequest<%= request.id %>">✏️ Edit</button>
-              <form action="/requests/cancel-request/<%= request.id %>" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to cancel this request?');">
-                <button type="submit" class="btn btn-sm btn-outline-danger">❌ Cancel</button>
+              <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#editRequest<%= request.id %>">✏️</button>
+              <form action="/requests/cancel-request/<%= request.id %>" method="POST" class="d-inline">
+                <button class="btn btn-sm btn-outline-danger">❌</button>
               </form>
             <% } else if (!request.assigned_user_id) { %>
               <form action="/requests/assign-request/<%= request.id %>" method="POST" class="d-inline">
-                <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('Do you want to help with this pickup?');">I can help</button>
+                <button class="btn btn-sm btn-outline-success">Help</button>
               </form>
-            <% } else { %>
-              <span class="badge bg-info">Assigned to <%= request.assigned_driver_name %></span>
             <% } %>
           </td>
         </tr>
         <% if (request.user_id === session.userId || request.assigned_user_id === session.userId) { %>
-          <tr class="collapse" id="editRequest<%= request.id %>">
-            <td colspan="6">
-              <form action="/requests/edit-request/<%= request.id %>" method="POST" class="row g-2">
-                <div class="col-md-3">
-                  <input type="text" name="pickup_location" value="<%= request.pickup_location %>" class="form-control" required>
-                </div>
-                <div class="col-md-3">
-                  <input type="text" name="dropoff_location" value="<%= request.dropoff_location %>" class="form-control">
-                </div>
-                <div class="col-md-4">
-                  <input type="text" name="note" value="<%= request.note %>" class="form-control" placeholder="Optional note">
-                </div>
-                <div class="col-md-2">
-                  <button type="submit" class="btn btn-primary w-100">💾 Save</button>
-                </div>
-              </form>
-            </td>
-          </tr>
+        <tr class="collapse" id="editRequest<%= request.id %>">
+          <td colspan="7">
+            <form action="/requests/edit-request/<%= request.id %>" method="POST" class="row g-2">
+              <div class="col-md-3">
+                <input type="text" name="pickup_location" value="<%= request.pickup_location %>" class="form-control" required>
+              </div>
+              <div class="col-md-3">
+                <input type="text" name="dropoff_location" value="<%= request.dropoff_location %>" class="form-control">
+              </div>
+              <div class="col-md-4">
+                <input type="text" name="note" value="<%= request.note %>" class="form-control">
+              </div>
+              <div class="col-md-2">
+                <button class="btn btn-primary w-100">💾</button>
+              </div>
+            </form>
+          </td>
+        </tr>
         <% } %>
       <% }) %>
     </tbody>
   </table>
 
+  <% if (requests.length === 0) { %>
+    <p class="text-muted">No ride requests matching your filter.</p>
+  <% } %>
+
+  <!-- CARD VIEW -->
+  <div class="row" id="rideCards" style="display:none;">
+    <% rideOffers.forEach(offer => { %>
+      <div class="col-md-6 mb-4">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title"><%= offer.school %></h5>
+            <p class="card-text">Driver: <strong><%= offer.driver_name %></strong></p>
+            <p class="card-text">🕒 <span class="text-primary" data-time="<%= offer.pickup_time %>"><%= new Date(offer.pickup_time).toLocaleString() %></span></p>
+            <p class="card-text">Seats: <span class="badge bg-<%= offer.seats_taken < offer.seats_total ? 'success' : 'danger' %>"><%= offer.seats_taken %> / <%= offer.seats_total %></span></p>
+            <% if (offer.notes) { %>
+              <p class="card-text text-muted">Note: <%= offer.notes %></p>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+
+  <!-- NEW FORMS -->
   <div class="row my-5">
     <div class="col-md-6">
       <h5>Offer a Ride</h5>
       <form action="/offer-ride" method="POST">
-        <div class="mb-2">
-          <input type="text" name="school" class="form-control" placeholder="School Name" required>
-        </div>
-        <div class="mb-2">
-          <input type="number" name="available_seats" class="form-control" placeholder="Seats Available" min="1" required>
-        </div>
-        <div class="mb-2">
-          <input type="datetime-local" name="pickup_time" class="form-control" required>
-        </div>
-        <div class="mb-2">
-          <textarea name="notes" class="form-control" placeholder="Optional notes..."></textarea>
-        </div>
-        <button type="submit" class="btn btn-primary w-100">🚗 Offer Ride</button>
+        <input type="text" name="school" class="form-control mb-2" placeholder="School Name" required>
+        <input type="number" name="available_seats" class="form-control mb-2" placeholder="Seats Available" min="1" required>
+        <input type="datetime-local" name="pickup_time" class="form-control mb-2" required>
+        <textarea name="notes" class="form-control mb-2" placeholder="Optional notes..."></textarea>
+        <button class="btn btn-primary w-100">🚗 Offer Ride</button>
       </form>
     </div>
 
     <div class="col-md-6">
       <h5>Request a Pickup</h5>
       <form action="/requests/request-ride" method="POST">
-        <div class="mb-2">
-          <input type="text" name="pickup_location" class="form-control" placeholder="Pickup Location" required>
-        </div>
-        <div class="mb-2">
-          <input type="text" name="dropoff_location" class="form-control" placeholder="Dropoff Location (optional)">
-        </div>
-        <div class="mb-2">
-          <input type="datetime-local" name="pickup_time" class="form-control" required>
-        </div>
-        <div class="mb-2">
-          <select name="child_id" class="form-select" required>
-            <option value="" disabled selected>Select Your Child</option>
-            <% children.forEach(child => { %>
-              <option value="<%= child.id %>"><%= child.name %> – <%= child.school %></option>
-            <% }) %>
-          </select>
-        </div>
-        <div class="mb-2">
-          <textarea name="note" class="form-control" placeholder="Additional details... (optional)"></textarea>
-        </div>
-        <button type="submit" class="btn btn-outline-success w-100">📣 Request Pickup</button>
+        <input type="text" name="pickup_location" class="form-control mb-2" placeholder="Pickup Location" required>
+        <input type="text" name="dropoff_location" class="form-control mb-2" placeholder="Dropoff Location (optional)">
+        <input type="datetime-local" name="pickup_time" class="form-control mb-2" required>
+        <select name="child_id" class="form-select mb-2" required>
+          <option disabled selected>Select Your Child</option>
+          <% children.forEach(child => { %>
+            <option value="<%= child.id %>"><%= child.name %> – <%= child.school %></option>
+          <% }) %>
+        </select>
+        <textarea name="note" class="form-control mb-2" placeholder="Additional details..."></textarea>
+        <button class="btn btn-outline-success w-100">📣 Request Pickup</button>
       </form>
     </div>
   </div>
 </div>
+
+<!-- SCRIPTS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+<script>
+function toggleViewMode() {
+  const cards = document.getElementById('rideCards');
+  const tables = document.querySelectorAll('.ride-table');
+  if (cards.style.display === 'none') {
+    cards.style.display = 'flex';
+    tables.forEach(t => t.style.display = 'none');
+  } else {
+    cards.style.display = 'none';
+    tables.forEach(t => t.style.display = 'table');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('[data-time]').forEach(el => {
+    const raw = el.getAttribute('data-time');
+    el.innerText = moment(raw).fromNow();
+  });
+
+  document.getElementById('rideSearch').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    document.querySelectorAll('tbody tr').forEach(row => {
+      row.style.display = row.innerText.toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+});
+</script>
 
 <%- include('partials/footer1') %>
