@@ -9,38 +9,52 @@ router.get('/dashboard', async (req, res) => {
   if (!userId) return res.redirect('/login');
 
   try {
+    const [[user]] = await db.query('SELECT * FROM Users WHERE id = ?', [userId]);
     const [children] = await db.query('SELECT * FROM Children WHERE user_id = ?', [userId]);
-    const [rides] = await db.query(`
-      SELECT Rides.*, Users.name AS driver_name
-      FROM Rides JOIN Users ON Rides.user_id = Users.id
-    `);
-    const [rideOffers] = await db.query(`
-      SELECT RideOffers.*, Users.name AS driver_name
-      FROM RideOffers JOIN Users ON RideOffers.user_id = Users.id
-      ORDER BY pickup_time ASC
-    `);
-    const [offers] = await db.query(`SELECT * FROM RideOffers WHERE user_id = ?`, [userId]);
-    const [requests] = await db.query(`
-      SELECT RideRequests.*, Users.name AS user_name, Children.name AS child_name
-      FROM RideRequests
-      JOIN Users ON RideRequests.user_id = Users.id
-      JOIN Children ON RideRequests.child_id = Children.id
-      ORDER BY RideRequests.created_at DESC
-    `);
+    const [neighbors] = await db.query(`
+      SELECT id, name, home_lat, home_lng
+      FROM Users
+      WHERE home_lat IS NOT NULL AND id != ?
+    `, [userId]);
 
     res.render('dashboard', {
       session: req.session,
+      user,
       children,
-      rides,
-      rideOffers,
-      offers,
-      requests
+      neighbors
     });
   } catch (err) {
     console.error('Dashboard error:', err);
     res.status(500).send('Error loading dashboard.');
   }
 });
+
+// Set Home address
+router.post('/update-address', async (req, res) => {
+  const userId = req.session.userId;
+  const { home_address, home_lat, home_lng } = req.body;
+
+  // Guard clause: check that all fields are filled
+  if (!home_address || !home_lat || !home_lng) {
+    return res.status(400).send('Missing address details');
+  }
+
+  try {
+    await db.query(`
+      UPDATE Users 
+      SET home_address = ?, home_lat = ?, home_lng = ? 
+      WHERE id = ?
+    `, [home_address, parseFloat(home_lat), parseFloat(home_lng), userId]);
+
+    res.redirect('/dashboard');
+  } catch (err) {
+    console.error('Update address error:', err);
+    res.status(500).send('Failed to update address.');
+  }
+});
+
+
+
 
 // POST /add-child
 router.post('/add-child', async (req, res) => {

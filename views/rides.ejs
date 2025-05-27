@@ -14,6 +14,7 @@
           <th>Pickup Time</th>
           <th>Seats</th>
           <th>Notes</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -24,6 +25,13 @@
             <td><%= new Date(offer.pickup_time).toLocaleString() %></td>
             <td><%= offer.seats_taken %> of <%= offer.seats_total %></td>
             <td><%= offer.notes || '—' %></td>
+            <td>
+              <% if (offer.user_id === session.userId) { %>
+                <form action="/rides/cancel-offer/<%= offer.id %>" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to cancel this offer?');">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">❌ Cancel</button>
+                </form>
+              <% } %>
+            </td>
           </tr>
         <% }) %>
       </tbody>
@@ -58,22 +66,22 @@
           <td>
             <% if (request.user_id === session.userId || request.assigned_user_id === session.userId) { %>
               <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#editRequest<%= request.id %>">✏️ Edit</button>
-              <form action="/cancel-request/<%= request.id %>" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to cancel this request?');">
+              <form action="/requests/cancel-request/<%= request.id %>" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to cancel this request?');">
                 <button type="submit" class="btn btn-sm btn-outline-danger">❌ Cancel</button>
               </form>
             <% } else if (!request.assigned_user_id) { %>
-              <form action="/assign-request/<%= request.id %>" method="POST" class="d-inline">
+              <form action="/requests/assign-request/<%= request.id %>" method="POST" class="d-inline">
                 <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('Do you want to help with this pickup?');">I can help</button>
               </form>
             <% } else { %>
-              <span class="badge bg-secondary">Assigned</span>
+              <span class="badge bg-info">Assigned to <%= request.assigned_driver_name %></span>
             <% } %>
           </td>
         </tr>
         <% if (request.user_id === session.userId || request.assigned_user_id === session.userId) { %>
           <tr class="collapse" id="editRequest<%= request.id %>">
             <td colspan="6">
-              <form action="/edit-request/<%= request.id %>" method="POST" class="row g-2">
+              <form action="/requests/edit-request/<%= request.id %>" method="POST" class="row g-2">
                 <div class="col-md-3">
                   <input type="text" name="pickup_location" value="<%= request.pickup_location %>" class="form-control" required>
                 </div>

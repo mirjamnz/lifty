@@ -21,14 +21,15 @@ router.get('/', async (req, res) => {
     `);
 
     // Load ride requests by the user
-    const [requests] = await db.query(`
-      SELECT RideRequests.*, Users.name AS user_name, Children.name AS child_name
-      FROM RideRequests
-      JOIN Users ON RideRequests.user_id = Users.id
-      JOIN Children ON RideRequests.child_id = Children.id
-      WHERE RideRequests.user_id = ?
-      ORDER BY RideRequests.created_at DESC
-    `, [userId]);
+const [requests] = await db.query(`
+  SELECT rr.*, u.name AS user_name, c.name AS child_name, ad.name AS assigned_driver_name
+  FROM RideRequests rr
+  JOIN Users u ON rr.user_id = u.id
+  JOIN Children c ON rr.child_id = c.id
+  LEFT JOIN Users ad ON rr.assigned_user_id = ad.id
+  ORDER BY rr.created_at DESC
+`);
+
 
     res.render('rides', {
       session: req.session,
@@ -39,6 +40,22 @@ router.get('/', async (req, res) => {
   } catch (err) {
     console.error('GET /rides error:', err);
     res.status(500).send('Failed to load rides page.');
+  }
+});
+
+  // Cancel ride requests by the user
+router.post('/cancel-offer/:id', async (req, res) => {
+  const userId = req.session.userId;
+  const offerId = req.params.id;
+
+  if (!userId) return res.redirect('/login');
+
+  try {
+    await db.query('DELETE FROM RideOffers WHERE id = ? AND user_id = ?', [offerId, userId]);
+    res.redirect('/rides');
+  } catch (err) {
+    console.error('Cancel Ride Offer Error:', err);
+    res.status(500).send('Could not cancel the offer.');
   }
 });
 
