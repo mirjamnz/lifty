@@ -4,18 +4,26 @@
 <div class="container py-5">
   <h2 class="mb-4">🚗 My Rides, <%= session.userName %>!</h2>
 
-  <!-- FILTER + VIEW TOGGLE -->
-  <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
-    <div class="btn-group mb-2">
-      <a href="/rides?filter=all" class="btn btn-sm <%= filter === 'all' ? 'btn-primary' : 'btn-outline-primary' %>">All Requests</a>
+
+
+ <!-- Filter, View + Hide Expired option -->
+  <form method="GET" action="/rides" class="d-flex gap-2 align-items-center mb-3">
+  <input type="hidden" name="filter" value="<%= filter %>">
+  <div class="btn-group">
+      <a href="/rides?filter=all" class="btn btn-sm <%= filter === 'all' ? 'btn-primary' : 'btn-outline-primary' %>">All</a>
       <a href="/rides?filter=my" class="btn btn-sm <%= filter === 'my' ? 'btn-primary' : 'btn-outline-primary' %>">My Requests</a>
       <a href="/rides?filter=others" class="btn btn-sm <%= filter === 'others' ? 'btn-primary' : 'btn-outline-primary' %>">Others'</a>
-    </div>
-    <div class="form-check form-switch">
-      <input class="form-check-input" type="checkbox" id="toggleView" onchange="toggleViewMode()">
-      <label class="form-check-label" for="toggleView">🗂️ Card View</label>
-    </div>
   </div>
+  <div class="form-check form-switch ms-3">
+    <input class="form-check-input" type="checkbox" name="expired" value="false" id="hideExpired" onchange="this.form.submit()" <%= expired === 'false' ? 'checked' : '' %>>
+    <label class="form-check-label" for="hideExpired">Hide expired</label>
+  </div>
+  <div class="form-check form-switch">
+      <input class="form-check-input" type="checkbox" id="toggleView" onchange="toggleViewMode()">
+      <label class="form-check-label" for="toggleView">📂 Card View</label>
+    </div>
+</form>
+
 
   <!-- QUICK SEARCH -->
   <div class="input-group mb-4">
@@ -23,31 +31,75 @@
     <input type="text" id="rideSearch" class="form-control" placeholder="Search rides or requests...">
   </div>
 
-  <!-- RIDE OFFERS TABLE -->
-  <% if (rideOffers.length > 0) { %>
-    <h5>🚘 Ride Offers</h5>
-    <table class="table table-hover mb-4 ride-table">
+  <!-- TABLE VIEW -->
+  <div id="tableView">
+    <!-- Ride Offers -->
+    <% if (rideOffers.length > 0) { %>
+      <h5>🚘 Ride Offers</h5>
+      <table class="table table-hover mb-4 ride-table">
+        <thead class="table-light">
+          <tr>
+            <th>Driver</th>
+            <th>School</th>
+            <th>Pickup</th>
+            <th>Seats</th>
+            <th>Notes</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% rideOffers.forEach(offer => { %>
+            <tr>
+              <td><strong><%= offer.driver_name %></strong></td>
+              <td><%= offer.school %></td>
+              <td><span data-time="<%= offer.pickup_time %>"><%= new Date(offer.pickup_time).toLocaleString() %></span></td>
+              <td><span class="badge bg-success"><%= offer.available_seats %></span></td>
+              <td><%= offer.notes || '—' %></td>
+              <td>
+                <% if (offer.user_id === session.userId) { %>
+                  <form action="/rides/cancel-offer/<%= offer.id %>" method="POST" class="d-inline">
+                    <button class="btn btn-sm btn-outline-danger">❌</button>
+                  </form>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+
+    <!-- Ride Requests -->
+    <h5>📣 Ride Requests</h5>
+    <table class="table table-striped ride-table">
       <thead class="table-light">
         <tr>
-          <th>Driver</th>
-          <th>School</th>
-          <th>Pickup</th>
-          <th>Seats</th>
-          <th>Notes</th>
+          <th>Child</th>
+          <th>From</th>
+          <th>To</th>
+          <th>Note</th>
+          <th>Time</th>
+          <th>Status</th>
           <th></th>
         </tr>
       </thead>
       <tbody>
-        <% rideOffers.forEach(offer => { %>
+        <% requests.forEach(request => { %>
           <tr>
-            <td><strong><%= offer.driver_name %></strong></td>
-            <td><%= offer.school %></td>
-            <td><span class="text-primary" data-time="<%= offer.pickup_time %>"><%= new Date(offer.pickup_time).toLocaleString() %></span></td>
-            <td><span class="badge bg-<%= offer.seats_taken < offer.seats_total ? 'success' : 'danger' %>"><%= offer.seats_taken %> / <%= offer.seats_total %></span></td>
-            <td><%= offer.notes || '—' %></td>
+            <td><%= request.child_name %><br><small class="text-muted">by <%= request.user_name %></small></td>
+            <td><%= request.pickup_location %></td>
+            <td><%= request.dropoff_location || '—' %></td>
+            <td><%= request.note || '—' %></td>
+            <td><span data-time="<%= request.created_at %>"><%= new Date(request.created_at).toLocaleString() %></span></td>
             <td>
-              <% if (offer.user_id === session.userId) { %>
-                <form action="/rides/cancel-offer/<%= offer.id %>" method="POST" class="d-inline" onsubmit="return confirm('Cancel this offer?');">
+              <% if (!request.assigned_user_id) { %>
+                <span class="badge bg-warning text-dark">Waiting</span>
+              <% } else { %>
+                <span class="badge bg-success">Assigned to <%= request.assigned_driver_name %></span>
+              <% } %>
+            </td>
+            <td>
+              <% if (request.user_id === session.userId || request.assigned_user_id === session.userId) { %>
+                <form action="/requests/cancel-request/<%= request.id %>" method="POST" class="d-inline">
                   <button class="btn btn-sm btn-outline-danger">❌</button>
                 </form>
               <% } %>
@@ -56,143 +108,38 @@
         <% }) %>
       </tbody>
     </table>
-  <% } else { %>
-    <p class="text-muted">No current ride offers.</p>
-  <% } %>
-
-  <!-- REQUESTED PICKUPS -->
-  <h5 class="mt-5">📣 Ride Requests</h5>
-  <table class="table table-striped ride-table">
-    <thead class="table-light">
-      <tr>
-        <th>Child</th>
-        <th>From</th>
-        <th>To</th>
-        <th>Note</th>
-        <th>Time</th>
-        <th>Status</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      <% requests.forEach(request => { %>
-        <tr>
-          <td><%= request.child_name %> <br><small class="text-muted">by <%= request.user_name %></small></td>
-          <td><%= request.pickup_location %></td>
-          <td><%= request.dropoff_location || '—' %></td>
-          <td><%= request.note || '—' %></td>
-          <td><span class="text-info" data-time="<%= request.created_at %>"><%= new Date(request.created_at).toLocaleString() %></span></td>
-          <td>
-            <% if (!request.assigned_user_id) { %>
-              <span class="badge bg-warning text-dark">Waiting</span>
-            <% } else { %>
-              <span class="badge bg-success">Assigned to <%= request.assigned_driver_name %></span>
-            <% } %>
-          </td>
-          <td>
-            <% if (request.user_id === session.userId || request.assigned_user_id === session.userId) { %>
-              <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#editRequest<%= request.id %>">✏️</button>
-              <form action="/requests/cancel-request/<%= request.id %>" method="POST" class="d-inline">
-                <button class="btn btn-sm btn-outline-danger">❌</button>
-              </form>
-            <% } else if (!request.assigned_user_id) { %>
-              <form action="/requests/assign-request/<%= request.id %>" method="POST" class="d-inline">
-                <button class="btn btn-sm btn-outline-success">Help</button>
-              </form>
-            <% } %>
-          </td>
-        </tr>
-        <% if (request.user_id === session.userId || request.assigned_user_id === session.userId) { %>
-        <tr class="collapse" id="editRequest<%= request.id %>">
-          <td colspan="7">
-            <form action="/requests/edit-request/<%= request.id %>" method="POST" class="row g-2">
-              <div class="col-md-3">
-                <input type="text" name="pickup_location" value="<%= request.pickup_location %>" class="form-control" required>
-              </div>
-              <div class="col-md-3">
-                <input type="text" name="dropoff_location" value="<%= request.dropoff_location %>" class="form-control">
-              </div>
-              <div class="col-md-4">
-                <input type="text" name="note" value="<%= request.note %>" class="form-control">
-              </div>
-              <div class="col-md-2">
-                <button class="btn btn-primary w-100">💾</button>
-              </div>
-            </form>
-          </td>
-        </tr>
-        <% } %>
-      <% }) %>
-    </tbody>
-  </table>
-
-  <% if (requests.length === 0) { %>
-    <p class="text-muted">No ride requests matching your filter.</p>
-  <% } %>
+  </div>
 
   <!-- CARD VIEW -->
-  <div class="row" id="rideCards" style="display:none;">
+  <div class="row" id="cardView" style="display:none;">
+    <h5 class="mb-3">🚘 Ride Offers</h5>
     <% rideOffers.forEach(offer => { %>
       <div class="col-md-6 mb-4">
         <div class="card shadow-sm">
           <div class="card-body">
             <h5 class="card-title"><%= offer.school %></h5>
-            <p class="card-text">Driver: <strong><%= offer.driver_name %></strong></p>
-            <p class="card-text">🕒 <span class="text-primary" data-time="<%= offer.pickup_time %>"><%= new Date(offer.pickup_time).toLocaleString() %></span></p>
-            <p class="card-text">Seats: <span class="badge bg-<%= offer.seats_taken < offer.seats_total ? 'success' : 'danger' %>"><%= offer.seats_taken %> / <%= offer.seats_total %></span></p>
-            <% if (offer.notes) { %>
-              <p class="card-text text-muted">Note: <%= offer.notes %></p>
-            <% } %>
+            <p class="card-text">🕒 <%= new Date(offer.pickup_time).toLocaleString() %></p>
+            <p class="card-text">🚗 <strong><%= offer.driver_name %></strong> &mdash; <%= offer.available_seats %> seats</p>
+            <p class="card-text text-muted"><%= offer.notes || 'No notes' %></p>
           </div>
         </div>
       </div>
     <% }) %>
   </div>
 
-  <!-- NEW FORMS -->
-  <div class="row my-5">
-    <div class="col-md-6">
-      <h5>Offer a Ride</h5>
-      <form action="/offer-ride" method="POST">
-        <input type="text" name="school" class="form-control mb-2" placeholder="School Name" required>
-        <input type="number" name="available_seats" class="form-control mb-2" placeholder="Seats Available" min="1" required>
-        <input type="datetime-local" name="pickup_time" class="form-control mb-2" required>
-        <textarea name="notes" class="form-control mb-2" placeholder="Optional notes..."></textarea>
-        <button class="btn btn-primary w-100">🚗 Offer Ride</button>
-      </form>
-    </div>
-
-    <div class="col-md-6">
-      <h5>Request a Pickup</h5>
-      <form action="/requests/request-ride" method="POST">
-        <input type="text" name="pickup_location" class="form-control mb-2" placeholder="Pickup Location" required>
-        <input type="text" name="dropoff_location" class="form-control mb-2" placeholder="Dropoff Location (optional)">
-        <input type="datetime-local" name="pickup_time" class="form-control mb-2" required>
-        <select name="child_id" class="form-select mb-2" required>
-          <option disabled selected>Select Your Child</option>
-          <% children.forEach(child => { %>
-            <option value="<%= child.id %>"><%= child.name %> – <%= child.school %></option>
-          <% }) %>
-        </select>
-        <textarea name="note" class="form-control mb-2" placeholder="Additional details..."></textarea>
-        <button class="btn btn-outline-success w-100">📣 Request Pickup</button>
-      </form>
-    </div>
-  </div>
 </div>
 
-<!-- SCRIPTS -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
 <script>
 function toggleViewMode() {
-  const cards = document.getElementById('rideCards');
-  const tables = document.querySelectorAll('.ride-table');
+  const table = document.getElementById('tableView');
+  const cards = document.getElementById('cardView');
   if (cards.style.display === 'none') {
     cards.style.display = 'flex';
-    tables.forEach(t => t.style.display = 'none');
+    table.style.display = 'none';
   } else {
     cards.style.display = 'none';
-    tables.forEach(t => t.style.display = 'table');
+    table.style.display = 'block';
   }
 }
 
