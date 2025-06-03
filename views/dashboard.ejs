@@ -1,21 +1,86 @@
+<!--views/dashboard.ejs -->
 <%- include('partials/header1') %>
 <%- include('partials/navbar1') %>
 
 <div class="container py-5">
-  <h2 class="mb-4">👋 Hi! Welcome <%= session.userName %>!</h2>
+  <h2 class="mb-4">👋 Welcome, <%= session.userName %>!</h2>
 
   <!-- Address Section -->
-  <h5>🏠 Your Home Address</h5>
-<form action="/update-address" method="POST" class="row g-2 mb-4" onsubmit="return validateCoords();">
-  <div class="col-md-8">
-    <input type="text" name="home_address" id="homeAddress" class="form-control" value="<%= user.home_address || '' %>" required>
+  <div class="card mb-4 shadow-sm">
+    <div class="card-body">
+      <h5 class="card-title">🏠 Your Home Address</h5>
+      <form action="/update-address" method="POST" class="row g-2" onsubmit="return validateCoords();">
+        <div class="col-md-8">
+          <input type="text" name="home_address" id="homeAddress" class="form-control" value="<%= user.home_address || '' %>" required>
+        </div>
+        <input type="hidden" name="home_lat" id="homeLat">
+        <input type="hidden" name="home_lng" id="homeLng">
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-success w-100">📍 Save</button>
+        </div>
+      </form>
+      <div id="map" class="mt-3 rounded" style="height: 300px;"></div>
+    </div>
   </div>
-  <input type="hidden" name="home_lat" id="homeLat">
-  <input type="hidden" name="home_lng" id="homeLng">
-  <div class="col-md-2">
-    <button type="submit" class="btn btn-success w-100">📍 Save</button>
+
+  <!-- Children Section -->
+  <div class="card shadow-sm mb-5">
+    <div class="card-body">
+      <h4 class="card-title mb-3">👶 Your Children</h4>
+
+      <% if (children.length > 0) { %>
+        <ul class="list-group mb-4">
+          <% children.forEach(child => { %>
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+              <div>
+                <strong><%= child.name %></strong> – <%= child.school %>
+                <% if (child.club) { %> | Club: <%= child.club %> <% } %>
+              </div>
+              <div>
+                <button class="btn btn-sm btn-outline-secondary me-2" data-bs-toggle="collapse" data-bs-target="#editForm<%= child.id %>">✏️ Edit</button>
+                <a href="/delete-child/<%= child.id %>" class="btn btn-sm btn-outline-danger">🗑 Delete</a>
+              </div>
+            </li>
+            <li class="list-group-item collapse" id="editForm<%= child.id %>">
+              <form action="/edit-child/<%= child.id %>" method="POST" class="row g-2">
+                <div class="col-md-4">
+                  <input type="text" name="name" value="<%= child.name %>" class="form-control" required>
+                </div>
+                <div class="col-md-4">
+                  <input type="text" name="school" value="<%= child.school %>" class="form-control" required>
+                </div>
+                <div class="col-md-3">
+                  <input type="text" name="club" value="<%= child.club %>" class="form-control" placeholder="Club (optional)">
+                </div>
+                <div class="col-md-1">
+                  <button type="submit" class="btn btn-primary w-100">💾</button>
+                </div>
+              </form>
+            </li>
+          <% }) %>
+        </ul>
+      <% } else { %>
+        <p class="text-muted">No children registered yet.</p>
+      <% } %>
+
+      <h5 class="mt-4">➕ Add New Child</h5>
+      <form action="/add-child" method="POST" class="row g-2 mt-2">
+        <div class="col-md-4">
+          <input type="text" name="name" class="form-control" placeholder="Child's Name" required>
+        </div>
+        <div class="col-md-4">
+          <input type="text" name="school" class="form-control" placeholder="School" required>
+        </div>
+        <div class="col-md-3">
+          <input type="text" name="club" class="form-control" placeholder="Club (optional)">
+        </div>
+        <div class="col-md-1">
+          <button type="submit" class="btn btn-success w-100">Add</button>
+        </div>
+      </form>
+    </div>
   </div>
-</form>
+</div>
 
 <script>
   function validateCoords() {
@@ -28,8 +93,23 @@
     return true;
   }
 
-  // Google Maps Autocomplete
   function initMap() {
+    const userLoc = {
+      lat: <%= user.home_lat || -36.8485 %>,
+      lng: <%= user.home_lng || 174.7633 %>
+    };
+    const map = new google.maps.Map(document.getElementById('map'), {
+      center: userLoc,
+      zoom: 12
+    });
+    new google.maps.Marker({ position: userLoc, map, title: "Your Home" });
+    <% neighbors.forEach(n => { %>
+      new google.maps.Marker({
+        position: { lat: <%= n.home_lat %>, lng: <%= n.home_lng %> },
+        map,
+        title: "<%= n.name %>"
+      });
+    <% }); %>
     const autocomplete = new google.maps.places.Autocomplete(document.getElementById('homeAddress'));
     autocomplete.addListener('place_changed', function () {
       const place = autocomplete.getPlace();
@@ -38,126 +118,8 @@
         document.getElementById('homeLng').value = place.geometry.location.lng();
       }
     });
-
-    const userLoc = {
-      lat: <%= user.home_lat || -36.8485 %>,
-      lng: <%= user.home_lng || 174.7633 %>
-    };
-
-    const map = new google.maps.Map(document.getElementById('map'), {
-      center: userLoc,
-      zoom: 12
-    });
-
-    <% neighbors.forEach(n => { %>
-      new google.maps.Marker({
-        position: { lat: <%= n.home_lat %>, lng: <%= n.home_lng %> },
-        map,
-        title: "<%= n.name %>"
-      });
-    <% }); %>
   }
 </script>
 <script async defer src="https://maps.googleapis.com/maps/api/js?key=<%= GMAPS_API_KEY %>&libraries=places&callback=initMap"></script>
-
-
-    <!-- Show Map -->
-    <div id="map" style="height: 400px;"></div>
-<script>
-  function initMap() {
-    const userLoc = { lat: <%= user.home_lat || -36.8485 %>, lng: <%= user.home_lng || 174.7633 %> }; // Default Auckland
-    const map = new google.maps.Map(document.getElementById('map'), {
-      zoom: 12,
-      center: userLoc
-    });
-
-    <% neighbors.forEach(n => { %>
-      new google.maps.Marker({
-        position: { lat: <%= n.home_lat %>, lng: <%= n.home_lng %> },
-        map,
-        title: "<%= n.name %>"
-      });
-    <% }) %>
-
-    const autocomplete = new google.maps.places.Autocomplete(document.querySelector('[name=home_address]'));
-    autocomplete.addListener('place_changed', function() {
-      const place = autocomplete.getPlace();
-      if (!place.geometry) return;
-      document.getElementById('homeLat').value = place.geometry.location.lat();
-      document.getElementById('homeLng').value = place.geometry.location.lng();
-    });
-  }
-  new google.maps.Marker({
-  position: userLoc,
-  map,
-  title: "Your Home"
-});
-</script>
-<script async defer src="https://maps.googleapis.com/maps/api/js?key=<%= GMAPS_API_KEY %>&libraries=places&callback=initMap"></script>
-
-
-
-  <!-- Children Section -->
-  <div class="mb-5">
-    <h4 class="mb-3">Your Children</h4>
-
-    <% if (children.length > 0) { %>
-      <ul class="list-group mb-4">
-        <% children.forEach(child => { %>
-          <li class="list-group-item d-flex justify-content-between align-items-center">
-            <div>
-              <strong><%= child.name %></strong> – <%= child.school %>
-              <% if (child.club) { %> | Club: <%= child.club %> <% } %>
-            </div>
-            <div>
-              <button class="btn btn-sm btn-outline-secondary me-2" data-bs-toggle="collapse" data-bs-target="#editForm<%= child.id %>">✏️ Edit</button>
-              <a href="/delete-child/<%= child.id %>" class="btn btn-sm btn-outline-danger">🗑 Delete</a>
-            </div>
-          </li>
-          <li class="list-group-item collapse" id="editForm<%= child.id %>">
-            <form action="/edit-child/<%= child.id %>" method="POST" class="row g-2">
-              <div class="col-md-4">
-                <input type="text" name="name" value="<%= child.name %>" class="form-control" required>
-              </div>
-              <div class="col-md-4">
-                <input type="text" name="school" value="<%= child.school %>" class="form-control" required>
-              </div>
-              <div class="col-md-3">
-                <input type="text" name="club" value="<%= child.club %>" class="form-control" placeholder="Club (optional)">
-              </div>
-              <div class="col-md-1">
-                <button type="submit" class="btn btn-primary w-100">💾</button>
-              </div>
-            </form>
-          </li>
-        <% }) %>
-      </ul>
-    <% } else { %>
-      <p class="text-muted">No children registered yet.</p>
-    <% } %>
-
-
-
-    <!-- Add New Child Form -->
-    <h5 class="mt-4" id="add-child-form">➕ Add New Child</h5>
-    <form action="/add-child" method="POST" class="row g-2 mt-2">
-
-      <div class="col-md-4">
-        <input type="text" name="name" class="form-control" placeholder="Child's Name" required>
-      </div>
-      <div class="col-md-4">
-        <input type="text" name="school" class="form-control" placeholder="School" required>
-      </div>
-      <div class="col-md-3">
-        <input type="text" name="club" class="form-control" placeholder="Club (optional)">
-      </div>
-      <div class="col-md-1">
-        <button type="submit" class="btn btn-success w-100">Add</button>
-      </div>
-    </form>
-  </div>
-
-
-
 
 <%- include('partials/footer1') %>
