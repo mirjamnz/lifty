@@ -1,3 +1,4 @@
+<!--views/add-child.ejs -->
 <%- include('partials/header1') %>
 <%- include('partials/navbar1') %>
 
@@ -23,5 +24,46 @@
     <button type="submit" class="btn btn-primary">Add Child</button>
   </form>
 </div>
+<form action="/add-child" method="POST" class="row g-3">
+  <div class="col-md-6">
+    <label for="childName">Child Name</label>
+    <input type="text" name="name" id="childName" class="form-control" required>
+  </div>
+
+  <div class="col-md-6">
+    <label for="school">School</label>
+    <input type="text" class="form-control autocomplete" name="school" data-type="school" id="schoolInput" required>
+  </div>
+
+  <div class="col-md-6">
+    <label for="club">Club (optional)</label>
+    <input type="text" class="form-control autocomplete" name="club" data-type="club" id="clubInput">
+  </div>
+
+  <div class="col-md-12">
+    <button type="submit" class="btn btn-primary">➕ Add Child</button>
+  </div>
+</form>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap-autocomplete@1.0.7/dist/bootstrap-autocomplete.min.js"></script>
+<script>
+  document.querySelectorAll('.autocomplete').forEach(input => {
+    const type = input.dataset.type;
+
+    new window.Autocomplete(input, {
+      threshold: 1,
+      onSearch: async ({ currentValue }) => {
+        const res = await fetch(`/organizations/autocomplete?term=${encodeURIComponent(currentValue)}&type=${type}`);
+        return await res.json();
+      },
+      onResults: ({ matches }) =>
+        matches.map(m => `<li class="dropdown-item" data-value="${m.value}">${m.label}</li>`),
+      onSubmit: ({ value }) => {
+        input.value = value;
+      }
+    });
+  });
+</script>
+
 
 <%- include('partials/footer1') %>

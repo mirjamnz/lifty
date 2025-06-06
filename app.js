@@ -1,46 +1,47 @@
-// -------------------------------
-// ✅ app.js: Express setup
-// -------------------------------
 const express = require('express');
 const session = require('express-session');
 const path = require('path');
 const dotenv = require('dotenv');
 dotenv.config();
 
-// Require routes
+const app = express();
+
+// Route imports
 const authRoutes = require('./routes/auth');
 const dashboardRoutes = require('./routes/dashboard');
 const rideRequestRoutes = require('./routes/rideRequests');
 const rideRoutes = require('./routes/rides');
-
-const app = express();
+const orgRoutes = require('./routes/organizations');
 
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
+
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
+
+// Set GMAPS API key for EJS views
 app.use((req, res, next) => {
   res.locals.GMAPS_API_KEY = process.env.GMAPS_API_KEY;
   next();
 });
 
-
-// Sessions
+// Session
 app.use(session({
   secret: process.env.SESSION_SECRET || 'lifty_secret_key',
   resave: false,
   saveUninitialized: false
 }));
 
-// Route mounting
-app.use('/', authRoutes);             // /login, /register, /logout
-app.use('/', dashboardRoutes);        // /dashboard, /add-child, etc.
+// Routes
+app.use('/', authRoutes);
+app.use('/', dashboardRoutes);
 app.use('/requests', rideRequestRoutes);
 app.use('/rides', rideRoutes);
+app.use('/organizations', orgRoutes);
 
-// Home redirects to dashboard
+// Home
 app.get('/', (req, res) => {
   if (req.session.userId) {
     res.redirect('/dashboard');
@@ -49,14 +50,13 @@ app.get('/', (req, res) => {
   }
 });
 
-
-// Error handling
+// Error handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).send('Something broke!');
 });
 
-// Server
+// Start
 const PORT = 3033;
 app.listen(PORT, () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
