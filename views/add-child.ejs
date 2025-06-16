@@ -4,8 +4,21 @@
 
 <!-- Main Content -->
 <div class="container py-5">
-  <h2 class="mb-4">👧 Add a Child</h2>
-  <form method="POST" action="/add-child">
+  <h2 class="mb-4">👧 Add a Child or 🏫 Organizations</h2>
+ 
+<% if (session.success) { %>
+  <div class="alert alert-success alert-dismissible fade show" role="alert">
+    <%= session.success %>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+  <% session.success = null; %>
+<% } %>
+
+    <!-- Add Organizations via Button -->
+    <p class="mt-2">
+  Can't find your school/club/event?
+  <a href="/organizations/add" class="btn btn-sm btn-outline-primary">Add New</a>
+</p>
     <!-- Hidden User ID Field -->
     <input type="hidden" name="user_id" value="<%= session.userId %>">
 
@@ -45,6 +58,7 @@
   </div>
 </form>
 
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap-autocomplete@1.0.7/dist/bootstrap-autocomplete.min.js"></script>
 <script>
   document.querySelectorAll('.autocomplete').forEach(input => {
@@ -61,6 +75,7 @@
       onSubmit: ({ value }) => {
         input.value = value;
       }
+      
     });
   });
 </script>

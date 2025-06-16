@@ -5,15 +5,14 @@
   <h2 class="mb-4">🚗 My Rides, <%= session.userName %>!</h2>
 
   <!-- FILTERS & VIEW SWITCH -->
-  <div class="d-flex justify-content-between align-items-center flex-wrap mb-4">
-    <div class="btn-group mb-2">
-      <a href="/rides?filter=all&expired=false" class="btn btn-sm <%= filter === 'all' ? 'btn-primary' : 'btn-outline-primary' %>">All</a>
-      <a href="/rides?filter=my&expired=false" class="btn btn-sm <%= filter === 'my' ? 'btn-primary' : 'btn-outline-primary' %>">My Requests</a>
-      <a href="/rides?filter=others&expired=false" class="btn btn-sm <%= filter === 'others' ? 'btn-primary' : 'btn-outline-primary' %>">Others'</a>
-    </div>
-    <div class="form-check form-switch mb-2">
+  <div class="d-flex align-items-center mb-3">
+    <div class="form-check form-switch">
       <input class="form-check-input" type="checkbox" id="toggleView" onchange="toggleViewMode()">
       <label class="form-check-label" for="toggleView">🗋️ Card View</label>
+    </div>
+    <div class="form-check form-check-inline ms-4">
+      <input class="form-check-input" type="checkbox" id="seekingOnly" onchange="applyFilters()">
+      <label class="form-check-label" for="seekingOnly">👓 Seeking Drivers Only</label>
     </div>
   </div>
 
@@ -41,8 +40,8 @@
       <div class="p-3 border rounded shadow-sm bg-light h-100 d-flex flex-column justify-content-between">
         <h5>📣 Request a Pickup</h5>
         <form action="/requests/request-ride" method="POST" class="flex-grow-1 d-flex flex-column">
-          <input type="text" name="pickup_location" class="form-control mb-2 autocomplete" data-type="pickup" placeholder="Pickup Location" required>
-          <input type="text" name="dropoff_location" class="form-control mb-2 autocomplete" data-type="dropoff" placeholder="Dropoff Location (optional)">
+          <input type="text" name="pickup_location" class="form-control mb-2 autocomplete" data-type="organization" placeholder="Search School, Club, or Event" required>
+          <input type="text" name="dropoff_location" class="form-control mb-2 autocomplete" data-type="dropoff" placeholder="Search School, Club, or Event" required>
           <input type="datetime-local" name="pickup_time" class="form-control mb-2" required>
           <select name="child_id" class="form-select mb-2" required>
             <option disabled selected>Select Your Child</option>
@@ -72,7 +71,7 @@
       </thead>
       <tbody>
         <% rideOffers.forEach(offer => { %>
-          <tr>
+          <tr data-seats="<%= offer.available_seats %>" data-type="offer">
             <td><strong><%= offer.driver_name %></strong></td>
             <td><%= offer.school %></td>
             <td><span class="text-primary" data-time="<%= offer.pickup_time %>"><%= new Date(offer.pickup_time).toLocaleString() %></span></td>
@@ -103,7 +102,7 @@
       </thead>
       <tbody>
         <% requests.forEach(request => { %>
-          <tr>
+          <tr data-assigned="<%= request.assigned_user_id ? 'yes' : 'no' %>" data-type="request">
             <td><%= request.child_name %><br><small class="text-muted">by <%= request.user_name %></small></td>
             <td><%= request.pickup_location %></td>
             <td><%= request.dropoff_location || '—' %></td>
@@ -155,13 +154,97 @@
     });
   });
 
+  function confirmHelp(child, caregiver, pickup, dropoff, time) {
+    const dt = new Date(time).toLocaleString();
+    return confirm(`✅ Thanks for helping out!\nWe have notified ${caregiver} that you will take ${child} from ${pickup} to ${dropoff} @ ${dt}.`);
+  }
+
+  function applyFilters() {
+    const seekingOnly = document.getElementById('seekingOnly').checked;
+
+    document.querySelectorAll('tbody tr').forEach(row => {
+      const isAssigned = row.dataset.assigned === 'yes';
+      const seats = parseInt(row.dataset.seats || '1');
+      const isRequest = row.dataset.type === 'request';
+
+      const shouldHide = seekingOnly && (isRequest ? isAssigned : seats === 0);
+      row.style.display = shouldHide ? 'none' : '';
+    });
+
+    document.querySelectorAll('#rideCards .card').forEach(card => {
+      const isAssigned = card.getAttribute('data-assigned') === 'yes';
+      const seats = parseInt(card.getAttribute('data-seats') || '1');
+      const type = card.getAttribute('data-type');
+
+      const shouldHide = seekingOnly && (type === 'request' ? isAssigned : seats === 0);
+      card.style.display = shouldHide ? 'none' : '';
+    });
+  }
+
+  function populateRideCards() {
+    const cardsContainer = document.getElementById('rideCards');
+    cardsContainer.innerHTML = '';
+
+    const rideOffers = <%- JSON.stringify(rideOffers) %>;
+    const requests = <%- JSON.stringify(requests) %>;
+
+    if (rideOffers.length > 0) {
+      cardsContainer.innerHTML += `<h5 class="w-100">🚘 Ride Offers</h5>`;
+      rideOffers.forEach(offer => {
+        const card = document.createElement('div');
+        card.className = 'card p-3 shadow-sm';
+        card.style.width = '300px';
+        card.setAttribute('data-seats', offer.available_seats);
+        card.setAttribute('data-type', 'offer');
+        card.innerHTML = `
+          <h6 class="mb-1"><strong>${offer.driver_name}</strong></h6>
+          <p class="mb-1"><strong>School:</strong> ${offer.school}</p>
+          <p class="mb-1"><strong>Pickup:</strong> ${new Date(offer.pickup_time).toLocaleString()}</p>
+          <p class="mb-1"><strong>Seats:</strong> ${offer.available_seats}</p>
+          <p class="mb-0"><strong>Notes:</strong> ${offer.notes || '—'}</p>
+        `;
+        cardsContainer.appendChild(card);
+      });
+    }
+
+    if (requests.length > 0) {
+      cardsContainer.innerHTML += `<h5 class="w-100 mt-4">📣 Ride Requests</h5>`;
+      requests.forEach(req => {
+        const card = document.createElement('div');
+        card.className = 'card p-3 shadow-sm';
+        card.style.width = '300px';
+        card.setAttribute('data-assigned', req.assigned_user_id ? 'yes' : 'no');
+        card.setAttribute('data-type', 'request');
+        card.innerHTML = `
+          <h6 class="mb-1">${req.child_name}</h6>
+          <p class="mb-1"><strong>By:</strong> ${req.user_name}</p>
+          <p class="mb-1"><strong>Pickup:</strong> ${req.pickup_location}</p>
+          <p class="mb-1"><strong>Dropoff:</strong> ${req.dropoff_location || '—'}</p>
+          <p class="mb-1"><strong>Time:</strong> ${new Date(req.pickup_time).toLocaleString()}</p>
+          <p class="mb-1"><strong>Note:</strong> ${req.note || '—'}</p>
+          <p class="mb-1"><strong>Status:</strong> ${req.assigned_user_id ? `<span class='badge bg-success'>Assigned</span> <br><small>${req.assigned_driver_name}</small>` : `<span class='badge bg-warning text-dark'>Waiting</span>`}</p>
+          ${!req.assigned_user_id && req.user_id !== <%= session.userId %> ? `
+            <form action="/requests/assign-request/${req.id}" method="POST" onsubmit="return confirmHelp('${req.child_name}', '${req.user_name}', '${req.pickup_location}', '${req.dropoff_location}', '${req.pickup_time}');">
+              <button class="btn btn-sm btn-outline-success w-100 mt-2">Help</button>
+            </form>
+          ` : ''}
+        `;
+        cardsContainer.appendChild(card);
+      });
+    }
+    applyFilters();
+  }
+
   function toggleViewMode() {
     const tables = document.querySelectorAll('.ride-table');
     const cards = document.getElementById('rideCards');
     const showCards = tables[0].style.display !== 'none';
+
     tables.forEach(t => t.style.display = showCards ? 'none' : 'table');
     cards.classList.toggle('d-none', !showCards);
     cards.classList.toggle('d-flex', showCards);
+
+    if (showCards) populateRideCards();
   }
 
   window.addEventListener('DOMContentLoaded', () => {
@@ -177,85 +260,6 @@
       });
     });
   });
-
-  function confirmHelp(child, caregiver, pickup, dropoff, time) {
-    const dt = new Date(time).toLocaleString();
-    return confirm(`✅ Thanks for helping out!\nWe have notified ${caregiver} that you will take ${child} from ${pickup} to ${dropoff} @ ${dt}.`);
-  }
-
-  // Dynamically build card view
-  function populateRideCards() {
-    const cardsContainer = document.getElementById('rideCards');
-    cardsContainer.innerHTML = ''; // Clear
-
-    const rideOffers = <%- JSON.stringify(rideOffers) %>;
-    const requests = <%- JSON.stringify(requests) %>;
-
-    // RIDE OFFERS
-    if (rideOffers.length > 0) {
-      cardsContainer.innerHTML += `<h5 class="w-100">🚘 Ride Offers</h5>`;
-      rideOffers.forEach(offer => {
-        const card = document.createElement('div');
-        card.className = 'card p-3 shadow-sm';
-        card.style.width = '300px';
-        card.innerHTML = `
-          <h6 class="mb-1"><strong>${offer.driver_name}</strong></h6>
-          <p class="mb-1"><strong>School:</strong> ${offer.school}</p>
-          <p class="mb-1"><strong>Pickup:</strong> ${new Date(offer.pickup_time).toLocaleString()}</p>
-          <p class="mb-1"><strong>Seats:</strong> ${offer.available_seats}</p>
-          <p class="mb-0"><strong>Notes:</strong> ${offer.notes || '—'}</p>
-        `;
-        cardsContainer.appendChild(card);
-      });
-    }
-
-    // RIDE REQUESTS
-    if (requests.length > 0) {
-      cardsContainer.innerHTML += `<h5 class="w-100 mt-4">📣 Ride Requests</h5>`;
-      requests.forEach(req => {
-        const card = document.createElement('div');
-        card.className = 'card p-3 shadow-sm';
-        card.style.width = '300px';
-        card.innerHTML = `
-          <h6 class="mb-1">${req.child_name}</h6>
-          <p class="mb-1"><strong>By:</strong> ${req.user_name}</p>
-          <p class="mb-1"><strong>Pickup:</strong> ${req.pickup_location}</p>
-          <p class="mb-1"><strong>Dropoff:</strong> ${req.dropoff_location || '—'}</p>
-          <p class="mb-1"><strong>Time:</strong> ${new Date(req.pickup_time).toLocaleString()}</p>
-          <p class="mb-1"><strong>Note:</strong> ${req.note || '—'}</p>
-          <p class="mb-1"><strong>Status:</strong> ${
-            req.assigned_user_id
-              ? `<span class="badge bg-success">Assigned</span> <br><small>${req.assigned_driver_name}</small>`
-              : `<span class="badge bg-warning text-dark">Waiting</span>`
-          }</p>
-          ${
-            !req.assigned_user_id && req.user_id !== <%= session.userId %>
-              ? `<form action="/requests/assign-request/${req.id}" method="POST" onsubmit="return confirmHelp('${req.child_name}', '${req.user_name}', '${req.pickup_location}', '${req.dropoff_location}', '${req.pickup_time}');">
-                   <button class="btn btn-sm btn-outline-success w-100 mt-2">Help</button>
-                 </form>`
-              : ''
-          }
-        `;
-        cardsContainer.appendChild(card);
-      });
-    }
-  }
-
-  // Update toggleViewMode() to populate cards
-  function toggleViewMode() {
-    const tables = document.querySelectorAll('.ride-table');
-    const cards = document.getElementById('rideCards');
-    const showCards = tables[0].style.display !== 'none';
-
-    tables.forEach(t => t.style.display = showCards ? 'none' : 'table');
-    cards.classList.toggle('d-none', !showCards);
-    cards.classList.toggle('d-flex', showCards);
-
-    if (showCards) populateRideCards();
-  }
 </script>
-
-
-
 
 <%- include('partials/footer1') %>

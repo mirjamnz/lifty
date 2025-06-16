@@ -34,6 +34,7 @@ app.use(session({
   saveUninitialized: false
 }));
 
+
 // Routes
 app.use('/', authRoutes);
 app.use('/', dashboardRoutes);

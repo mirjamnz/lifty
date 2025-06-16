@@ -1,0 +1,51 @@
+<!--views/add-organizations.ejs -->
+<%- include('partials/header1') %>
+<%- include('partials/navbar1') %>
+
+<div class="container py-5">
+  <h2 class="mb-4">➕ Add a School, Club or Event</h2>
+
+  <form action="/organizations/add" method="POST">
+    <div class="mb-3">
+      <label for="name" class="form-label">Organization Name</label>
+      <input type="text" name="name" id="name" class="form-control" required>
+    </div>
+
+    <div class="mb-3">
+      <label for="type" class="form-label">Type</label>
+      <select name="type" id="type" class="form-select" required>
+        <option disabled selected>Select type</option>
+        <option value="school">🏫 School</option>
+        <option value="club">🏈 Club</option>
+        <option value="event">🎉 Event</option>
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label for="address" class="form-label">Address</label>
+      <input type="text" name="address" id="orgAddress" class="form-control" required>
+      <input type="hidden" name="lat" id="orgLat">
+      <input type="hidden" name="lng" id="orgLng">
+    </div>
+
+    <button type="submit" class="btn btn-primary">Add Organization</button>
+  </form>
+</div>
+
+<script>
+  function initAutocomplete() {
+    const input = document.getElementById('orgAddress');
+    const autocomplete = new google.maps.places.Autocomplete(input);
+    autocomplete.addListener('place_changed', () => {
+      const place = autocomplete.getPlace();
+      if (place.geometry) {
+        document.getElementById('orgLat').value = place.geometry.location.lat();
+        document.getElementById('orgLng').value = place.geometry.location.lng();
+      }
+    });
+  }
+</script>
+
+<script async defer src="https://maps.googleapis.com/maps/api/js?key=<%= GMAPS_API_KEY %>&libraries=places&callback=initAutocomplete"></script>
+
+<%- include('partials/footer1') %>
