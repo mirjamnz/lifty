@@ -10,12 +10,16 @@ router.get('/add', (req, res) => {
 });
 
 // GET /organizations/autocomplete
+// routes/organizations.js
 router.get('/autocomplete', async (req, res) => {
   const { term = '', type } = req.query;
+
   let query = `SELECT id, name, address, lat, lng, type FROM Organizations WHERE name LIKE ?`;
   const params = [`%${term}%`];
 
-  if (type) {
+  if (type === 'organization') {
+    query += ` AND type IN ('school', 'club', 'event')`;
+  } else if (type) {
     query += ` AND type = ?`;
     params.push(type);
   } else {
@@ -34,12 +38,16 @@ router.get('/autocomplete', async (req, res) => {
       lng: org.lng,
       type: org.type
     }));
+
+    // ✅ FIX: explicitly tell browser it's JSON
+    res.setHeader('Content-Type', 'application/json');
     res.json(results);
   } catch (err) {
-    console.error('❌ Autocomplete Error:', err.message);
+    console.error('❌ Autocomplete error:', err);
     res.status(500).json({ error: 'Autocomplete failed' });
   }
 });
+
 
 // POST /organizations/add — create
 router.post('/add', async (req, res) => {

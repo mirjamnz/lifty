@@ -1,10 +1,11 @@
+
 <%- include('partials/header1') %>
 <%- include('partials/navbar1') %>
 
 <div class="container py-5">
   <h2 class="mb-4">🚗 My Rides, <%= session.userName %>!</h2>
 
-  <!-- FILTERS & VIEW SWITCH -->
+  <!-- Filters -->
   <div class="d-flex align-items-center mb-3">
     <div class="form-check form-switch">
       <input class="form-check-input" type="checkbox" id="toggleView" onchange="toggleViewMode()">
@@ -16,19 +17,19 @@
     </div>
   </div>
 
-  <!-- SEARCH BAR -->
+  <!-- Search -->
   <div class="input-group mb-4">
     <span class="input-group-text">🔎</span>
     <input type="text" id="rideSearch" class="form-control" placeholder="Search ride offers or requests...">
   </div>
 
-  <!-- REQUEST + OFFER CTA -->
-  <div class="row g-4 mb-4 align-items-stretch">
+  <!-- Offer + Request Forms -->
+  <div class="row g-4 mb-4">
     <div class="col-md-6">
-      <div class="p-3 border rounded shadow-sm bg-light h-100 d-flex flex-column justify-content-between">
+      <div class="p-3 bg-light border rounded shadow-sm h-100 d-flex flex-column justify-content-between">
         <h5>🚘 Offer a Ride</h5>
         <form action="/rides/offer-ride" method="POST" class="flex-grow-1 d-flex flex-column">
-          <input type="text" name="school" class="form-control mb-2 autocomplete" data-type="school" placeholder="School Name" required>
+          <input name="school" type="text" class="form-control mb-2 autocomplete" data-type="school" placeholder="School Name" required>
           <input type="number" name="available_seats" class="form-control mb-2" placeholder="Seats Available" min="1" required>
           <input type="datetime-local" name="pickup_time" class="form-control mb-2" required>
           <textarea name="notes" class="form-control mb-2" placeholder="Optional notes..."></textarea>
@@ -36,12 +37,13 @@
         </form>
       </div>
     </div>
+
     <div class="col-md-6">
-      <div class="p-3 border rounded shadow-sm bg-light h-100 d-flex flex-column justify-content-between">
+      <div class="p-3 bg-light border rounded shadow-sm h-100 d-flex flex-column justify-content-between">
         <h5>📣 Request a Pickup</h5>
         <form action="/requests/request-ride" method="POST" class="flex-grow-1 d-flex flex-column">
-          <input type="text" name="pickup_location" class="form-control mb-2 autocomplete" data-type="organization" placeholder="Search School, Club, or Event" required>
-          <input type="text" name="dropoff_location" class="form-control mb-2 autocomplete" data-type="dropoff" placeholder="Search School, Club, or Event" required>
+          <input name="pickup_location" type="text" class="form-control mb-2 autocomplete" data-type="organization" placeholder="Search School, Club, or Event" required>
+          <input name="dropoff_location" type="text" class="form-control mb-2 autocomplete" data-type="organization" placeholder="Search School, Club, or Event" required>
           <input type="datetime-local" name="pickup_time" class="form-control mb-2" required>
           <select name="child_id" class="form-select mb-2" required>
             <option disabled selected>Select Your Child</option>
@@ -56,49 +58,33 @@
     </div>
   </div>
 
-  <!-- RIDE OFFERS TABLE -->
+  <!-- Offers Table -->
   <% if (rideOffers.length > 0) { %>
     <h5 class="mt-4">🚘 Ride Offers</h5>
     <table class="table table-hover ride-table mb-4">
       <thead class="table-light">
-        <tr>
-          <th>Driver</th>
-          <th>School</th>
-          <th>Pickup</th>
-          <th>Seats</th>
-          <th>Notes</th>
-        </tr>
+        <tr><th>Driver</th><th>School</th><th>Pickup</th><th>Seats</th><th>Notes</th></tr>
       </thead>
       <tbody>
         <% rideOffers.forEach(offer => { %>
           <tr data-seats="<%= offer.available_seats %>" data-type="offer">
             <td><strong><%= offer.driver_name %></strong></td>
             <td><%= offer.school %></td>
-            <td><span class="text-primary" data-time="<%= offer.pickup_time %>"><%= new Date(offer.pickup_time).toLocaleString() %></span></td>
+            <td><span data-time="<%= offer.pickup_time %>"><%= new Date(offer.pickup_time).toLocaleString() %></span></td>
             <td><%= offer.available_seats %></td>
             <td><%= offer.notes || '—' %></td>
           </tr>
         <% }) %>
       </tbody>
     </table>
-  <% } else { %>
-    <p class="text-muted">No current ride offers.</p>
   <% } %>
 
-  <!-- RIDE REQUESTS TABLE -->
+  <!-- Requests Table -->
   <% if (requests.length > 0) { %>
     <h5 class="mt-5">📣 Ride Requests</h5>
     <table class="table table-striped ride-table">
       <thead class="table-light">
-        <tr>
-          <th>Child</th>
-          <th>Pickup</th>
-          <th>Dropoff</th>
-          <th>Note</th>
-          <th>Time</th>
-          <th>Status</th>
-          <th></th>
-        </tr>
+        <tr><th>Child</th><th>Pickup</th><th>Dropoff</th><th>Note</th><th>Time</th><th>Status</th><th></th></tr>
       </thead>
       <tbody>
         <% requests.forEach(request => { %>
@@ -107,18 +93,17 @@
             <td><%= request.pickup_location %></td>
             <td><%= request.dropoff_location || '—' %></td>
             <td><%= request.note || '—' %></td>
-            <td><span class="text-info" data-time="<%= request.pickup_time %>"><%= new Date(request.pickup_time).toLocaleString() %></span></td>
+            <td><span data-time="<%= request.pickup_time %>"><%= new Date(request.pickup_time).toLocaleString() %></span></td>
             <td>
               <% if (!request.assigned_user_id) { %>
                 <span class="badge bg-warning text-dark">Waiting</span>
               <% } else { %>
-                <span class="badge bg-success">Assigned</span><br>
-                <small class="text-muted"><%= request.assigned_driver_name %></small>
+                <span class="badge bg-success">Assigned</span><br><small><%= request.assigned_driver_name %></small>
               <% } %>
             </td>
             <td>
               <% if (!request.assigned_user_id && request.user_id !== session.userId) { %>
-                <form action="/requests/assign-request/<%= request.id %>" method="POST" class="d-inline" onsubmit="return confirmHelp('<%= request.child_name %>', '<%= request.user_name %>', '<%= request.pickup_location %>', '<%= request.dropoff_location %>', '<%= request.pickup_time %>');">
+                <form action="/requests/assign-request/<%= request.id %>" method="POST" onsubmit="return confirmHelp('<%= request.child_name %>', '<%= request.user_name %>', '<%= request.pickup_location %>', '<%= request.dropoff_location %>', '<%= request.pickup_time %>');">
                   <button class="btn btn-sm btn-outline-success">Help</button>
                 </form>
               <% } %>
@@ -127,139 +112,69 @@
         <% }) %>
       </tbody>
     </table>
-  <% } else { %>
-    <p class="text-muted">No ride requests found.</p>
   <% } %>
 </div>
 
-<!-- OPTIONAL CARD VIEW -->
-<div id="rideCards" class="d-none flex-wrap gap-3"></div>
+<div id="rideCards" class="d-none flex-wrap gap-3 px-4"></div>
 
+<!-- Scripts -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap-autocomplete@1.0.7/dist/bootstrap-autocomplete.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@10.2.7/dist/css/autoComplete.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@10.2.7/dist/autoComplete.min.js"></script>
+
 <script>
-  document.querySelectorAll('.autocomplete').forEach(input => {
-    const type = input.dataset.type;
-    new window.Autocomplete(input, {
-      threshold: 1,
-      onSearch: async ({ currentValue }) => {
-        const res = await fetch(`/organizations/autocomplete?term=${encodeURIComponent(currentValue)}&type=${type}`);
-        return await res.json();
-      },
-      onResults: ({ matches }) =>
-        matches.map(m => `<li class="dropdown-item" data-value="${m.value}">${m.label}</li>`),
-      onSubmit: ({ value }) => {
-        input.value = value;
-      }
-    });
+document.addEventListener('DOMContentLoaded', () => {
+  // Human-readable times
+  document.querySelectorAll('[data-time]').forEach(el => {
+    el.innerText = moment(el.dataset.time).fromNow();
   });
 
-  function confirmHelp(child, caregiver, pickup, dropoff, time) {
-    const dt = new Date(time).toLocaleString();
-    return confirm(`✅ Thanks for helping out!\nWe have notified ${caregiver} that you will take ${child} from ${pickup} to ${dropoff} @ ${dt}.`);
-  }
-
-  function applyFilters() {
-    const seekingOnly = document.getElementById('seekingOnly').checked;
-
+  // Table search filter
+  document.getElementById('rideSearch').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
     document.querySelectorAll('tbody tr').forEach(row => {
-      const isAssigned = row.dataset.assigned === 'yes';
-      const seats = parseInt(row.dataset.seats || '1');
-      const isRequest = row.dataset.type === 'request';
-
-      const shouldHide = seekingOnly && (isRequest ? isAssigned : seats === 0);
-      row.style.display = shouldHide ? 'none' : '';
-    });
-
-    document.querySelectorAll('#rideCards .card').forEach(card => {
-      const isAssigned = card.getAttribute('data-assigned') === 'yes';
-      const seats = parseInt(card.getAttribute('data-seats') || '1');
-      const type = card.getAttribute('data-type');
-
-      const shouldHide = seekingOnly && (type === 'request' ? isAssigned : seats === 0);
-      card.style.display = shouldHide ? 'none' : '';
-    });
-  }
-
-  function populateRideCards() {
-    const cardsContainer = document.getElementById('rideCards');
-    cardsContainer.innerHTML = '';
-
-    const rideOffers = <%- JSON.stringify(rideOffers) %>;
-    const requests = <%- JSON.stringify(requests) %>;
-
-    if (rideOffers.length > 0) {
-      cardsContainer.innerHTML += `<h5 class="w-100">🚘 Ride Offers</h5>`;
-      rideOffers.forEach(offer => {
-        const card = document.createElement('div');
-        card.className = 'card p-3 shadow-sm';
-        card.style.width = '300px';
-        card.setAttribute('data-seats', offer.available_seats);
-        card.setAttribute('data-type', 'offer');
-        card.innerHTML = `
-          <h6 class="mb-1"><strong>${offer.driver_name}</strong></h6>
-          <p class="mb-1"><strong>School:</strong> ${offer.school}</p>
-          <p class="mb-1"><strong>Pickup:</strong> ${new Date(offer.pickup_time).toLocaleString()}</p>
-          <p class="mb-1"><strong>Seats:</strong> ${offer.available_seats}</p>
-          <p class="mb-0"><strong>Notes:</strong> ${offer.notes || '—'}</p>
-        `;
-        cardsContainer.appendChild(card);
-      });
-    }
-
-    if (requests.length > 0) {
-      cardsContainer.innerHTML += `<h5 class="w-100 mt-4">📣 Ride Requests</h5>`;
-      requests.forEach(req => {
-        const card = document.createElement('div');
-        card.className = 'card p-3 shadow-sm';
-        card.style.width = '300px';
-        card.setAttribute('data-assigned', req.assigned_user_id ? 'yes' : 'no');
-        card.setAttribute('data-type', 'request');
-        card.innerHTML = `
-          <h6 class="mb-1">${req.child_name}</h6>
-          <p class="mb-1"><strong>By:</strong> ${req.user_name}</p>
-          <p class="mb-1"><strong>Pickup:</strong> ${req.pickup_location}</p>
-          <p class="mb-1"><strong>Dropoff:</strong> ${req.dropoff_location || '—'}</p>
-          <p class="mb-1"><strong>Time:</strong> ${new Date(req.pickup_time).toLocaleString()}</p>
-          <p class="mb-1"><strong>Note:</strong> ${req.note || '—'}</p>
-          <p class="mb-1"><strong>Status:</strong> ${req.assigned_user_id ? `<span class='badge bg-success'>Assigned</span> <br><small>${req.assigned_driver_name}</small>` : `<span class='badge bg-warning text-dark'>Waiting</span>`}</p>
-          ${!req.assigned_user_id && req.user_id !== <%= session.userId %> ? `
-            <form action="/requests/assign-request/${req.id}" method="POST" onsubmit="return confirmHelp('${req.child_name}', '${req.user_name}', '${req.pickup_location}', '${req.dropoff_location}', '${req.pickup_time}');">
-              <button class="btn btn-sm btn-outline-success w-100 mt-2">Help</button>
-            </form>
-          ` : ''}
-        `;
-        cardsContainer.appendChild(card);
-      });
-    }
-    applyFilters();
-  }
-
-  function toggleViewMode() {
-    const tables = document.querySelectorAll('.ride-table');
-    const cards = document.getElementById('rideCards');
-    const showCards = tables[0].style.display !== 'none';
-
-    tables.forEach(t => t.style.display = showCards ? 'none' : 'table');
-    cards.classList.toggle('d-none', !showCards);
-    cards.classList.toggle('d-flex', showCards);
-
-    if (showCards) populateRideCards();
-  }
-
-  window.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('[data-time]').forEach(el => {
-      const raw = el.getAttribute('data-time');
-      el.innerText = moment(raw).fromNow();
-    });
-
-    document.getElementById('rideSearch').addEventListener('input', e => {
-      const q = e.target.value.toLowerCase();
-      document.querySelectorAll('tbody tr').forEach(row => {
-        row.style.display = row.innerText.toLowerCase().includes(q) ? '' : 'none';
-      });
+      row.style.display = row.innerText.toLowerCase().includes(q) ? '' : 'none';
     });
   });
+
+  // ✅ Autocomplete logic
+  document.querySelectorAll('.autocomplete').forEach(input => {
+    const type = input.dataset.type || 'organization';
+
+    new autoComplete({
+      selector: () => input,
+      threshold: 1,
+      debounce: 200,
+      searchEngine: "loose",
+      data: {
+        src: async (query) => {
+          try {
+            const res = await fetch(`/organizations/autocomplete?term=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}`);
+            return await res.json(); // [{ label: 'Westlake Girls', value: 'Westlake Girls' }, ...]
+          } catch (err) {
+            console.error("Autocomplete fetch error", err);
+            return [];
+          }
+        },
+        keys: ["label"] // allow searching inside the label field
+      },
+      resultsList: {
+        noResults: true,
+        maxResults: 10
+      },
+      resultItem: {
+  highlight: true,
+  element: (el, data) => {
+    el.innerHTML = `<div class="dropdown-item">${data.value.label}</div>`; // ✅ show the label in dropdown
+  }
+},
+onSelection: (feedback) => {
+  input.value = feedback.selection.value.label; // ✅ fill in the input with selected label
+}
+
+    });
+  });
+});
 </script>
 
 <%- include('partials/footer1') %>
