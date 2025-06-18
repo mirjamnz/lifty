@@ -1,99 +1,130 @@
-<!--views/dashboard.ejs -->
 <%- include('partials/header1') %>
 <%- include('partials/navbar1') %>
 
 <div class="container py-5">
   <% if (session.success) { %>
-  <div class="alert alert-success alert-dismissible fade show" role="alert">
-    <%= session.success %>
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-  </div>
-  <% session.success = null; %>
-<% } %>
-  <h2 class="mb-4">👋 Welcome, <%= session.userName %>!</h2>
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+      <%= session.success %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    <% session.success = null; %>
+  <% } %>
 
-  <!-- Address Section -->
-  <div class="card mb-4 shadow-sm">
+  <h2 class="mb-4 fw-semibold">👋 Welcome, <%= session.userName %>!</h2>
+
+  <!-- Home Address -->
+  <div class="card mb-4 shadow-sm rounded-4">
     <div class="card-body">
-      <h5 class="card-title">🏠 Your Home Address</h5>
+      <h5 class="card-title fw-semibold">🏠 Your Home Address</h5>
       <form action="/update-address" method="POST" class="row g-2" onsubmit="return validateCoords();">
         <div class="col-md-8">
-          <input type="text" name="home_address" id="homeAddress" class="form-control" value="<%= user.home_address || '' %>" required>
+          <input type="text" name="home_address" id="homeAddress" class="form-control rounded-pill" value="<%= user.home_address || '' %>" required>
         </div>
         <input type="hidden" name="home_lat" id="homeLat">
         <input type="hidden" name="home_lng" id="homeLng">
-        <div class="col-md-2">
-          <button type="submit" class="btn btn-success w-100">📍 Save</button>
+        <div class="col-md-4">
+          <button type="submit" class="btn btn-success w-100 rounded-pill">📍 Save</button>
         </div>
       </form>
-      <div id="map" class="mt-3 rounded" style="height: 300px;"></div>
+      <div id="map" class="mt-3 rounded shadow-sm" style="height: 300px;"></div>
     </div>
   </div>
 
-      <!-- Add Organizations via Button -->
-    <p class="mt-2">
-  Can't find your school/club/event?
-  <a href="/organizations/add" class="btn btn-sm btn-outline-primary">Add New</a>
-</p>
+  <!-- Children + Organizations in 2 columns -->
+ <div class="row">
+  <!-- 👶 Your Children -->
+  <div class="col-md-6 mb-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title mb-3">👶 Your Children</h5>
 
-  <!-- Children Section -->
-  <div class="card shadow-sm mb-5">
-    <div class="card-body">
-      <h4 class="card-title mb-3">👶 Your Children</h4>
+        <% if (children.length > 0) { %>
+          <ul class="list-group mb-4">
+            <% children.forEach(child => { %>
+              <li class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center">
+                  <div>
+                    <strong><%= child.name %></strong> – <%= child.school %>
+                    <% if (child.club) { %> | Club: <%= child.club %> <% } %>
+                  </div>
+                  <div>
+                    <button class="btn btn-sm btn-outline-secondary me-2" data-bs-toggle="collapse" data-bs-target="#editForm<%= child.id %>">✏️</button>
+                    <a href="/delete-child/<%= child.id %>" class="btn btn-sm btn-outline-danger">🗑</a>
+                  </div>
+                </div>
+                <div class="collapse mt-2" id="editForm<%= child.id %>">
+                  <form action="/edit-child/<%= child.id %>" method="POST" class="row g-2">
+                    <div class="col-md-4">
+                      <input type="text" name="name" value="<%= child.name %>" class="form-control" required>
+                    </div>
+                    <div class="col-md-4">
+                      <input type="text" name="school" value="<%= child.school %>" class="form-control" required>
+                    </div>
+                    <div class="col-md-3">
+                      <input type="text" name="club" value="<%= child.club %>" class="form-control" placeholder="Club (optional)">
+                    </div>
+                    <div class="col-md-1">
+                      <button type="submit" class="btn btn-primary w-100">💾</button>
+                    </div>
+                  </form>
+                </div>
+              </li>
+            <% }) %>
+          </ul>
+        <% } else { %>
+          <p class="text-muted">No children registered yet.</p>
+        <% } %>
 
-      <% if (children.length > 0) { %>
-        <ul class="list-group mb-4">
-          <% children.forEach(child => { %>
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-              <div>
-                <strong><%= child.name %></strong> – <%= child.school %>
-                <% if (child.club) { %> | Club: <%= child.club %> <% } %>
-              </div>
-              <div>
-                <button class="btn btn-sm btn-outline-secondary me-2" data-bs-toggle="collapse" data-bs-target="#editForm<%= child.id %>">✏️ Edit</button>
-                <a href="/delete-child/<%= child.id %>" class="btn btn-sm btn-outline-danger">🗑 Delete</a>
-              </div>
-            </li>
-            <li class="list-group-item collapse" id="editForm<%= child.id %>">
-              <form action="/edit-child/<%= child.id %>" method="POST" class="row g-2">
-                <div class="col-md-4">
-                  <input type="text" name="name" value="<%= child.name %>" class="form-control" required>
-                </div>
-                <div class="col-md-4">
-                  <input type="text" name="school" value="<%= child.school %>" class="form-control" required>
-                </div>
-                <div class="col-md-3">
-                  <input type="text" name="club" value="<%= child.club %>" class="form-control" placeholder="Club (optional)">
-                </div>
-                <div class="col-md-1">
-                  <button type="submit" class="btn btn-primary w-100">💾</button>
-                </div>
-              </form>
-            </li>
-          <% }) %>
-        </ul>
-      <% } else { %>
-        <p class="text-muted">No children registered yet.</p>
-      <% } %>
+        <h6>➕ Add New Child</h6>
+        <form action="/add-child" method="POST" class="row g-2 mt-2">
+          <div class="col-md-4">
+            <input type="text" name="name" class="form-control" placeholder="Name" required>
+          </div>
+          <div class="col-md-4">
+            <input type="text" name="school" class="form-control" placeholder="School" required>
+          </div>
+          <div class="col-md-3">
+            <input type="text" name="club" class="form-control" placeholder="Club (optional)">
+          </div>
+          <div class="col-md-1">
+            <button type="submit" class="btn btn-success w-100">Add</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
 
-      <h5 class="mt-4">➕ Add New Child</h5>
-      <form action="/add-child" method="POST" class="row g-2 mt-2">
-        <div class="col-md-4">
-          <input type="text" name="name" class="form-control" placeholder="Child's Name" required>
+  <!-- 🏫 Clubs & Schools -->
+  <div class="col-md-6 mb-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body d-flex flex-column">
+        <h5 class="card-title">🏫 Clubs & Schools</h5>
+
+        <form class="input-group mb-3" method="GET" action="/organizations/search">
+          <input type="text" name="q" class="form-control" placeholder="Search...">
+          <button class="btn btn-outline-secondary" type="submit">🔍</button>
+        </form>
+
+        <div style="max-height: 280px; overflow-y: auto;" class="mb-3 border rounded p-2">
+          <% if (organizations && organizations.length > 0) { %>
+            <ul class="list-group">
+              <% organizations.forEach(org => { %>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                  <span><%= org.name %> <small class="text-muted">(<%= org.type %>)</small></span>
+                </li>
+              <% }) %>
+            </ul>
+          <% } else { %>
+            <p class="text-muted">No organizations available yet.</p>
+          <% } %>
         </div>
-        <div class="col-md-4">
-          <input type="text" name="school" class="form-control" placeholder="School" required>
-        </div>
-        <div class="col-md-3">
-          <input type="text" name="club" class="form-control" placeholder="Club (optional)">
-        </div>
-        <div class="col-md-1">
-          <button type="submit" class="btn btn-success w-100">Add</button>
-        </div>
-      </form>
+
+        <a href="/organizations/add" class="btn btn-outline-primary mt-auto w-100">➕ Add New School or Club</a>
+      </div>
     </div>
   </div>
 </div>
+
 
 <script>
   function validateCoords() {
@@ -116,6 +147,7 @@
       zoom: 12
     });
     new google.maps.Marker({ position: userLoc, map, title: "Your Home" });
+
     <% neighbors.forEach(n => { %>
       new google.maps.Marker({
         position: { lat: <%= n.home_lat %>, lng: <%= n.home_lng %> },
@@ -123,6 +155,7 @@
         title: "<%= n.name %>"
       });
     <% }); %>
+
     const autocomplete = new google.maps.places.Autocomplete(document.getElementById('homeAddress'));
     autocomplete.addListener('place_changed', function () {
       const place = autocomplete.getPlace();
@@ -132,7 +165,18 @@
       }
     });
   }
-</script>
-<script async defer src="https://maps.googleapis.com/maps/api/js?key=<%= GMAPS_API_KEY %>&libraries=places&callback=initMap"></script>
 
+  // Live search filter for organization list
+  document.addEventListener('DOMContentLoaded', () => {
+    const input = document.getElementById('orgSearch');
+    input?.addEventListener('keyup', () => {
+      const val = input.value.toLowerCase();
+      document.querySelectorAll('#orgList li').forEach(li => {
+        li.style.display = li.innerText.toLowerCase().includes(val) ? '' : 'none';
+      });
+    });
+  });
+</script>
+
+<script async defer src="https://maps.googleapis.com/maps/api/js?key=<%= GMAPS_API_KEY %>&libraries=places&callback=initMap"></script>
 <%- include('partials/footer1') %>

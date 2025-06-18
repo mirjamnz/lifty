@@ -124,12 +124,10 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  // Human-readable times
   document.querySelectorAll('[data-time]').forEach(el => {
     el.innerText = moment(el.dataset.time).fromNow();
   });
 
-  // Table search filter
   document.getElementById('rideSearch').addEventListener('input', e => {
     const q = e.target.value.toLowerCase();
     document.querySelectorAll('tbody tr').forEach(row => {
@@ -137,7 +135,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // ✅ Autocomplete logic
   document.querySelectorAll('.autocomplete').forEach(input => {
     const type = input.dataset.type || 'organization';
 
@@ -150,31 +147,35 @@ document.addEventListener('DOMContentLoaded', () => {
         src: async (query) => {
           try {
             const res = await fetch(`/organizations/autocomplete?term=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}`);
-            return await res.json(); // [{ label: 'Westlake Girls', value: 'Westlake Girls' }, ...]
+            const items = await res.json();
+            return items.map(item => ({
+              label: item.label,
+              value: item.label  // 👈 just the string
+            }));
           } catch (err) {
             console.error("Autocomplete fetch error", err);
             return [];
           }
         },
-        keys: ["label"] // allow searching inside the label field
+        keys: ["label"]
       },
       resultsList: {
         noResults: true,
         maxResults: 10
       },
       resultItem: {
-  highlight: true,
-  element: (el, data) => {
-    el.innerHTML = `<div class="dropdown-item">${data.value.label}</div>`; // ✅ show the label in dropdown
-  }
-},
-onSelection: (feedback) => {
-  input.value = feedback.selection.value.label; // ✅ fill in the input with selected label
-}
-
+        highlight: true,
+        element: (el, data) => {
+          el.innerHTML = `<div class="dropdown-item">${data.match}</div>`;
+        }
+      },
+      onSelection: (feedback) => {
+        input.value = feedback.selection.value; // ✅ now a plain string!
+      }
     });
   });
 });
 </script>
+
 
 <%- include('partials/footer1') %>

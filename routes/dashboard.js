@@ -16,18 +16,26 @@ router.get('/dashboard', async (req, res) => {
       FROM Users
       WHERE home_lat IS NOT NULL AND id != ?
     `, [userId]);
+    const [organizations] = await db.query(`
+      SELECT id, name, type
+      FROM Organizations
+      ORDER BY name ASC
+      LIMIT 50
+    `);
 
     res.render('dashboard', {
       session: req.session,
       user,
       children,
-      neighbors
+      neighbors,
+      organizations
     });
   } catch (err) {
     console.error('Dashboard error:', err);
     res.status(500).send('Error loading dashboard.');
   }
 });
+
 
 // Set Home address
 router.post('/update-address', async (req, res) => {
