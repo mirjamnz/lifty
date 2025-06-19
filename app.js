@@ -6,48 +6,47 @@ dotenv.config();
 
 const app = express();
 
-// Route imports
-const authRoutes = require('./routes/auth');
-const dashboardRoutes = require('./routes/dashboard');
-const rideRequestRoutes = require('./routes/rideRequests');
-const rideRoutes = require('./routes/rides');
-const orgRoutes = require('./routes/organizations');
-
-// Middleware
-app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*'); // ⚠️ allow all for dev
-  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  next();
-});
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static('public'));
-
+// View engine setup
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// Set GMAPS API key for EJS views
-app.use((req, res, next) => {
-  res.locals.GMAPS_API_KEY = process.env.GMAPS_API_KEY;
-  next();
-});
+// Static files
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Session
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// ✅ Session middleware must be BEFORE routes
 app.use(session({
   secret: process.env.SESSION_SECRET || 'lifty_secret_key',
   resave: false,
   saveUninitialized: false
 }));
 
+// ✅ Inject GMAPS API key into all EJS views
+app.use((req, res, next) => {
+  res.locals.GMAPS_API_KEY = process.env.GMAPS_API_KEY || '';
+  next();
+});
 
-// Routes
+// ✅ Route imports
+const authRoutes = require('./routes/auth');
+const dashboardRoutes = require('./routes/dashboard');
+const rideRequestRoutes = require('./routes/rideRequests');
+const rideRoutes = require('./routes/rides');
+const orgRoutes = require('./routes/organizations');
+const childDashboardRoutes = require('./routes/childDashboard');
+
+// ✅ Mount routes
 app.use('/', authRoutes);
 app.use('/', dashboardRoutes);
 app.use('/requests', rideRequestRoutes);
 app.use('/rides', rideRoutes);
 app.use('/organizations', orgRoutes);
+app.use('/', childDashboardRoutes); // this relies on session, so comes after session setup
 
-// Home
+// Home page
 app.get('/', (req, res) => {
   if (req.session.userId) {
     res.redirect('/dashboard');
@@ -62,8 +61,8 @@ app.use((err, req, res, next) => {
   res.status(500).send('Something broke!');
 });
 
-// Start
-const PORT = 3033;
+// Start server
+const PORT = process.env.PORT || 3033;
 app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
+  console.log(`✅ Server running at http://localhost:${PORT}`);
 });

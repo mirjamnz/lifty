@@ -1,0 +1,84 @@
+<!--views/child-dashboard.ejs -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lifty – <%= child.name %>'s Dashboard</title>
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+  <div class="container my-4">
+    <!-- Welcome Message -->
+    <h1 class="mb-4">Welcome, <%= child.name %>!</h1>
+
+    <!-- Your Ride Requests Section -->
+    <h2>Your Ride Requests</h2>
+    <% if (!requests || requests.length === 0) { %>
+      <p class="text-muted">No ride requests found.</p>
+    <% } else { %>
+      <div class="row mb-5">
+        <% requests.forEach(function(request) { %>
+          <div class="col-md-6 col-lg-4"><!-- Card column -->
+            <div class="card mb-3">
+              <div class="card-body">
+                <h5 class="card-title">Ride to <%= request.destination %></h5>
+                <p class="card-text">
+                  <strong>Pickup:</strong> <%= request.pickup %><br>
+                  <strong>Drop-off:</strong> <%= request.destination %><br>
+                  <strong>Date & Time:</strong> <%= new Date(request.date).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) %>
+                </p>
+                <% if (request.status) { %>
+                  <p class="card-text">
+                    <small class="text-muted">Status: <%= request.status %></small>
+                  </p>
+                <% } %>
+                <!-- Example action button (no actual functionality) -->
+                <a href="#" class="btn btn-primary btn-sm">View</a>
+              </div>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+
+    <!-- Your Ride Offers Section -->
+    <h2>Your Ride Offers</h2>
+    <% if (!offers || offers.length === 0) { %>
+      <p class="text-muted">No ride offers found.</p>
+    <% } else { %>
+      <div class="row">
+        <% offers.forEach(function(offer) { %>
+          <div class="col-md-6 col-lg-4"><!-- Card column -->
+            <div class="card mb-3">
+              <div class="card-body">
+                <h5 class="card-title">Ride to <%= offer.destination %></h5>
+                <p class="card-text">
+                  <strong>Pickup:</strong> <%= offer.pickup %><br>
+                  <strong>Drop-off:</strong> <%= offer.destination %><br>
+                  <strong>Date & Time:</strong> <%= new Date(offer.date).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) %>
+                </p>
+                <% if (offer.status) { %>
+                  <p class="card-text">
+                    <small class="text-muted">Status: <%= offer.status %></small>
+                  </p>
+                <% } %>
+                <!-- Example action button (no actual functionality) -->
+                <a href="#" class="btn btn-primary btn-sm">View</a>
+              </div>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+  </div>
+
+  <!-- Bootstrap 5 JS bundle (with Popper) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+
+<%- include('partials/footer1') %>

@@ -14,6 +14,27 @@
   <% session.success = null; %>
 <% } %>
 
+<h5>👶 Add a New Child</h5>
+<form action="/dashboard/add-child" method="POST">
+  <div class="mb-2">
+    <input type="text" name="child_name" class="form-control" placeholder="Child's name" required>
+  </div>
+  <div class="mb-2">
+    <input type="text" name="child_email" class="form-control" placeholder="Login email for child" required>
+  </div>
+  <div class="mb-2">
+    <input type="password" name="child_password" class="form-control" placeholder="Password for child" required>
+  </div>
+  <div class="mb-2">
+    <input type="text" name="school" class="form-control" placeholder="School">
+  </div>
+  <div class="mb-2">
+    <input type="text" name="club" class="form-control" placeholder="Club">
+  </div>
+  <button class="btn btn-primary">Add Child</button>
+</form>
+
+
     <!-- Add Organizations via Button -->
     <p class="mt-2">
   Can't find your school/club/event?
