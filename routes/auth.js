@@ -46,10 +46,11 @@ router.post('/login', async (req, res) => {
   }
 
   try {
+    // First, try to find user by email
     let [users] = await db.query('SELECT * FROM Users WHERE email = ?', [emailOrUsername]);
 
+    // If not found, try username (stored in name column)
     if (users.length === 0) {
-      // Try as username (stored in `name`)
       [users] = await db.query('SELECT * FROM Users WHERE name = ?', [emailOrUsername]);
     }
 
@@ -69,11 +70,13 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // ✅ Success: Set session
+    // ✅ Set session values
     req.session.userId = user.id;
     req.session.userName = user.name;
     req.session.role = user.role;
+    req.session.is_admin = user.is_admin === 1;
 
+    // Child user
     if (user.role === 'child') {
       const [[child]] = await db.query(
         'SELECT * FROM Children WHERE id = ?',
@@ -83,8 +86,13 @@ router.post('/login', async (req, res) => {
       return res.redirect('/child-dashboard');
     }
 
-    // Regular parent user
-    res.redirect('/dashboard');
+    // Admin user
+    if (user.is_admin) {
+      return res.redirect('/admin/dashboard');
+    }
+
+    // Default: parent or regular user
+    return res.redirect('/dashboard');
   } catch (err) {
     console.error('❌ Login Error:', err);
     res.status(500).send('Login failed.');

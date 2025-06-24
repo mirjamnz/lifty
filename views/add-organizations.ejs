@@ -1,4 +1,4 @@
-<!--views/add-organizations.ejs -->
+<!-- views/add-organizations.ejs -->
 <%- include('partials/header1') %>
 <%- include('partials/navbar1') %>
 
@@ -6,13 +6,12 @@
   <h2 class="mb-4">➕ Add a School, Club or Event</h2>
 
   <% if (session.error) { %>
-  <div class="alert alert-danger alert-dismissible fade show" role="alert">
-    <%= session.error %>
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-  </div>
-  <% session.error = null; %>
-<% } %>
-
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+      <%= session.error %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    <% session.error = null; %>
+  <% } %>
 
   <form action="/organizations/add" method="POST">
     <div class="mb-3">

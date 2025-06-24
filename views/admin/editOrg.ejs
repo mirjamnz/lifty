@@ -1,0 +1,27 @@
+<!--views/admin/editOrg.ejs -->
+<%- include('../partials/header1') %>
+<%- include(session && session.is_admin ? '../partials/navbar2' : '../partials/navbar1') %>
+
+
+<div class="container py-5">
+  <h2 class="mb-4">✏️ Edit Organization</h2>
+
+  <form method="POST" action="/admin/organizations/<%= org.id %>/edit">
+    <div class="mb-3">
+      <label class="form-label">Name</label>
+      <input type="text" name="name" value="<%= org.name %>" class="form-control" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Type</label>
+      <input type="text" name="type" value="<%= org.type %>" class="form-control" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Address</label>
+      <input type="text" name="address" value="<%= org.address %>" class="form-control">
+    </div>
+    <button type="submit" class="btn btn-success">💾 Save Changes</button>
+    <a href="/admin/dashboard" class="btn btn-secondary">Cancel</a>
+  </form>
+</div>
+
+<%- include('../partials/footer1') %>

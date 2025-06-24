@@ -1,0 +1,15 @@
+<!--views/403.ejs -->
+<%- include('partials/header1') %>
+
+<div class="container py-5 text-center">
+  <h1 class="display-4 text-danger">⛔ Access Denied</h1>
+  <p class="lead"><%= message || "You do not have permission to access this page." %></p>
+
+  <% if (!session || !session.userId) { %>
+    <a href="/login" class="btn btn-primary mt-4">🔐 Login</a>
+  <% } else { %>
+    <a href="/dashboard" class="btn btn-secondary mt-4">⬅️ Back to Dashboard</a>
+  <% } %>
+</div>
+
+<%- include('partials/footer1') %>

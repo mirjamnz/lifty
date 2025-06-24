@@ -2,9 +2,11 @@ const express = require('express');
 const session = require('express-session');
 const path = require('path');
 const dotenv = require('dotenv');
-dotenv.config();
+dotenv.config(); // ✅ Move dotenv early
 
-const app = express();
+const app = express(); // ✅ MUST come before any app.use(...)
+
+const adminRoutes = require('./routes/admin');
 
 // View engine setup
 app.set('view engine', 'ejs');
@@ -30,7 +32,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// ✅ Route imports
+// ✅ Mount routes
+app.use('/admin', adminRoutes); // ✅ now safe!
+
 const authRoutes = require('./routes/auth');
 const dashboardRoutes = require('./routes/dashboard');
 const rideRequestRoutes = require('./routes/rideRequests');
@@ -38,13 +42,12 @@ const rideRoutes = require('./routes/rides');
 const orgRoutes = require('./routes/organizations');
 const childDashboardRoutes = require('./routes/childDashboard');
 
-// ✅ Mount routes
 app.use('/', authRoutes);
 app.use('/', dashboardRoutes);
 app.use('/requests', rideRequestRoutes);
 app.use('/rides', rideRoutes);
 app.use('/organizations', orgRoutes);
-app.use('/', childDashboardRoutes); // this relies on session, so comes after session setup
+app.use('/', childDashboardRoutes);
 
 // Home page
 app.get('/', (req, res) => {
