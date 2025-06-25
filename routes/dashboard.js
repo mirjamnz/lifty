@@ -59,7 +59,6 @@ router.post('/update-address', async (req, res) => {
   }
 });
 
-
 // POST /add-child
 router.post('/add-child', async (req, res) => {
   const parentId = req.session.userId;
@@ -73,7 +72,6 @@ router.post('/add-child', async (req, res) => {
   }
 
   try {
-    // 1. Insert child into Children table
     const [childResult] = await db.query(
       'INSERT INTO Children (user_id, name, school, club) VALUES (?, ?, ?, ?)',
       [parentId, name.trim(), school.trim(), club?.trim() || null]
@@ -81,10 +79,8 @@ router.post('/add-child', async (req, res) => {
 
     const childId = childResult.insertId;
 
-    // 2. Optional: Create child user account
     if (child_username && child_password) {
       const hashed = await bcrypt.hash(child_password, 10);
-
       try {
         await db.query(
           `INSERT INTO Users (name, username, email, password_hash, role, parent_id, child_profile_id)
@@ -114,6 +110,51 @@ router.post('/add-child', async (req, res) => {
   }
 });
 
+// POST /edit-child/:id
+router.post('/edit-child/:id', async (req, res) => {
+  const parentId = req.session.userId;
+  const childId = req.params.id;
+  const { name, school, club } = req.body;
+
+  if (!parentId || !childId || !name || !school) {
+    return res.status(400).send('Parent ID, child ID, name, and school are required.');
+  }
+
+  try {
+    // Verify the child belongs to the parent
+    const [[child]] = await db.query(
+      'SELECT * FROM Children WHERE id = ? AND user_id = ?',
+      [childId, parentId]
+    );
+    if (!child) {
+      return res.status(403).send('Unauthorized or child not found.');
+    }
+
+    await db.query(
+      'UPDATE Children SET name = ?, school = ?, club = ? WHERE id = ?',
+      [name.trim(), school.trim(), club?.trim() || null, childId]
+    );
+
+    // Update the associated User record if it exists
+    const [[user]] = await db.query(
+      'SELECT * FROM Users WHERE child_profile_id = ?',
+      [childId]
+    );
+    if (user) {
+      await db.query(
+        'UPDATE Users SET name = ? WHERE child_profile_id = ?',
+        [name.trim(), childId]
+      );
+    }
+
+    req.session.success = `✅ Child '${name}' updated successfully.`;
+    res.redirect('/dashboard');
+  } catch (err) {
+    console.error('❌ Edit child error:', err.message, '\n', err.stack);
+    req.session.error = "Something went wrong while editing the child.";
+    res.redirect('/dashboard');
+  }
+});
 
 // GET /delete-child/:id
 router.get('/delete-child/:id', async (req, res) => {
