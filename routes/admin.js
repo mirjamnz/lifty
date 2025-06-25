@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const isAdmin = require('../middleware/isAdmin');
+const bcrypt = require('bcrypt'); // Add bcrypt for password hashing
 
 router.use(isAdmin);
 
@@ -83,7 +84,7 @@ router.get('/organizations/add', (req, res) => {
 // Add Organization (POST)
 router.post('/organizations/add', async (req, res) => {
   const { name, address, type } = req.body;
-  const userId = req.session.userId; // Get the admin's userId from session
+  const userId = req.session.userId;
   if (!name || !type || !userId) {
     return res.status(400).send('Name, type, and admin session are required.');
   }
@@ -96,6 +97,105 @@ router.post('/organizations/add', async (req, res) => {
   } catch (err) {
     console.error('Add org error:', err);
     res.status(500).send('Could not add organization: ' + err.message);
+  }
+});
+
+// Add User (GET)
+router.get('/users/add', async (req, res) => {
+  try {
+    const [users] = await db.query('SELECT id, name, role FROM Users');
+    res.render('admin/addUser', { session: req.session, users });
+  } catch (err) {
+    console.error('Load add user page error:', err);
+    res.status(500).send('Could not load add user page');
+  }
+});
+
+router.post('/users/add', async (req, res) => {
+  const { name, email, password, role, parent_id } = req.body;
+  if (!name || !email || !password || !role) {
+    return res.status(400).send('All fields are required.');
+  }
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    let query = 'INSERT INTO Users (name, email, password_hash, role, created_at';
+    let values = [name.trim(), email.trim(), hashedPassword, role];
+
+    if (role === 'child' && parent_id) {
+      query += ', parent_id';
+      values.push(parseInt(parent_id));
+      // Validate parent exists and is a parent
+      const [[parent]] = await db.query('SELECT role FROM Users WHERE id = ?', [parent_id]);
+      if (!parent || parent.role !== 'parent') {
+        return res.status(400).send('Selected parent is invalid.');
+      }
+    }
+    query += ') VALUES (?, ?, ?, ?, NOW()';
+    if (role === 'child' && parent_id) query += ', ?';
+    query += ')';
+
+    const [result] = await db.query(query, values);
+    const newUserId = result.insertId;
+
+    // If child, create a corresponding Children entry
+    if (role === 'child' && parent_id) {
+      await db.query(
+        'INSERT INTO Children (user_id, name, school, created_at) VALUES (?, ?, ?, NOW())',
+        [newUserId, name.trim(), 'TBD'] // Placeholder school
+      );
+    }
+    res.redirect('/admin/dashboard');
+  } catch (err) {
+    console.error('Add user error:', err);
+    res.status(500).send('Could not add user: ' + err.message);
+  }
+});
+
+// Add User (POST)
+router.post('/users/add', async (req, res) => {
+  const { name, email, password, role } = req.body;
+  if (!name || !email || !password || !role) {
+    return res.status(400).send('All fields are required.');
+  }
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await db.query(
+      'INSERT INTO Users (name, email, password_hash, role, created_at) VALUES (?, ?, ?, ?, NOW())',
+      [name.trim(), email.trim(), hashedPassword, role]
+    );
+    res.redirect('/admin/dashboard');
+  } catch (err) {
+    console.error('Add user error:', err);
+    res.status(500).send('Could not add user: ' + err.message);
+  }
+});
+
+// Add Child (GET)
+router.get('/children/add', async (req, res) => {
+  try {
+    const [users] = await db.query('SELECT id, name, role FROM Users');
+    res.render('admin/addChild', { session: req.session, users });
+  } catch (err) {
+    console.error('Load add child page error:', err);
+    res.status(500).send('Could not load add child page');
+  }
+});
+
+// Add Child (POST)
+router.post('/children/add', async (req, res) => {
+  const { name, school, club, user_id } = req.body;
+  if (!name || !school || !user_id) {
+    return res.status(400).send('Name, school, and parent user ID are required.');
+  }
+  try {
+    await db.query(
+      'INSERT INTO Children (user_id, name, school, club, created_at) VALUES (?, ?, ?, ?, NOW())',
+      [user_id, name.trim(), school.trim(), club.trim() || null]
+    );
+    res.redirect('/admin/dashboard');
+  } catch (err) {
+    console.error('Add child error:', err);
+    res.status(500).send('Could not add child: ' + err.message);
   }
 });
 
