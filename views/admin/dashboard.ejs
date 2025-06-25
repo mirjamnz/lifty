@@ -2,29 +2,32 @@
 <%- include('../partials/header1') %>
 <%- include(session && session.is_admin ? '../partials/navbar2' : '../partials/navbar1') %>
 
-
 <div class="container py-5">
   <h2 class="mb-4 fw-bold">🛠 Admin Dashboard</h2>
 
   <div class="row">
+
     <!-- Organizations -->
-    <div class="col-md-6">
-      <h4>🏫 Organizations</h4>
-      <table class="table table-bordered table-sm table-striped">
-        <thead><tr><th>Name</th><th>Type</th><th>Actions</th></tr></thead>
-        <tbody>
-          <% organizations.forEach(org => { %>
-            <tr>
-              <td><%= org.name %></td>
-              <td><%= org.type %></td>
-              <td>
-                <a href="/admin/organizations/<%= org.id %>/edit" class="btn btn-sm btn-outline-primary">Edit</a>
-              </td>
-            </tr>
-          <% }) %>
-        </tbody>
-      </table>
-    </div>
+<div class="col-md-6">
+  <h4>🏫 Organizations</h4>
+  <a href="/admin/organizations/add" class="btn btn-primary mb-3">➕ Add New Organization</a>
+  <table class="table table-bordered table-sm table-striped">
+    <thead><tr><th>Name</th><th>Type</th><th>Actions</th></tr></thead>
+    <tbody>
+      <% organizations.forEach(org => { %>
+        <tr>
+          <td><%= org.name %></td>
+          <td><%= org.type %></td>
+          <td>
+            <form action="/admin/organizations/<%= org.id %>/edit" method="GET" style="display:inline;">
+              <button type="submit" class="btn btn-sm btn-outline-primary">Edit</button>
+            </form>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
 
     <!-- Users -->
     <div class="col-md-6">
@@ -39,10 +42,10 @@
               <td><%= user.is_blocked ? "Yes" : "No" %></td>
               <td>
                 <form action="/admin/users/<%= user.id %>/block" method="POST" style="display:inline;">
-                  <button class="btn btn-sm btn-warning"><%= user.is_blocked ? "Unblock" : "Block" %></button>
+                  <button type="submit" class="btn btn-sm btn-warning"><%= user.is_blocked ? "Unblock" : "Block" %></button>
                 </form>
-                <form action="/admin/users/<%= user.id %>/delete" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure?');">
-                  <button class="btn btn-sm btn-danger">Delete</button>
+                <form action="/admin/users/<%= user.id %>/delete" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete <%= user.name %>?');">
+                  <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                 </form>
               </td>
             </tr>

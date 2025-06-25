@@ -30,8 +30,8 @@
     </div>
   </div>
 
-  <!-- Children + Organizations in 2 columns -->
- <div class="row">
+<!-- Children + Organizations in 2 columns -->
+<div class="row">
   <!-- 👶 Your Children -->
   <div class="col-md-6 mb-4">
     <div class="card shadow-sm h-100">
@@ -76,27 +76,28 @@
         <% } %>
 
         <form action="/add-child" method="POST" class="row g-2 mt-2">
-  <div class="col-md-3">
-    <input type="text" name="name" class="form-control" placeholder="Child's Name" required>
-  </div>
-  <div class="col-md-3">
-    <input type="text" name="school" class="form-control" placeholder="School" required>
-  </div>
-  <div class="col-md-2">
-    <input type="text" name="club" class="form-control" placeholder="Club (optional)">
-  </div>
-  <div class="col-md-2">
-    <input type="text" name="child_username" class="form-control" placeholder="Username">
-  </div>
-  <div class="col-md-1">
-    <input type="password" name="child_password" class="form-control" placeholder="Password">
-  </div>
-  <div class="col-md-1">
-    <button type="submit" class="btn btn-success w-100">Add</button>
-  </div>
-</form>
-
-
+          <div class="col-md-3">
+            <input type="text" name="name" class="form-control" placeholder="Child's Name" required>
+          </div>
+          <div class="col-md-3">
+            <input type="text" name="school" class="form-control" placeholder="School" required>
+          </div>
+          <div class="col-md-2">
+            <input type="text" name="club" class="form-control" placeholder="Club (optional)">
+          </div>
+          <div class="col-md-2">
+            <input type="text" name="child_username" class="form-control" placeholder="Username">
+          </div>
+          <div class="col-md-1">
+            <input type="password" name="child_password" class="form-control" placeholder="Password">
+          </div>
+          <div class="col-md-1">
+            <button type="submit" class="btn btn-success w-100">Add</button>
+          </div>
+        </form>
+      </div> <!-- end .card-body -->
+    </div> <!-- end .card -->
+  </div> <!-- end .col-md-6 👶 -->
 
   <!-- 🏫 Clubs & Schools -->
   <div class="col-md-6 mb-4">
@@ -126,8 +127,9 @@
         <a href="/organizations/add" class="btn btn-outline-primary mt-auto w-100">➕ Add New School or Club</a>
       </div>
     </div>
-  </div>
-</div>
+  </div> <!-- end .col-md-6 🏫 -->
+</div> <!-- end .row -->
+
 
 
 <script>

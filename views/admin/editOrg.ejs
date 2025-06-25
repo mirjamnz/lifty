@@ -2,7 +2,6 @@
 <%- include('../partials/header1') %>
 <%- include(session && session.is_admin ? '../partials/navbar2' : '../partials/navbar1') %>
 
-
 <div class="container py-5">
   <h2 class="mb-4">✏️ Edit Organization</h2>
 
@@ -13,7 +12,11 @@
     </div>
     <div class="mb-3">
       <label class="form-label">Type</label>
-      <input type="text" name="type" value="<%= org.type %>" class="form-control" required>
+      <select name="type" class="form-select" required>
+        <option value="school" <%= org.type === 'school' ? 'selected' : '' %>>School</option>
+        <option value="club" <%= org.type === 'club' ? 'selected' : '' %>>Club</option>
+        <option value="event" <%= org.type === 'event' ? 'selected' : '' %>>Event</option>
+      </select>
     </div>
     <div class="mb-3">
       <label class="form-label">Address</label>

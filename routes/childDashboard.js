@@ -19,7 +19,7 @@ router.get('/child-dashboard', async (req, res) => {
 
     // 3. Load child’s ride requests
     const [requests] = await db.query(
-      'SELECT * FROM RideRequests WHERE child_id = ? ORDER BY created_at DESC',
+      'SELECT * FROM RideRequests WHERE child_id = ? ORDER BY pickup_time DESC',
       [user.child_profile_id]
     );
 
@@ -29,11 +29,12 @@ router.get('/child-dashboard', async (req, res) => {
       [user.child_profile_id]
     );
 
-    // 5. Render child dashboard
+    // 5. Render child dashboard with session
     res.render('child-dashboard', {
       child: childProfile,
       requests,
-      offers
+      offers,
+      session: req.session // Pass the session object
     });
   } catch (err) {
     console.error('❌ Child dashboard error:', err);
