@@ -1,0 +1,48 @@
+<!--views/admin/editChild.ejs -->
+<%- include('../partials/header1') %>
+<%- include(session && session.is_admin ? '../partials/navbar2' : '../partials/navbar1') %>
+
+<div class="container py-5">
+  <h2 class="mb-4 fw-bold">Edit Child</h2>
+
+  <% if (session.success) { %>
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+      <%= session.success %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    <% session.success = null; %>
+  <% } %>
+  <% if (session.error) { %>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+      <%= session.error %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    <% session.error = null; %>
+  <% } %>
+
+  <form action="/admin/children/<%= child.id %>/edit" method="POST" class="mx-auto" style="max-width: 400px;">
+    <div class="mb-3">
+      <label for="name" class="form-label">Name</label>
+      <input type="text" name="name" id="name" class="form-control" value="<%= child.name %>" required>
+    </div>
+    <div class="mb-3">
+      <label for="school" class="form-label">School</label>
+      <input type="text" name="school" id="school" class="form-control" value="<%= child.school %>" required>
+    </div>
+    <div class="mb-3">
+      <label for="club" class="form-label">Club</label>
+      <input type="text" name="club" id="club" class="form-control" value="<%= child.club || '' %>">
+    </div>
+    <div class="mb-3">
+      <label for="user_id" class="form-label">Parent</label>
+      <select name="user_id" id="user_id" class="form-select" required>
+        <% users.forEach(user => { %>
+          <option value="<%= user.id %>" <%= user.id === child.user_id ? 'selected' : '' %>><%= user.name %></option>
+        <% }); %>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary w-100">Save Changes</button>
+  </form>
+</div>
+
+<%- include('../partials/footer1') %>

@@ -1,3 +1,5 @@
+<!--views/admin/dashboard.ejs -->
+<!DOCTYPE html>
 <%- include('../partials/header1') %>
 <%- include(session && session.is_admin ? '../partials/navbar2' : '../partials/navbar1') %>
 
@@ -9,7 +11,7 @@
     <div class="col-md-6">
       <h4>🏫 Organizations</h4>
       <a href="/admin/organizations/add" class="btn btn-primary mb-3">➕ Add New Organization</a>
-      <table class="table table-bordered table-sm table-striped">
+      <table class="table table-bordered table-sm table-striped" id="organizationsTable">
         <thead>
           <tr>
             <th>Name <a href="#" class="sort" data-sort="name">🔽</a></th>
@@ -18,17 +20,21 @@
           </tr>
         </thead>
         <tbody>
-          <% organizations.forEach(org => { %>
-            <tr>
-              <td><%= org.name %></td>
-              <td><%= org.type %></td>
-              <td>
-                <form action="/admin/organizations/<%= org.id %>/edit" method="GET" style="display:inline;">
-                  <button type="submit" class="btn btn-sm btn-outline-primary" title="Edit Organization">✏️</button>
-                </form>
-              </td>
-            </tr>
-          <% }) %>
+          <% if (organizations && organizations.length > 0) { %>
+            <% organizations.forEach(org => { %>
+              <tr>
+                <td><%= org.name %></td>
+                <td><%= org.type %></td>
+                <td>
+                  <form action="/admin/organizations/<%= org.id %>/edit" method="GET" style="display:inline;">
+                    <button type="submit" class="btn btn-sm btn-outline-primary" title="Edit Organization">✏️</button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          <% } else { %>
+            <tr><td colspan="3">No organizations found.</td></tr>
+          <% } %>
         </tbody>
       </table>
     </div>
@@ -36,9 +42,6 @@
     <!-- Parents -->
     <div class="col-md-6">
       <h4>👤 Parents</h4>
-      <div class="mb-3">
-        <input type="text" id="parentSearch" class="form-control" placeholder="Search parents..." aria-label="Search parents">
-      </div>
       <a href="/admin/users/add" class="btn btn-primary mb-3">➕ Add New Parent</a>
       <table class="table table-bordered table-sm table-striped" id="parentsTable">
         <thead>
@@ -50,21 +53,25 @@
           </tr>
         </thead>
         <tbody>
-          <% users.filter(user => user.role === 'parent').forEach(user => { %>
-            <tr>
-              <td><%= user.name %></td>
-              <td><%= user.email %></td>
-              <td><%= user.is_blocked ? "Yes" : "No" %></td>
-              <td>
-                <form action="/admin/users/<%= user.id %>/block" method="POST" style="display:inline;">
-                  <button type="submit" class="btn btn-sm btn-warning" title="<%= user.is_blocked ? 'Unblock' : 'Block' %>"><%= user.is_blocked ? '🔓' : '🔒' %></button>
-                </form>
-                <form action="/admin/users/<%= user.id %>/delete" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete <%= user.name %>?');">
-                  <button type="submit" class="btn btn-sm btn-danger" title="Delete User">🗑️</button>
-                </form>
-              </td>
-            </tr>
-          <% }) %>
+          <% if (users && users.length > 0) { %>
+            <% users.filter(user => user.role === 'parent').forEach(user => { %>
+              <tr>
+                <td<%= user.is_blocked ? ' style="color: red; text-decoration: line-through;"' : '' %>><%= user.name %></td>
+                <td<%= user.is_blocked ? ' style="color: red; text-decoration: line-through;"' : '' %>><%= user.email %></td>
+                <td<%= user.is_blocked ? ' style="color: red; text-decoration: line-through;"' : '' %>><%= user.is_blocked ? "Yes" : "No" %></td>
+                <td>
+                  <form action="/admin/users/<%= user.id %>/block" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-sm btn-warning" title="<%= user.is_blocked ? 'Unblock' : 'Block' %>"><%= user.is_blocked ? '🔓' : '🔒' %></button>
+                  </form>
+                  <form action="/admin/users/<%= user.id %>/delete" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete <%= user.name %>?');">
+                    <button type="submit" class="btn btn-sm btn-danger" title="Delete User">🗑️</button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          <% } else { %>
+            <tr><td colspan="4">No parents found.</td></tr>
+          <% } %>
         </tbody>
       </table>
     </div>
@@ -72,29 +79,43 @@
     <!-- Children -->
     <div class="col-md-12 mt-4">
       <h4>👶 Children</h4>
-      <div class="mb-3">
-        <input type="text" id="childSearch" class="form-control" placeholder="Search children..." aria-label="Search children">
-      </div>
       <a href="/admin/children/add" class="btn btn-primary mb-3">➕ Add New Child</a>
       <table class="table table-bordered table-sm table-striped" id="childrenTable">
         <thead>
           <tr>
-            <th>Name <a href="#" class="sort" data-sort="name">🔽</a></th>
+            <th>Parent Name <a href="#" class="sort" data-sort="parent_name">🔽</a></th>
+            <th>Child Name <a href="#" class="sort" data-sort="name">🔽</a></th>
             <th>School <a href="#" class="sort" data-sort="school">🔽</a></th>
             <th>Club <a href="#" class="sort" data-sort="club">🔽</a></th>
-            <th>Parent Name (ID) <a href="#" class="sort" data-sort="user_id">🔽</a></th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          <% children.forEach(child => { %>
-            <% const [parent] = users.filter(user => user.id === child.user_id); %>
-            <tr>
-              <td><%= child.name %></td>
-              <td><%= child.school || 'N/A' %></td>
-              <td><%= child.club || 'N/A' %></td>
-              <td><%= parent ? `${parent.name} (${child.user_id})` : child.user_id %></td>
-            </tr>
-          <% }) %>
+          <% if (users && children && users.length > 0 && children.length > 0) { %>
+            <% users.filter(user => user.role === 'parent').forEach(parent => { %>
+              <% const parentChildren = children.filter(child => child.user_id === parent.id); %>
+              <% if (parentChildren.length > 0) { %>
+                <% parentChildren.forEach(child => { %>
+                  <tr>
+                    <td<%= child.is_blocked ? ' style="color: red; text-decoration: line-through;"' : '' %>><%= parent.name %></td>
+                    <td<%= child.is_blocked ? ' style="color: red; text-decoration: line-through;"' : '' %>><%= child.name %></td>
+                    <td<%= child.is_blocked ? ' style="color: red; text-decoration: line-through;"' : '' %>><%= child.school || 'N/A' %></td>
+                    <td<%= child.is_blocked ? ' style="color: red; text-decoration: line-through;"' : '' %>><%= child.club || 'N/A' %></td>
+                    <td>
+                      <form action="/admin/children/<%= child.id %>/edit" method="GET" style="display:inline;">
+                        <button type="submit" class="btn btn-sm btn-outline-primary" title="Edit Child">✏️</button>
+                      </form>
+                      <form action="/admin/children/<%= child.id %>/delete" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete <%= child.name %>?');">
+                        <button type="submit" class="btn btn-sm btn-danger" title="Delete Child">🗑️</button>
+                      </form>
+                    </td>
+                  </tr>
+                <% }); %>
+              <% } %>
+            <% }); %>
+          <% } else { %>
+            <tr><td colspan="5">No children or users found.</td></tr>
+          <% } %>
         </tbody>
       </table>
     </div>
@@ -107,20 +128,25 @@
 
 <script>
   $(document).ready(function() {
+    // Initialize DataTables for Organizations
+    $('#organizationsTable').DataTable({
+      "order": [[0, "asc"]],
+      "pageLength": 10,
+      "lengthMenu": [5, 10, 25, 50]
+    });
+
     // Initialize DataTables for Parents
     $('#parentsTable').DataTable({
-      "order": [[0, "asc"]], // Default sort by Name
+      "order": [[0, "asc"]],
       "pageLength": 10,
-      "lengthMenu": [5, 10, 25, 50],
-      "dom": '<"top"lf>rt<"bottom"ip><"clear">'
+      "lengthMenu": [5, 10, 25, 50]
     });
 
     // Initialize DataTables for Children
     $('#childrenTable').DataTable({
-      "order": [[0, "asc"]], // Default sort by Name
+      "order": [[1, "asc"]], // Sort by Child Name by default
       "pageLength": 10,
-      "lengthMenu": [5, 10, 25, 50],
-      "dom": '<"top"lf>rt<"bottom"ip><"clear">'
+      "lengthMenu": [5, 10, 25, 50]
     });
 
     // Sorting functionality
@@ -132,15 +158,6 @@
       const order = table.order()[0][1] === 'asc' ? 'desc' : 'asc';
       table.order([parseInt($(this).closest('th').index()), order]).draw();
       $(this).text(order === 'asc' ? '🔽' : '🔼');
-    });
-
-    // Search functionality
-    $('#parentSearch').on('keyup', function() {
-      $('#parentsTable').DataTable().search(this.value).draw();
-    });
-
-    $('#childSearch').on('keyup', function() {
-      $('#childrenTable').DataTable().search(this.value).draw();
     });
   });
 </script>

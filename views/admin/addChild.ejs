@@ -19,9 +19,8 @@
       <input type="text" name="club" class="form-control rounded-pill">
     </div>
     <div class="mb-3">
-      <label class="form-label">Assign to Parent</label>
-      <select name="user_id" class="form-select rounded-pill" required>
-        <option value="" disabled selected>Select a parent</option>
+      <label class="form-label">Assign to Parent(s)</label>
+      <select name="user_id[]" class="form-select rounded-pill" multiple required>
         <% users.forEach(user => { %>
           <% if (user.role === 'parent') { %>
             <option value="<%= user.id %>"><%= user.name %> (ID: <%= user.id %>)</option>
