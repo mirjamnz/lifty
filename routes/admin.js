@@ -112,7 +112,7 @@ router.get('/users/add', async (req, res) => {
 });
 
 router.post('/users/add', async (req, res) => {
-  const { name, email, password, role, parent_id } = req.body;
+  const { name, email, password, role, parent_id, school } = req.body;
   console.log('Received data for /users/add:', req.body); // Debug
   if (!name || !email || !password || !role) {
     return res.status(400).send('All fields are required.');
@@ -128,13 +128,13 @@ router.post('/users/add', async (req, res) => {
       if (!parent || parent.role !== 'parent') {
         return res.status(400).send('Selected parent is invalid.');
       }
-      // Insert Children first to get childId
+      // Insert Children first to get childId with school from form
       const [childResult] = await db.query(
         'INSERT INTO Children (user_id, name, school, created_at) VALUES (?, ?, ?, NOW())',
-        [parent_id, name.trim(), 'TBD'] // Placeholder school
+        [parent_id, name.trim(), school || 'TBD'] // Use form school or fallback to TBD
       );
       const childId = childResult.insertId;
-      console.log('Inserted into Children, childId:', childId); // Debug
+      console.log('Inserted into Children, childId:', childId, 'school:', school || 'TBD'); // Debug
 
       query += ', parent_id, child_profile_id';
       values.push(parseInt(parent_id), childId);
@@ -186,13 +186,13 @@ router.post('/children/add', async (req, res) => {
     // Start transaction to ensure consistency
     await db.query('START TRANSACTION');
 
-    // Insert into Children table with parent user_id
+    // Insert into Children table with parent user_id and form-submitted school
     const [childResult] = await db.query(
       'INSERT INTO Children (user_id, name, school, club, created_at) VALUES (?, ?, ?, ?, NOW())',
       [user_id, name.trim(), school.trim(), club ? club.trim() : null]
     );
     const childId = childResult.insertId;
-    console.log('Inserted into Children, childId:', childId); // Debug child ID
+    console.log('Inserted into Children, childId:', childId, 'school:', school.trim()); // Debug child ID and school
 
     // Hash the password and insert into Users table
     const hashedPassword = await bcrypt.hash(child_password, 10);

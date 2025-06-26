@@ -1,4 +1,3 @@
-<!--views/admin/dashboard.ejs -->
 <%- include('../partials/header1') %>
 <%- include(session && session.is_admin ? '../partials/navbar2' : '../partials/navbar1') %>
 
@@ -28,14 +27,14 @@
       </table>
     </div>
 
-    <!-- Users -->
+    <!-- Parents -->
     <div class="col-md-6">
-      <h4>👤 Users</h4>
-      <a href="/admin/users/add" class="btn btn-primary mb-3">➕ Add New User</a>
+      <h4>👤 Parents</h4>
+      <a href="/admin/users/add" class="btn btn-primary mb-3">➕ Add New Parent</a>
       <table class="table table-bordered table-sm table-striped">
         <thead><tr><th>Name</th><th>Email</th><th>Blocked?</th><th>Actions</th></tr></thead>
         <tbody>
-          <% users.forEach(user => { %>
+          <% users.filter(user => user.role === 'parent').forEach(user => { %>
             <tr>
               <td><%= user.name %></td>
               <td><%= user.email %></td>
@@ -55,18 +54,19 @@
     </div>
 
     <!-- Children -->
-    <div class="col-md-6 mt-4">
+    <div class="col-md-12 mt-4">
       <h4>👶 Children</h4>
       <a href="/admin/children/add" class="btn btn-primary mb-3">➕ Add New Child</a>
       <table class="table table-bordered table-sm table-striped">
-        <thead><tr><th>Name</th><th>School</th><th>Club</th><th>Parent ID</th></tr></thead>
+        <thead><tr><th>Name</th><th>School</th><th>Club</th><th>Parent Name (ID)</th></tr></thead>
         <tbody>
           <% children.forEach(child => { %>
+            <% const [parent] = users.filter(user => user.id === child.user_id); %>
             <tr>
               <td><%= child.name %></td>
-              <td><%= child.school %></td>
+              <td><%= child.school || 'N/A' %></td>
               <td><%= child.club || 'N/A' %></td>
-              <td><%= child.user_id %></td>
+              <td><%= parent ? `${parent.name} (${child.user_id})` : child.user_id %></td>
             </tr>
           <% }) %>
         </tbody>
