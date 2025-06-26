@@ -167,66 +167,90 @@ footer a:hover {
   padding: 0.75rem;
 }
 
-/* Children Card Styling */
+/* Existing styles... */
+
+/* Child Dashboard Card Styling */
 .card {
   border: none;
-  border-radius: 0.5rem;
-  width: 100%;
+  border-radius: 1rem;
+  transition: transform 0.2s ease;
+  overflow: hidden;
+}
+
+.card:hover {
+  transform: translateY(-5px);
 }
 
 .card-header {
-  background-color: #f8f9fa; /* Very light gray */
-  border-bottom: 1px solid #dee2e6;
-  padding: 0.75rem 1.25rem;
-  cursor: pointer;
+  border-top-left-radius: 1rem;
+  border-top-right-radius: 1rem;
+  padding: 0.5rem;
 }
 
 .card-body {
   padding: 1rem;
   background-color: #fff;
-  max-width: 100%;
+  border-bottom-left-radius: 1rem;
+  border-bottom-right-radius: 1rem;
 }
 
-.card-body .d-flex {
-  gap: 1rem;
-  align-items: center;
+.card-title {
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+  color: #4dabf7;
 }
 
-.btn-outline-success {
+.list-group-item {
+  background-color: transparent;
+  border: none;
+  padding: 0.5rem 0;
+}
+
+.list-group-item i {
   color: #28a745;
-  border-color: #28a745;
 }
 
-.btn-outline-success:hover {
-  background-color: #28a745;
-  color: #fff;
+.map-preview {
+  border-radius: 0.5rem;
+  overflow: hidden;
+  border: 1px solid #dee2e6;
 }
 
-.btn-danger, .btn-warning {
-  margin-top: 2px;
+.badge {
+  font-size: 0.9rem;
+  padding: 0.25rem 0.5rem;
 }
 
-/* Actions Column */
-td:last-child {
-  min-width: 200px; /* Ensure Actions column has enough space */
-  padding: 0.5rem;
-}
-
-td:last-child .d-flex {
-  flex-wrap: wrap;
-  gap: 5px;
+/* Blocked User Styling (if applicable, adjust if needed) */
+.blocked-user {
+  color: #dc3545;
+  text-decoration: line-through;
 }
 
 /* Responsive Adjustments */
 @media (max-width: 768px) {
-  .table-responsive {
-    overflow-x: auto;
+  .col-12.col-md-6.col-lg-4 {
+    flex: 0 0 100%;
+    max-width: 100%;
   }
-  .card-body .d-flex {
-    flex-direction: column;
-    align-items: flex-start;
+  .card-body {
+    padding: 0.75rem;
   }
-  td:last-child {
-    min-width: 150px;
+  .map-preview {
+    height: 120px;
   }
+}
+
+/* Additional Child Dashboard Styling */
+.text-primary {
+  color: #4dabf7 !important;
+}
+
+.text-success {
+  color: #28a745 !important;
+}
+
+.alert-info {
+  background-color: #cce5ff;
+  border-color: #b8daff;
 }

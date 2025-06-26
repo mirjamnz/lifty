@@ -13,7 +13,7 @@
     </div>
     <div class="form-check form-check-inline ms-4">
       <input class="form-check-input" type="checkbox" id="seekingOnly" onchange="applyFilters()">
-      <label class="form-check-label" for="seekingOnly">👓 Seeking Drivers Only</label>
+      <label class="form-check-label" for="seekingOnly">👃 Seeking Drivers Only</label>
     </div>
   </div>
 
@@ -31,7 +31,7 @@
         <form action="/rides/offer-ride" method="POST" class="flex-grow-1 d-flex flex-column">
           <input name="school" type="text" class="form-control mb-2 autocomplete" data-type="school" placeholder="School Name" required>
           <input type="number" name="available_seats" class="form-control mb-2" placeholder="Seats Available" min="1" required>
-          <input type="datetime-local" name="pickup_time" class="form-control mb-2" required>
+          <input type="text" name="pickup_time" class="form-control flatpickr-input mb-2" id="offerPickupTime" placeholder="Select Date & Time" required>
           <textarea name="notes" class="form-control mb-2" placeholder="Optional notes..."></textarea>
           <button class="btn btn-primary w-100">🚗 Offer Ride</button>
         </form>
@@ -42,9 +42,9 @@
       <div class="p-3 bg-light border rounded shadow-sm h-100 d-flex flex-column justify-content-between">
         <h5>📣 Request a Pickup</h5>
         <form action="/requests/request-ride" method="POST" class="flex-grow-1 d-flex flex-column">
-          <input name="pickup_location" type="text" class="form-control mb-2 autocomplete" data-type="organization" placeholder="Search School, Club, or Event" required>
-          <input name="dropoff_location" type="text" class="form-control mb-2 autocomplete" data-type="organization" placeholder="Search School, Club, or Event" required>
-          <input type="datetime-local" name="pickup_time" class="form-control mb-2" required>
+          <input name="pickup_location" id="pickup_location" type="text" class="form-control mb-2 autocomplete" data-type="organization" placeholder="Search School, Club, or Event" required>
+          <input name="dropoff_location" id="dropoff_location" type="text" class="form-control mb-2 autocomplete" data-type="organization" placeholder="Search School, Club, or Event" required>
+          <input type="text" name="pickup_time" class="form-control flatpickr-input mb-2" id="requestPickupTime" placeholder="Select Date & Time" required>
           <select name="child_id" class="form-select mb-2" required>
             <option disabled selected>Select Your Child</option>
             <% children.forEach(child => { %>
@@ -118,12 +118,31 @@
 <div id="rideCards" class="d-none flex-wrap gap-3 px-4"></div>
 
 <!-- Scripts -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@10.2.7/dist/css/autoComplete.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@10.2.7/dist/autoComplete.min.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+  flatpickr("#offerPickupTime", {
+    enableTime: true,
+    dateFormat: "Y-m-d\\TH:i",
+    minDate: "today",
+    defaultDate: new Date()
+  });
+
+  flatpickr("#requestPickupTime", {
+    enableTime: true,
+    dateFormat: "Y-m-d\\TH:i",
+    minDate: "today",
+    defaultDate: new Date()
+  });
+
   document.querySelectorAll('[data-time]').forEach(el => {
     el.innerText = moment(el.dataset.time).fromNow();
   });
@@ -147,11 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
         src: async (query) => {
           try {
             const res = await fetch(`/organizations/autocomplete?term=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}`);
-            const items = await res.json();
-            return items.map(item => ({
-              label: item.label,
-              value: item.label  // 👈 just the string
-            }));
+            return await res.json();
           } catch (err) {
             console.error("Autocomplete fetch error", err);
             return [];
@@ -161,21 +176,83 @@ document.addEventListener('DOMContentLoaded', () => {
       },
       resultsList: {
         noResults: true,
-        maxResults: 10
+        maxResults: 10,
+        render: true
       },
       resultItem: {
         highlight: true,
-        element: (el, data) => {
-          el.innerHTML = `<div class="dropdown-item">${data.match}</div>`;
-        }
+        content: (data) => data.label
       },
       onSelection: (feedback) => {
-        input.value = feedback.selection.value; // ✅ now a plain string!
+        const selected = feedback.selection.value;
+        input.value = selected.value || selected.label || "";
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      },
+      events: {
+        input: {
+          selection: (event) => {
+            const feedback = event.detail;
+            const selected = feedback.selection.value;
+            event.target.value = selected.value || selected.label || "";
+            event.target.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
       }
     });
   });
+
+  window.toggleViewMode = function () {
+    const table = document.querySelector('.ride-table');
+    const cards = document.getElementById('rideCards');
+    const isCardView = document.getElementById('toggleView').checked;
+
+    if (isCardView) {
+      table.style.display = 'none';
+      cards.classList.remove('d-none');
+      cards.innerHTML = '';
+
+      document.querySelectorAll('.ride-table tbody tr').forEach(row => {
+        const type = row.dataset.type;
+        const isSeeking = type === 'request' && row.dataset.assigned === 'no';
+        if (!document.getElementById('seekingOnly').checked || (document.getElementById('seekingOnly').checked && isSeeking)) {
+          const card = document.createElement('div');
+          card.classList.add('card', 'mb-3', 'shadow-sm');
+          card.innerHTML = `
+            <div class="card-body">
+              <h5 class="card-title">${type === 'offer' ? 'Offer' : 'Request'}</h5>
+              <p class="card-text">
+                ${type === 'offer' ? `Driver: ${row.cells[0].textContent}` : `Child: ${row.cells[0].textContent}`} <br>
+                ${type === 'offer' ? `School: ${row.cells[1].textContent}` : `Pickup: ${row.cells[1].textContent}, Dropoff: ${row.cells[2].textContent}`} <br>
+                ${row.cells[3].textContent !== '—' ? `Notes: ${row.cells[3].textContent}` : ''} <br>
+                Time: ${row.cells[type === 'offer' ? 2 : 4].textContent}
+              </p>
+              ${type === 'request' && row.dataset.assigned === 'no' && row.cells[6].querySelector('form') ? row.cells[6].innerHTML : ''}
+            </div>
+          `;
+          cards.appendChild(card);
+        }
+      });
+    } else {
+      table.style.display = '';
+      cards.classList.add('d-none');
+    }
+    applyFilters();
+  }
+
+  window.applyFilters = function () {
+    const isSeekingOnly = document.getElementById('seekingOnly').checked;
+    document.querySelectorAll('.ride-table tbody tr').forEach(row => {
+      const isRequest = row.dataset.type === 'request';
+      const isUnassigned = row.dataset.assigned === 'no';
+      row.style.display = (isSeekingOnly && isRequest && !isUnassigned) ? 'none' : '';
+    });
+    if (document.getElementById('toggleView').checked) toggleViewMode();
+  }
+
+  window.confirmHelp = function (childName, userName, pickup, dropoff, time) {
+    return confirm(`Are you sure you want to help ${childName} (${userName})?\nPickup: ${pickup}\nDropoff: ${dropoff}\nTime: ${new Date(time).toLocaleString()}`);
+  }
 });
 </script>
-
 
 <%- include('partials/footer1') %>

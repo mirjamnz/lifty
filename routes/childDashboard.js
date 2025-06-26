@@ -17,24 +17,41 @@ router.get('/child-dashboard', async (req, res) => {
       [user.child_profile_id]
     );
 
-    // 3. Load child’s ride requests
+    // 3. Load child’s ride requests with driver info
     const [requests] = await db.query(
-      'SELECT * FROM RideRequests WHERE child_id = ? ORDER BY pickup_time DESC',
+      `SELECT r.id, r.pickup_location, r.dropoff_location, r.pickup_time,
+              u.name AS driver_name
+       FROM RideRequests r
+       LEFT JOIN Users u ON r.assigned_user_id = u.id
+       WHERE r.child_id = ? ORDER BY r.pickup_time DESC`,
       [user.child_profile_id]
     );
+    // Derive status and format date
+    requests.forEach(request => {
+      request.status = request.assigned_user_id ? 'Assigned' : 'Pending';
+      request.formatted_time = new Date(request.pickup_time).toLocaleString('en-NZ', { dateStyle: 'medium', timeStyle: 'short' });
+    });
 
-    // 4. Load child’s ride offers (if applicable)
+    // 4. Load child’s ride offers
     const [offers] = await db.query(
-      'SELECT * FROM RideOffers WHERE child_id = ? ORDER BY created_at DESC',
+      `SELECT o.id, o.school, o.pickup_time
+       FROM RideOffers o
+       WHERE o.child_id = ? ORDER BY o.created_at DESC`,
       [user.child_profile_id]
     );
+    // Format date for offers
+    offers.forEach(offer => {
+      offer.formatted_time = new Date(offer.pickup_time).toLocaleString('en-NZ', { dateStyle: 'medium', timeStyle: 'short' });
+    });
 
     // 5. Render child dashboard with session
     res.render('child-dashboard', {
       child: childProfile,
       requests,
       offers,
-      session: req.session // Pass the session object
+      users: await db.query('SELECT id, name FROM Users'), // For driver lookup
+      session: req.session,
+      GMAPS_API_KEY: process.env.GMAPS_API_KEY || 'YOUR_API_KEY' // Kept for future use
     });
   } catch (err) {
     console.error('❌ Child dashboard error:', err);
