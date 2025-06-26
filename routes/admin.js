@@ -25,27 +25,37 @@ router.get('/dashboard', async (req, res) => {
   }
 });
 
-// Block/Unblock User
-router.post('/users/:id/block', async (req, res) => {
+// Manage Block Status (GET)
+router.get('/users/:id/manage-block', async (req, res) => {
   try {
-    const userId = req.params.id;
-    const [[user]] = await db.query('SELECT is_blocked FROM Users WHERE id = ?', [userId]);
-    if (!user) {
+    const [users] = await db.query('SELECT * FROM Users WHERE id = ?', [req.params.id]);
+    if (!users || users.length === 0) {
       return res.status(404).send('User not found');
     }
-    const newStatus = !user.is_blocked;
+    const user = users[0];
+    res.render('admin/manageBlock', { user, session: req.session });
+  } catch (err) {
+    console.error('Load manage block error:', err);
+    res.status(500).send('Could not load block management');
+  }
+});
 
-    // Start transaction to block/unblock parent and children
+// Manage Block Status (POST)
+router.post('/users/:id/:action', async (req, res) => {
+  const userId = req.params.id;
+  const action = req.params.action; // 'block' or 'unblock'
+  const newStatus = action === 'block';
+  try {
     await db.query('START TRANSACTION');
     await db.query('UPDATE Users SET is_blocked = ? WHERE id = ?', [newStatus, userId]);
     await db.query('UPDATE Children SET is_blocked = ? WHERE user_id = ?', [newStatus, userId]);
     await db.query('COMMIT');
-    req.session.success = `✅ User and associated children have been ${newStatus ? 'blocked' : 'unblocked'} successfully.`;
+    req.session.success = `✅ User and associated children have been ${action}ed successfully.`;
     res.redirect('/admin/dashboard');
   } catch (err) {
     await db.query('ROLLBACK');
-    console.error('Block user error:', err);
-    req.session.error = 'Failed to block/unblock user and children';
+    console.error('Block/unblock error:', err);
+    req.session.error = `Failed to ${action} user and children`;
     res.redirect('/admin/dashboard');
   }
 });
@@ -242,7 +252,7 @@ router.get('/children/:id/edit', async (req, res) => {
     if (!children || children.length === 0) {
       return res.status(404).send('Child not found');
     }
-    const child = children[0]; // Take the first (and only) result
+    const child = children[0];
     const [users] = await db.query('SELECT id, name FROM Users WHERE role = "parent"');
     res.render('admin/editChild', { child, users, session: req.session });
   } catch (err) {
@@ -301,6 +311,41 @@ router.post('/children/:id/delete', async (req, res) => {
     console.error('Delete child error:', err);
     req.session.error = `Failed to delete child: ${err.message || 'Unknown error'}`;
     res.redirect('/admin/dashboard');
+  }
+});
+
+// Manage Block Status (GET)
+router.get('/users/:id/manage-block', async (req, res) => {
+  try {
+    const [users] = await db.query('SELECT * FROM Users WHERE id = ?', [req.params.id]);
+    if (!users || users.length === 0) {
+      return res.status(404).send('User not found');
+    }
+    const user = users[0];
+    res.render('admin/manageBlock', { user, session: req.session });
+  } catch (err) {
+    console.error('Load manage block error:', err);
+    res.status(500).send('Could not load block management');
+  }
+});
+
+// Manage Block Status (POST)
+router.post('/users/:id/:action', async (req, res) => {
+  const userId = req.params.id;
+  const action = req.params.action; // 'block' or 'unblock'
+  const newStatus = action === 'block';
+  try {
+    await db.query('START TRANSACTION');
+    await db.query('UPDATE Users SET is_blocked = ? WHERE id = ?', [newStatus, userId]);
+    await db.query('UPDATE Children SET is_blocked = ? WHERE user_id = ?', [newStatus, userId]);
+    await db.query('COMMIT');
+    req.session.success = `✅ User and associated children have been ${action}ed successfully.`;
+    res.redirect('/admin/dashboard');
+  } catch (err) {
+    await db.query('ROLLBACK');
+    console.error('Block/unblock error:', err);
+    req.session.error = `Failed to ${action} user and children`;
+    res.redirect(`/admin/users/${userId}/manage-block`);
   }
 });
 

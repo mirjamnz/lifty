@@ -1,0 +1,72 @@
+<!--views/admin/manageBlock.ejs -->
+<%- include('../partials/header1') %>
+<%- include(session && session.is_admin ? '../partials/navbar2' : '../partials/navbar1') %>
+
+<div class="container py-5">
+  <h2 class="mb-4 fw-bold">Manage Block Status for <%= user.name %></h2>
+
+  <% if (session.success) { %>
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+      <%= session.success %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    <% session.success = null; %>
+  <% } %>
+  <% if (session.error) { %>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+      <%= session.error %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    <% session.error = null; %>
+  <% } %>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <p>Current status: <span class="<%= user.is_blocked ? 'blocked-user' : '' %>"><%= user.is_blocked ? 'Blocked' : 'Unblocked' %></span></p>
+      <button class="btn btn-warning w-100 mt-3" data-bs-toggle="modal" data-bs-target="#blockModal" id="manageBlockBtn">
+        <%= user.is_blocked ? 'Unblock' : 'Block' %>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal for Confirmation -->
+<div class="modal fade" id="blockModal" tabindex="-1" aria-labelledby="blockModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="blockModalLabel">Confirm Action</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to <strong><span id="actionText"></span></strong> <span id="userName"></span>?</p>
+        <p>This will also affect associated children.</p>
+        <div id="confirmationAnimation" class="text-center" style="display:none;">
+          <div class="spinner-border text-warning" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <form id="blockForm" method="POST" action="/admin/users/<%= user.id %>/<%= user.is_blocked ? 'unblock' : 'block' %>" style="display:inline;">
+          <button type="submit" class="btn btn-warning" id="confirmBlock">Confirm</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/js/bootstrap.bundle.min.js"></script>
+<script>
+  document.getElementById('confirmBlock').addEventListener('click', function(e) {
+    const animation = document.getElementById('confirmationAnimation');
+    animation.style.display = 'block';
+    setTimeout(() => {
+      animation.style.display = 'none';
+    }, 1000); // Hide after 1 second
+  });
+</script>
+
+<%- include('../partials/footer1') %>

@@ -137,3 +137,17 @@ footer a:hover {
   background-color: #fff !important;
   border: 1px solid #ced4da !important;
 }
+
+/* Blocked User Styling */
+.blocked-user {
+  color: red;
+  text-decoration: line-through;
+  font-style: italic; 
+}
+
+/* Ensure table cells inherit styling */
+.table td.blocked-user,
+.table th.blocked-user {
+  color: red;
+  text-decoration: line-through;
+}

@@ -56,13 +56,15 @@
           <% if (users && users.length > 0) { %>
             <% users.filter(user => user.role === 'parent').forEach(user => { %>
               <tr>
-                <td<%= user.is_blocked ? ' style="color: red; text-decoration: line-through;"' : '' %>><%= user.name %></td>
-                <td<%= user.is_blocked ? ' style="color: red; text-decoration: line-through;"' : '' %>><%= user.email %></td>
-                <td<%= user.is_blocked ? ' style="color: red; text-decoration: line-through;"' : '' %>><%= user.is_blocked ? "Yes" : "No" %></td>
+                <td class="<%= user.is_blocked ? 'blocked-user' : '' %>">
+                  <%= user.name %> <%- user.is_blocked ? '<i class="fas fa-lock text-danger ms-1"></i>' : '' %>
+                </td>
+                <td class="<%= user.is_blocked ? 'blocked-user' : '' %>"><%= user.email %></td>
+                <td class="<%= user.is_blocked ? 'blocked-user' : '' %>"><%= user.is_blocked ? "Yes" : "No" %></td>
                 <td>
-                  <form action="/admin/users/<%= user.id %>/block" method="POST" style="display:inline;">
-                    <button type="submit" class="btn btn-sm btn-warning" title="<%= user.is_blocked ? 'Unblock' : 'Block' %>"><%= user.is_blocked ? '🔓' : '🔒' %></button>
-                  </form>
+                  <button class="btn btn-sm btn-warning manage-block" data-user-id="<%= user.id %>" data-blocked="<%= user.is_blocked %>" title="<%= user.is_blocked ? 'Unblock' : 'Block' %>">
+                    <%= user.is_blocked ? '🔓' : '🔒' %>
+                  </button>
                   <form action="/admin/users/<%= user.id %>/delete" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete <%= user.name %>?');">
                     <button type="submit" class="btn btn-sm btn-danger" title="Delete User">🗑️</button>
                   </form>
@@ -97,10 +99,12 @@
               <% if (parentChildren.length > 0) { %>
                 <% parentChildren.forEach(child => { %>
                   <tr>
-                    <td<%= child.is_blocked ? ' style="color: red; text-decoration: line-through;"' : '' %>><%= parent.name %></td>
-                    <td<%= child.is_blocked ? ' style="color: red; text-decoration: line-through;"' : '' %>><%= child.name %></td>
-                    <td<%= child.is_blocked ? ' style="color: red; text-decoration: line-through;"' : '' %>><%= child.school || 'N/A' %></td>
-                    <td<%= child.is_blocked ? ' style="color: red; text-decoration: line-through;"' : '' %>><%= child.club || 'N/A' %></td>
+                    <td class="<%= child.is_blocked ? 'blocked-user' : '' %>">
+                      <%= parent.name %> <%- child.is_blocked ? '<i class="fas fa-lock text-danger ms-1"></i>' : '' %>
+                    </td>
+                    <td class="<%= child.is_blocked ? 'blocked-user' : '' %>"><%= child.name %></td>
+                    <td class="<%= child.is_blocked ? 'blocked-user' : '' %>"><%= child.school || 'N/A' %></td>
+                    <td class="<%= child.is_blocked ? 'blocked-user' : '' %>"><%= child.club || 'N/A' %></td>
                     <td>
                       <form action="/admin/children/<%= child.id %>/edit" method="GET" style="display:inline;">
                         <button type="submit" class="btn btn-sm btn-outline-primary" title="Edit Child">✏️</button>
@@ -122,9 +126,40 @@
   </div>
 </div>
 
+<!-- Modal for Block/Unblock Management -->
+<div class="modal fade" id="blockModal" tabindex="-1" aria-labelledby="blockModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="blockModalLabel">Manage Block Status</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to <strong><span id="actionText"></span></strong> <span id="userName"></span>?</p>
+        <p>This will also affect associated children.</p>
+        <div id="confirmationAnimation" class="text-center" style="display:none;">
+          <div class="spinner-border text-warning" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <form id="blockForm" method="POST" action="">
+          <input type="hidden" name="userId" id="blockUserId">
+          <input type="hidden" name="action" id="blockAction">
+          <button type="submit" class="btn btn-warning" id="confirmBlock">Confirm</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
 <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<link rel="stylesheet" href="/css/style.css">
 
 <script>
   $(document).ready(function() {
@@ -159,7 +194,31 @@
       table.order([parseInt($(this).closest('th').index()), order]).draw();
       $(this).text(order === 'asc' ? '🔽' : '🔼');
     });
+
+    // Modal for Block/Unblock
+    $('.manage-block').on('click', function() {
+      const userId = $(this).data('user-id');
+      const blocked = $(this).data('blocked');
+      const userName = $(this).closest('tr').find('td:first').text().trim().replace(/<[^>]+>/g, '');
+      const action = blocked ? 'unblock' : 'block';
+      $('#blockUserId').val(userId);
+      $('#blockAction').val(action);
+      $('#actionText').text(action);
+      $('#userName').text(userName);
+      $('#blockForm').attr('action', `/admin/users/${userId}/${action}`);
+      $('#blockModal').modal('show');
+    });
+
+    $('#confirmBlock').on('click', function() {
+      const animation = $('#confirmationAnimation');
+      animation.show();
+      setTimeout(() => {
+        animation.hide();
+      }, 1000);
+    });
   });
 </script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
 
 <%- include('../partials/footer1') %>
