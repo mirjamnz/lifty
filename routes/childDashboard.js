@@ -17,9 +17,9 @@ router.get('/child-dashboard', async (req, res) => {
       [user.child_profile_id]
     );
 
-    // 3. Load child’s ride requests with driver info
+    // 3. Load child's ride requests with driver info
     const [requests] = await db.query(
-      `SELECT r.id, r.pickup_location, r.dropoff_location, r.pickup_time,
+      `SELECT r.id, r.pickup_location, r.dropoff_location, r.pickup_time, r.assigned_user_id,
               u.name AS driver_name
        FROM RideRequests r
        LEFT JOIN Users u ON r.assigned_user_id = u.id
@@ -32,7 +32,7 @@ router.get('/child-dashboard', async (req, res) => {
       request.formatted_time = new Date(request.pickup_time).toLocaleString('en-NZ', { dateStyle: 'medium', timeStyle: 'short' });
     });
 
-    // 4. Load child’s ride offers
+    // 4. Load child's ride offers
     const [offers] = await db.query(
       `SELECT o.id, o.school, o.pickup_time
        FROM RideOffers o
@@ -45,11 +45,12 @@ router.get('/child-dashboard', async (req, res) => {
     });
 
     // 5. Render child dashboard with session
+    const [users] = await db.query('SELECT id, name FROM Users');
     res.render('child-dashboard', {
       child: childProfile,
       requests,
       offers,
-      users: await db.query('SELECT id, name FROM Users'), // For driver lookup
+      users, // For driver lookup
       session: req.session,
       GMAPS_API_KEY: process.env.GMAPS_API_KEY || 'YOUR_API_KEY' // Kept for future use
     });

@@ -12,15 +12,19 @@
     </div>
     <div class="mb-3">
       <label class="form-label">School</label>
-      <input type="text" name="school" class="form-control rounded-pill" required>
+      <div class="input-group">
+        <span class="input-group-text"><i class="fas fa-school"></i></span>
+        <input type="text" name="school" id="adminSchoolInput" class="form-control autocomplete" data-type="school" placeholder="Start typing school name..." required>
+      </div>
     </div>
     <div class="mb-3">
       <label class="form-label">Club (optional)</label>
       <input type="text" name="club" class="form-control rounded-pill">
     </div>
     <div class="mb-3">
-      <label class="form-label">Assign to Parent(s)</label>
-      <select name="user_id[]" class="form-select rounded-pill" multiple required>
+      <label class="form-label">Assign to Parent</label>
+      <select name="user_id" class="form-select selectpicker" data-live-search="true" required>
+        <option value="" disabled selected>Select a Parent</option>
         <% users.forEach(user => { %>
           <% if (user.role === 'parent') { %>
             <option value="<%= user.id %>"><%= user.name %> (ID: <%= user.id %>)</option>
@@ -42,3 +46,62 @@
 </div>
 
 <%- include('../partials/footer1') %>
+<!-- jQuery (required for Bootstrap Select) -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-select@1.14.0-beta3/dist/css/bootstrap-select.min.css">
+<script src="https://cdn.jsdelivr.net/npm/bootstrap-select@1.14.0-beta3/dist/js/bootstrap-select.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@10.2.7/dist/autoComplete.min.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Bootstrap Select
+    if (window.$ && $('.selectpicker').length) {
+      $('.selectpicker').selectpicker();
+    }
+    // School autocomplete
+    const input = document.getElementById('adminSchoolInput');
+    if (input) {
+      new autoComplete({
+        selector: () => input,
+        threshold: 1,
+        debounce: 200,
+        searchEngine: "loose",
+        data: {
+          src: async (query) => {
+            try {
+              const res = await fetch(`/organizations/autocomplete?term=${encodeURIComponent(query)}&type=school`);
+              return await res.json();
+            } catch (err) {
+              console.error("Autocomplete fetch error", err);
+              return [];
+            }
+          },
+          keys: ["label"]
+        },
+        resultsList: {
+          noResults: true,
+          maxResults: 10,
+          render: true
+        },
+        resultItem: {
+          highlight: true,
+          content: (data) => data.label
+        },
+        onSelection: (feedback) => {
+          const selected = feedback.selection.value;
+          input.value = selected.value || selected.label || "";
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        },
+        events: {
+          input: {
+            selection: (event) => {
+              const feedback = event.detail;
+              const selected = feedback.selection.value;
+              event.target.value = selected.value || selected.label || "";
+              event.target.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+          }
+        }
+      });
+    }
+  });
+</script>
