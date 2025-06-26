@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const isAdmin = require('../middleware/isAdmin');
-const bcrypt = require('bcrypt'); // Add bcrypt for password hashing
+const bcrypt = require('bcrypt');
 
 router.use(isAdmin);
 
@@ -113,6 +113,7 @@ router.get('/users/add', async (req, res) => {
 
 router.post('/users/add', async (req, res) => {
   const { name, email, password, role, parent_id } = req.body;
+  console.log('Received data for /users/add:', req.body); // Debug
   if (!name || !email || !password || !role) {
     return res.status(400).send('All fields are required.');
   }
@@ -122,47 +123,33 @@ router.post('/users/add', async (req, res) => {
     let values = [name.trim(), email.trim(), hashedPassword, role];
 
     if (role === 'child' && parent_id) {
-      query += ', parent_id';
-      values.push(parseInt(parent_id));
       // Validate parent exists and is a parent
       const [[parent]] = await db.query('SELECT role FROM Users WHERE id = ?', [parent_id]);
       if (!parent || parent.role !== 'parent') {
         return res.status(400).send('Selected parent is invalid.');
       }
+      // Insert Children first to get childId
+      const [childResult] = await db.query(
+        'INSERT INTO Children (user_id, name, school, created_at) VALUES (?, ?, ?, NOW())',
+        [parent_id, name.trim(), 'TBD'] // Placeholder school
+      );
+      const childId = childResult.insertId;
+      console.log('Inserted into Children, childId:', childId); // Debug
+
+      query += ', parent_id, child_profile_id';
+      values.push(parseInt(parent_id), childId);
     }
     query += ') VALUES (?, ?, ?, ?, NOW()';
-    if (role === 'child' && parent_id) query += ', ?';
+    if (role === 'child' && parent_id) query += ', ?, ?';
     query += ')';
 
-    const [result] = await db.query(query, values);
-    const newUserId = result.insertId;
-
-    // If child, create a corresponding Children entry
-    if (role === 'child' && parent_id) {
-      await db.query(
-        'INSERT INTO Children (user_id, name, school, created_at) VALUES (?, ?, ?, NOW())',
-        [newUserId, name.trim(), 'TBD'] // Placeholder school
-      );
+    const [userResult] = await db.query(query, values);
+    if (userResult.affectedRows === 0) {
+      throw new Error('Failed to insert into Users table');
     }
-    res.redirect('/admin/dashboard');
-  } catch (err) {
-    console.error('Add user error:', err);
-    res.status(500).send('Could not add user: ' + err.message);
-  }
-});
+    const newUserId = userResult.insertId;
+    console.log('Inserted into Users, newUserId:', newUserId); // Debug
 
-// Add User (POST)
-router.post('/users/add', async (req, res) => {
-  const { name, email, password, role } = req.body;
-  if (!name || !email || !password || !role) {
-    return res.status(400).send('All fields are required.');
-  }
-  try {
-    const hashedPassword = await bcrypt.hash(password, 10);
-    await db.query(
-      'INSERT INTO Users (name, email, password_hash, role, created_at) VALUES (?, ?, ?, ?, NOW())',
-      [name.trim(), email.trim(), hashedPassword, role]
-    );
     res.redirect('/admin/dashboard');
   } catch (err) {
     console.error('Add user error:', err);
@@ -183,19 +170,58 @@ router.get('/children/add', async (req, res) => {
 
 // Add Child (POST)
 router.post('/children/add', async (req, res) => {
-  const { name, school, club, user_id } = req.body;
-  if (!name || !school || !user_id) {
-    return res.status(400).send('Name, school, and parent user ID are required.');
+  const { name, school, club, user_id, child_username, child_password } = req.body;
+  console.log('Received data for /children/add:', req.body); // Debug incoming data
+  if (!name || !school || !user_id || !child_username || !child_password) {
+    return res.status(400).send('Name, school, parent user ID, username, and password are required.');
   }
+
   try {
-    await db.query(
+    // Verify the parent exists and is a parent
+    const [[parent]] = await db.query('SELECT role FROM Users WHERE id = ?', [user_id]);
+    if (!parent || parent.role !== 'parent') {
+      return res.status(400).send('Selected parent is invalid.');
+    }
+
+    // Start transaction to ensure consistency
+    await db.query('START TRANSACTION');
+
+    // Insert into Children table with parent user_id
+    const [childResult] = await db.query(
       'INSERT INTO Children (user_id, name, school, club, created_at) VALUES (?, ?, ?, ?, NOW())',
-      [user_id, name.trim(), school.trim(), club.trim() || null]
+      [user_id, name.trim(), school.trim(), club ? club.trim() : null]
     );
+    const childId = childResult.insertId;
+    console.log('Inserted into Children, childId:', childId); // Debug child ID
+
+    // Hash the password and insert into Users table
+    const hashedPassword = await bcrypt.hash(child_password, 10);
+    const [userResult] = await db.query(
+      'INSERT INTO Users (name, username, email, password_hash, role, parent_id, child_profile_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())',
+      [name.trim(), child_username.trim(), `${child_username.trim()}@child.local`, hashedPassword, 'child', user_id, childId]
+    );
+    if (userResult.affectedRows === 0) {
+      throw new Error('Failed to insert into Users table');
+    }
+    const newChildUserId = userResult.insertId;
+    console.log('Inserted into Users, newChildUserId:', newChildUserId, 'child_profile_id set to:', childId); // Debug user ID and profile link
+
+    // Verify the insertion
+    const [[newUser]] = await db.query('SELECT * FROM Users WHERE id = ?', [newChildUserId]);
+    console.log('Verified User entry:', newUser); // Debug verified entry
+
+    // Commit transaction
+    await db.query('COMMIT');
+    console.log('Transaction committed successfully');
+
+    req.session.success = `✅ Child '${name}' added successfully with login.`;
     res.redirect('/admin/dashboard');
   } catch (err) {
+    // Rollback transaction on error
+    await db.query('ROLLBACK');
     console.error('Add child error:', err);
-    res.status(500).send('Could not add child: ' + err.message);
+    req.session.error = `Could not add child: ${err.message}`;
+    res.redirect('/admin/children/add');
   }
 });
 

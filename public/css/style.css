@@ -132,3 +132,8 @@ footer a:hover {
   text-decoration: underline;
   color: #f9a03f !important;
 }
+
+.autocomplete {
+  background-color: #fff !important;
+  border: 1px solid #ced4da !important;
+}

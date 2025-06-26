@@ -19,7 +19,7 @@
       <h5 class="card-title fw-semibold">🏠 Your Home Address</h5>
       <form action="/update-address" method="POST" class="row g-2" onsubmit="return validateCoords();">
         <div class="col-md-8">
-          <input type="text" name="home_address" id="homeAddress" class="form-control rounded-pill" value="<%= user.home_address || '' %>" required>
+          <input type="text" name="home_address" id="homeAddress" class="form-control rounded-pill" value="<%= user.home_address || '' %>" required autocomplete="home">
         </div>
         <input type="hidden" name="home_lat" id="homeLat">
         <input type="hidden" name="home_lng" id="homeLng">
@@ -56,13 +56,13 @@
                   <div class="collapse mt-2" id="editForm<%= child.id %>">
                     <form action="/edit-child/<%= child.id %>" method="POST" class="row g-2">
                       <div class="col-md-4">
-                        <input type="text" name="name" value="<%= child.name %>" class="form-control" required>
+                        <input type="text" name="name" value="<%= child.name %>" class="form-control rounded-pill" required autocomplete="name">
                       </div>
                       <div class="col-md-4">
-                        <input type="text" name="school" value="<%= child.school %>" class="form-control autocomplete" data-type="school" required>
+                       <input name="school" type="text" class="form-control mb-2 autocomplete" data-type="school" placeholder="School Name" required>
                       </div>
                       <div class="col-md-3">
-                        <input type="text" name="club" value="<%= child.club %>" class="form-control autocomplete" data-type="club" placeholder="Club">
+                        <input type="text" name="club" value="<%= child.club %>" class="form-control autocomplete rounded-pill" data-type="club" placeholder="Club" autocomplete="club">
                       </div>
                       <div class="col-md-1">
                         <button type="submit" class="btn btn-primary w-100">💾</button>
@@ -79,23 +79,23 @@
           <form action="/add-child" method="POST" class="row g-2 mt-2">
             <div class="col-md-3">
               <label class="form-label">Child's Name</label>
-              <input type="text" name="name" class="form-control" placeholder="Child's Name" required>
+              <input type="text" name="name" class="form-control rounded-pill" placeholder="Child's Name" required autocomplete="name">
             </div>
             <div class="col-md-3">
               <label class="form-label">School</label>
-              <input type="text" name="school" class="form-control autocomplete" data-type="school" placeholder="School" required>
+              <input name="school" type="text" class="form-control mb-2 autocomplete" data-type="school" placeholder="School Name" required>
             </div>
             <div class="col-md-2">
               <label class="form-label">Club</label>
-              <input type="text" name="club" class="form-control autocomplete" data-type="club" placeholder="Club">
+              <input type="text" name="club" class="form-control autocomplete rounded-pill" data-type="club" placeholder="Club" autocomplete="club">
             </div>
             <div class="col-md-2">
               <label class="form-label">Username</label>
-              <input type="text" name="child_username" class="form-control" placeholder="Username">
+              <input type="text" name="child_username" class="form-control rounded-pill" placeholder="Username" autocomplete="username">
             </div>
             <div class="col-md-2">
               <label class="form-label">Password</label>
-              <input type="password" name="child_password" class="form-control" placeholder="Password">
+              <input type="password" name="child_password" class="form-control rounded-pill" placeholder="Password" autocomplete="new-password">
             </div>
             <!-- Add button below all fields -->
             <div class="col-12 mt-3">
@@ -113,8 +113,8 @@
           <h5 class="card-title">🏫 Clubs & Schools</h5>
 
           <form class="input-group mb-3" method="GET" action="/organizations/search">
-            <input type="text" name="q" class="form-control" placeholder="Search...">
-            <button class="btn btn-outline-secondary" type="submit">🔍</button>
+            <input type="text" name="q" class="form-control rounded-pill" placeholder="Search..." autocomplete="search">
+            <button class="btn btn-outline-secondary rounded-pill" type="submit">🔍</button>
           </form>
 
           <div style="max-height: 280px; overflow-y: auto;" class="mb-3 border rounded p-2">
@@ -177,57 +177,48 @@
       });
     }
 
-    // Autocomplete for school and club
+    // Autocomplete for school and club using bootstrap-autocomplete
     document.addEventListener('DOMContentLoaded', () => {
+      console.log("Initializing autocomplete for dashboard with bootstrap-autocomplete");
       document.querySelectorAll('.autocomplete').forEach(input => {
         const type = input.dataset.type;
-
-        new autoComplete({
-          selector: input,
-          threshold: 1,
-          debounce: 200,
-          searchEngine: "loose",
-          data: {
-            src: async (query) => {
-              try {
-                const res = await fetch(`/organizations/autocomplete?term=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}`);
-                const items = await res.json();
-                return items.map(item => ({
-                  label: item.label,
-                  value: item.label
-                }));
-              } catch (err) {
-                console.error("Autocomplete fetch error", err);
-                return [];
-              }
-            },
-            keys: ["label"]
-          },
-          resultsList: {
-            noResults: true,
-            maxResults: 10,
-            element: (list, data) => {
-              if (!data.results.length) {
-                const message = document.createElement("div");
-                message.setAttribute("class", "no_result");
-                message.innerHTML = `<span>No results found for "${data.query}"</span>`;
-                list.appendChild(message);
-              }
+        console.log(`Setting up autocomplete for ${type} on`, input);
+        $(input).autocomplete({
+          source: async (request, response) => {
+            try {
+              console.log(`Fetching autocomplete for ${type} with query: ${request.term}`);
+              const res = await fetch(`/requests/autocomplete?term=${encodeURIComponent(request.term)}&type=${encodeURIComponent(type)}`);
+              if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+              const items = await res.json();
+              console.log(`Received items for ${type}:`, items);
+              response(items.map(item => item.label));
+            } catch (err) {
+              console.error("Autocomplete fetch error", err);
+              response([]);
             }
           },
-          resultItem: {
-            highlight: true,
-            element: (el, data) => {
-              el.innerHTML = `<div class="dropdown-item">${data.match}</div>`;
-            }
+          select: function (event, ui) {
+            $(this).val(ui.item.label);
+            console.log("Input updated to:", $(this).val());
+            return false;
           },
-          onSelection: (feedback) => {
-            input.value = feedback.selection.value;
-          }
+          minLength: 1
+        }).on('autocomplete:select', function (event, ui) {
+          console.log("Autocomplete select event triggered:", ui.item.label);
         });
       });
     });
   </script>
 
   <script async defer src="https://maps.googleapis.com/maps/api/js?key=<%= GMAPS_API_KEY %>&libraries=places&callback=initMap"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap-autocomplete@1.0.7/dist/bootstrap-autocomplete.min.js">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@10.2.7/dist/css/autoComplete.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@10.2.7/dist/autoComplete.min.js"></script>
+
+<script>
+
+  </script>
   <%- include('partials/footer1') %>
