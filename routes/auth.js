@@ -62,6 +62,14 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // Check if user is blocked
+    if (user.is_blocked) {
+      return res.render('login', {
+        error: 'Your account has been blocked. Please contact an administrator.',
+        session: req.session
+      });
+    }
+
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       return res.render('login', {

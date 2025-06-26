@@ -29,24 +29,60 @@ router.get('/dashboard', async (req, res) => {
 // Block/Unblock User
 router.post('/users/:id/block', async (req, res) => {
   try {
-    const [[user]] = await db.query('SELECT is_blocked FROM Users WHERE id = ?', [req.params.id]);
+    const userId = req.params.id;
+    const [[user]] = await db.query('SELECT is_blocked FROM Users WHERE id = ?', [userId]);
+    if (!user) {
+      return res.status(404).send('User not found');
+    }
     const newStatus = !user.is_blocked;
-    await db.query('UPDATE Users SET is_blocked = ? WHERE id = ?', [newStatus, req.params.id]);
+    await db.query('UPDATE Users SET is_blocked = ? WHERE id = ?', [newStatus, userId]);
+    req.session.success = `✅ User has been ${newStatus ? 'blocked' : 'unblocked'} successfully.`;
     res.redirect('/admin/dashboard');
   } catch (err) {
     console.error('Block user error:', err);
-    res.status(500).send('Failed to block/unblock user');
+    req.session.error = 'Failed to block/unblock user';
+    res.redirect('/admin/dashboard');
   }
 });
 
 // Delete User
 router.post('/users/:id/delete', async (req, res) => {
   try {
-    await db.query('DELETE FROM Users WHERE id = ?', [req.params.id]);
+    const userId = req.params.id;
+    const [[user]] = await db.query('SELECT * FROM Users WHERE id = ?', [userId]);
+    if (!user) {
+      req.session.error = 'User not found';
+      return res.redirect('/admin/dashboard');
+    }
+
+    // Start transaction to ensure consistency
+    await db.query('START TRANSACTION');
+
+    // Check for and delete associated children
+    const [childrenResult] = await db.query('SELECT id FROM Children WHERE user_id = ?', [userId]);
+    if (childrenResult.length > 0) {
+      const childIds = childrenResult.map(child => child.id);
+      await db.query('DELETE FROM Children WHERE user_id = ?', [userId]);
+      console.log(`Deleted ${childrenResult.length} children for user ID ${userId}: ${childIds.join(', ')}`);
+    }
+
+    // Delete the user
+    const [userDeleteResult] = await db.query('DELETE FROM Users WHERE id = ?', [userId]);
+    if (userDeleteResult.affectedRows === 0) {
+      throw new Error('No user was deleted');
+    }
+    console.log(`Deleted user ID ${userId}: ${user.name}`);
+
+    // Commit transaction
+    await db.query('COMMIT');
+    req.session.success = `✅ User '${user.name}' deleted successfully.`;
     res.redirect('/admin/dashboard');
   } catch (err) {
+    // Rollback transaction on error
+    await db.query('ROLLBACK');
     console.error('Delete user error:', err);
-    res.status(500).send('Failed to delete user');
+    req.session.error = `Failed to delete user: ${err.message || 'Unknown error'}`;
+    res.redirect('/admin/dashboard');
   }
 });
 
@@ -194,6 +230,10 @@ router.post('/children/add', async (req, res) => {
     const childId = childResult.insertId;
     console.log('Inserted into Children, childId:', childId, 'school:', school.trim()); // Debug child ID and school
 
+    // Verify the Children insertion
+    const [[newChild]] = await db.query('SELECT * FROM Children WHERE id = ?', [childId]);
+    console.log('Verified Children entry:', newChild); // Debug verified entry
+
     // Hash the password and insert into Users table
     const hashedPassword = await bcrypt.hash(child_password, 10);
     const [userResult] = await db.query(
@@ -221,7 +261,7 @@ router.post('/children/add', async (req, res) => {
     await db.query('ROLLBACK');
     console.error('Add child error:', err);
     req.session.error = `Could not add child: ${err.message}`;
-    res.redirect('/admin/children/add');
+    res.redirect('/children/add'); // Fixed redirect to correct path
   }
 });
 
