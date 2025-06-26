@@ -1,127 +1,157 @@
 <!--views/admin/dashboard.ejs -->
-<!DOCTYPE html>
 <%- include('../partials/header1') %>
 <%- include(session && session.is_admin ? '../partials/navbar2' : '../partials/navbar1') %>
 
 <div class="container py-5">
-  <h2 class="mb-4 fw-bold">🛠 Admin Dashboard</h2>
+  <h2 class="mb-4 fw-bold text-primary">🛠 Admin Dashboard</h2>
 
   <div class="row">
     <!-- Organizations -->
     <div class="col-md-6">
-      <h4>🏫 Organizations</h4>
-      <a href="/admin/organizations/add" class="btn btn-primary mb-3">➕ Add New Organization</a>
-      <table class="table table-bordered table-sm table-striped" id="organizationsTable">
-        <thead>
-          <tr>
-            <th>Name <a href="#" class="sort" data-sort="name">🔽</a></th>
-            <th>Type <a href="#" class="sort" data-sort="type">🔽</a></th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% if (organizations && organizations.length > 0) { %>
-            <% organizations.forEach(org => { %>
-              <tr>
-                <td><%= org.name %></td>
-                <td><%= org.type %></td>
-                <td>
-                  <form action="/admin/organizations/<%= org.id %>/edit" method="GET" style="display:inline;">
-                    <button type="submit" class="btn btn-sm btn-outline-primary" title="Edit Organization">✏️</button>
-                  </form>
-                </td>
-              </tr>
-            <% }); %>
-          <% } else { %>
-            <tr><td colspan="3">No organizations found.</td></tr>
-          <% } %>
-        </tbody>
-      </table>
+      <h4 class="text-success">🏫 Organizations</h4>
+      <a href="/admin/organizations/add" class="btn btn-success mb-3">➕ Add New Organization</a>
+      <div class="table-responsive">
+        <table class="table table-bordered table-sm table-striped rounded shadow-sm" id="organizationsTable">
+          <thead class="table-light">
+            <tr>
+              <th>Name <a href="#" class="sort text-dark" data-sort="name">🔽</a></th>
+              <th>Type <a href="#" class="sort text-dark" data-sort="type">🔽</a></th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (organizations && organizations.length > 0) { %>
+              <% organizations.forEach(org => { %>
+                <tr>
+                  <td><%= org.name %></td>
+                  <td><%= org.type %></td>
+                  <td>
+                    <form action="/admin/organizations/<%= org.id %>/edit" method="GET" style="display:inline;">
+                      <button type="submit" class="btn btn-sm btn-outline-success" title="Edit Organization">✏️</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }); %>
+            <% } else { %>
+              <tr><td colspan="3" class="text-center text-muted">No organizations found.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- Parents -->
     <div class="col-md-6">
-      <h4>👤 Parents</h4>
-      <a href="/admin/users/add" class="btn btn-primary mb-3">➕ Add New Parent</a>
-      <table class="table table-bordered table-sm table-striped" id="parentsTable">
-        <thead>
-          <tr>
-            <th>Name <a href="#" class="sort" data-sort="name">🔽</a></th>
-            <th>Email <a href="#" class="sort" data-sort="email">🔽</a></th>
-            <th>Blocked? <a href="#" class="sort" data-sort="is_blocked">🔽</a></th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% if (users && users.length > 0) { %>
-            <% users.filter(user => user.role === 'parent').forEach(user => { %>
-              <tr>
-                <td class="<%= user.is_blocked ? 'blocked-user' : '' %>">
-                  <%= user.name %> <%- user.is_blocked ? '<i class="fas fa-lock text-danger ms-1"></i>' : '' %>
-                </td>
-                <td class="<%= user.is_blocked ? 'blocked-user' : '' %>"><%= user.email %></td>
-                <td class="<%= user.is_blocked ? 'blocked-user' : '' %>"><%= user.is_blocked ? "Yes" : "No" %></td>
-                <td>
-                  <button class="btn btn-sm btn-warning manage-block" data-user-id="<%= user.id %>" data-blocked="<%= user.is_blocked %>" title="<%= user.is_blocked ? 'Unblock' : 'Block' %>">
-                    <%= user.is_blocked ? '🔓' : '🔒' %>
-                  </button>
-                  <form action="/admin/users/<%= user.id %>/delete" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete <%= user.name %>?');">
-                    <button type="submit" class="btn btn-sm btn-danger" title="Delete User">🗑️</button>
-                  </form>
-                </td>
-              </tr>
-            <% }); %>
-          <% } else { %>
-            <tr><td colspan="4">No parents found.</td></tr>
-          <% } %>
-        </tbody>
-      </table>
+      <h4 class="text-success">👤 Parents</h4>
+      <a href="/admin/users/add" class="btn btn-success mb-3">➕ Add New Parent</a>
+      <div class="table-responsive">
+        <table class="table table-bordered table-sm table-striped rounded shadow-sm" id="parentsTable">
+          <thead class="table-light">
+            <tr>
+              <th>Name <a href="#" class="sort text-dark" data-sort="name">🔽</a></th>
+              <th>Email <a href="#" class="sort text-dark" data-sort="email">🔽</a></th>
+              <th>Blocked? <a href="#" class="sort text-dark" data-sort="is_blocked">🔽</a></th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (users && users.length > 0) { %>
+              <% users.filter(user => user.role === 'parent').forEach(user => { %>
+                <tr>
+                  <td class="<%= user.is_blocked ? 'blocked-user' : '' %>">
+                    <%= user.name %> <%- user.is_blocked ? '<i class="fas fa-lock text-danger ms-1"></i>' : '' %>
+                  </td>
+                  <td class="<%= user.is_blocked ? 'blocked-user' : '' %>"><%= user.email %></td>
+                  <td class="<%= user.is_blocked ? 'blocked-user' : '' %>"><%= user.is_blocked ? "Yes" : "No" %></td>
+                  <td>
+                    <button class="btn btn-sm btn-warning manage-block" data-user-id="<%= user.id %>" data-blocked="<%= user.is_blocked %>" title="<%= user.is_blocked ? 'Unblock' : 'Block' %>">
+                      <%= user.is_blocked ? '🔓' : '🔒' %>
+                    </button>
+                    <form action="/admin/users/<%= user.id %>/delete" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete <%= user.name %>?');">
+                      <button type="submit" class="btn btn-sm btn-danger" title="Delete User">🗑️</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }); %>
+            <% } else { %>
+              <tr><td colspan="4" class="text-center text-muted">No parents found.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- Children -->
     <div class="col-md-12 mt-4">
-      <h4>👶 Children</h4>
-      <a href="/admin/children/add" class="btn btn-primary mb-3">➕ Add New Child</a>
-      <table class="table table-bordered table-sm table-striped" id="childrenTable">
-        <thead>
-          <tr>
-            <th>Parent Name <a href="#" class="sort" data-sort="parent_name">🔽</a></th>
-            <th>Child Name <a href="#" class="sort" data-sort="name">🔽</a></th>
-            <th>School <a href="#" class="sort" data-sort="school">🔽</a></th>
-            <th>Club <a href="#" class="sort" data-sort="club">🔽</a></th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% if (users && children && users.length > 0 && children.length > 0) { %>
-            <% users.filter(user => user.role === 'parent').forEach(parent => { %>
-              <% const parentChildren = children.filter(child => child.user_id === parent.id); %>
-              <% if (parentChildren.length > 0) { %>
-                <% parentChildren.forEach(child => { %>
+      <h4 class="text-success">👶 Children</h4>
+      <a href="/admin/children/add" class="btn btn-success mb-3">➕ Add New Child</a>
+      <div class="table-responsive">
+        <table class="table table-bordered table-sm table-striped rounded shadow-sm" id="childrenTable">
+          <thead class="table-light">
+            <tr>
+              <th>Parent Name <a href="#" class="sort text-dark" data-sort="parent_name">🔽</a></th>
+              <th>Children Details</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (users && children && users.length > 0) { %>
+              <% users.filter(user => user.role === 'parent').forEach(parent => { %>
+                <% const parentChildren = children.filter(child => child.user_id === parent.id); %>
+                <% if (parentChildren.length > 0) { %>
                   <tr>
-                    <td class="<%= child.is_blocked ? 'blocked-user' : '' %>">
-                      <%= parent.name %> <%- child.is_blocked ? '<i class="fas fa-lock text-danger ms-1"></i>' : '' %>
+                    <td class="<%= parentChildren.some(child => child.is_blocked) ? 'blocked-user' : '' %>">
+                      <%= parent.name %> <%- parentChildren.some(child => child.is_blocked) ? '<i class="fas fa-lock text-danger ms-1"></i>' : '' %>
                     </td>
-                    <td class="<%= child.is_blocked ? 'blocked-user' : '' %>"><%= child.name %></td>
-                    <td class="<%= child.is_blocked ? 'blocked-user' : '' %>"><%= child.school || 'N/A' %></td>
-                    <td class="<%= child.is_blocked ? 'blocked-user' : '' %>"><%= child.club || 'N/A' %></td>
                     <td>
-                      <form action="/admin/children/<%= child.id %>/edit" method="GET" style="display:inline;">
-                        <button type="submit" class="btn btn-sm btn-outline-primary" title="Edit Child">✏️</button>
-                      </form>
-                      <form action="/admin/children/<%= child.id %>/delete" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete <%= child.name %>?');">
-                        <button type="submit" class="btn btn-sm btn-danger" title="Delete Child">🗑️</button>
-                      </form>
+                      <div class="card shadow-sm mb-3">
+                        <div class="card-header bg-light" id="heading<%= parent.id %>">
+                          <h5 class="mb-0">
+                            <button class="btn btn-link text-dark text-decoration-none w-100 text-start collapsed" data-bs-toggle="collapse" data-bs-target="#collapse<%= parent.id %>" aria-expanded="false" aria-controls="collapse<%= parent.id %>">
+                              <%= parentChildren.length %> Child<%= parentChildren.length > 1 ? 'ren' : '' %> <i class="fas fa-chevron-down ms-2"></i>
+                            </button>
+                          </h5>
+                        </div>
+                        <div id="collapse<%= parent.id %>" class="collapse" aria-labelledby="heading<%= parent.id %>" data-bs-parent="#childrenTable">
+                          <div class="card-body p-3">
+                            <% parentChildren.forEach(child => { %>
+                              <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-white rounded" style="width: 100%;">
+                                <span class="<%= child.is_blocked ? 'blocked-user' : '' %>">
+                                  <%= child.name %> - School: <%= child.school || 'N/A' %> <% if (child.club) { %>- Club: <%= child.club %> <% } %>
+                                  <%- child.is_blocked ? '<i class="fas fa-lock text-danger ms-1"></i>' : '' %>
+                                </span>
+                              </div>
+                            <% }); %>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="d-flex flex-column align-items-start">
+                        <button class="btn btn-sm btn-warning manage-block mb-2" data-user-id="<%= parent.id %>" data-blocked="<%= parent.is_blocked %>" title="<%= parent.is_blocked ? 'Unblock' : 'Block' %>">
+                          <%= parent.is_blocked ? '🔓' : '🔒' %>
+                        </button>
+                        <% parentChildren.forEach(child => { %>
+                          <div class="d-flex mb-2" style="gap: 5px;">
+                            <form action="/admin/children/<%= child.id %>/edit" method="GET" style="display:inline;">
+                              <button type="submit" class="btn btn-sm btn-outline-success" title="Edit <%= child.name %>">✏️ <%= child.name %></button>
+                            </form>
+                            <form action="/admin/children/<%= child.id %>/delete" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete <%= child.name %>?');">
+                              <button type="submit" class="btn btn-sm btn-danger" title="Delete <%= child.name %>">🗑️ <%= child.name %></button>
+                            </form>
+                          </div>
+                        <% }); %>
+                      </div>
                     </td>
                   </tr>
-                <% }); %>
-              <% } %>
-            <% }); %>
-          <% } else { %>
-            <tr><td colspan="5">No children or users found.</td></tr>
-          <% } %>
-        </tbody>
-      </table>
+                <% } %>
+              <% }); %>
+            <% } else { %>
+              <tr><td colspan="3" class="text-center text-muted">No children or users found.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>
@@ -179,9 +209,12 @@
 
     // Initialize DataTables for Children
     $('#childrenTable').DataTable({
-      "order": [[1, "asc"]], // Sort by Child Name by default
+      "order": [[0, "asc"]], // Sort by Parent Name by default
       "pageLength": 10,
-      "lengthMenu": [5, 10, 25, 50]
+      "lengthMenu": [5, 10, 25, 50],
+      "columnDefs": [
+        { "orderable": false, "targets": 2 } // Disable sorting on Actions column
+      ]
     });
 
     // Sorting functionality

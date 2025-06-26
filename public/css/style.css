@@ -140,14 +140,93 @@ footer a:hover {
 
 /* Blocked User Styling */
 .blocked-user {
-  color: red;
+  color: #dc3545; /* Bootstrap danger red, lighter and not bold */
   text-decoration: line-through;
-  font-style: italic; 
 }
 
-/* Ensure table cells inherit styling */
-.table td.blocked-user,
-.table th.blocked-user {
-  color: red;
-  text-decoration: line-through;
+/* Table Enhancements */
+.table {
+  background-color: #fff;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.table thead {
+  background-color: #e9ecef; /* Light gray background */
+}
+
+.table th {
+  color: #343a40; /* Dark gray text */
+  font-weight: 600;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.table td {
+  vertical-align: middle;
+  padding: 0.75rem;
+}
+
+/* Children Card Styling */
+.card {
+  border: none;
+  border-radius: 0.5rem;
+  width: 100%;
+}
+
+.card-header {
+  background-color: #f8f9fa; /* Very light gray */
+  border-bottom: 1px solid #dee2e6;
+  padding: 0.75rem 1.25rem;
+  cursor: pointer;
+}
+
+.card-body {
+  padding: 1rem;
+  background-color: #fff;
+  max-width: 100%;
+}
+
+.card-body .d-flex {
+  gap: 1rem;
+  align-items: center;
+}
+
+.btn-outline-success {
+  color: #28a745;
+  border-color: #28a745;
+}
+
+.btn-outline-success:hover {
+  background-color: #28a745;
+  color: #fff;
+}
+
+.btn-danger, .btn-warning {
+  margin-top: 2px;
+}
+
+/* Actions Column */
+td:last-child {
+  min-width: 200px; /* Ensure Actions column has enough space */
+  padding: 0.5rem;
+}
+
+td:last-child .d-flex {
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .table-responsive {
+    overflow-x: auto;
+  }
+  .card-body .d-flex {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  td:last-child {
+    min-width: 150px;
+  }
 }
