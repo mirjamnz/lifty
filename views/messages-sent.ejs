@@ -1,0 +1,88 @@
+<!--views/messages-sent.ejs -->
+<%- include('partials/header1') %>
+<%- include('partials/navbar1') %>
+
+<div class="container py-5">
+  <div class="row">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>📤 Sent Messages</h2>
+        <a href="/messages/inbox" class="btn btn-outline-primary">
+          <i class="fas fa-inbox me-2"></i>Inbox
+        </a>
+      </div>
+
+      <% if (!messages || messages.length === 0) { %>
+        <div class="alert alert-info text-center" role="alert">
+          <i class="fas fa-paper-plane fa-2x mb-3"></i>
+          <h5>No sent messages yet</h5>
+          <p class="mb-0">When you send messages about ride requests or offers, they'll appear here.</p>
+        </div>
+      <% } else { %>
+        <div class="card">
+          <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+              <i class="fas fa-paper-plane me-2"></i>
+              Sent Messages (<%= messages.length %> message<%= messages.length !== 1 ? 's' : '' %>)
+            </h5>
+          </div>
+          <div class="list-group list-group-flush">
+            <% messages.forEach(message => { %>
+              <div class="list-group-item message-item" data-message-id="<%= message.id %>">
+                <div class="row align-items-center">
+                  <div class="col-md-8">
+                    <div class="d-flex align-items-center mb-2">
+                      <h6 class="mb-0">
+                        <i class="fas fa-user me-2 text-primary"></i>
+                        To: <%= message.recipient_name %>
+                      </h6>
+                    </div>
+                    <p class="mb-1 text-muted">
+                      <i class="fas fa-clock me-1"></i>
+                      <%= new Date(message.sent_at).toLocaleString() %>
+                    </p>
+                    <p class="mb-0 message-content">
+                      <%= message.content %>
+                    </p>
+                    <% if (message.related_type && message.related_id) { %>
+                      <small class="text-info">
+                        <i class="fas fa-link me-1"></i>
+                        Related to: <%= message.related_type === 'request' ? 'Ride Request' : 'Ride Offer' %> #<%= message.related_id %>
+                      </small>
+                    <% } %>
+                  </div>
+                  <div class="col-md-4 text-end">
+                    <% if (!message.read_at) { %>
+                      <span class="badge bg-warning">Unread</span>
+                    <% } else { %>
+                      <span class="text-muted">
+                        <i class="fas fa-check-circle me-1"></i>Read
+                      </span>
+                    <% } %>
+                  </div>
+                </div>
+              </div>
+            <% }) %>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<style>
+.message-item {
+  transition: background-color 0.2s ease;
+}
+
+.message-item:hover {
+  background-color: #f8f9fa;
+}
+
+.message-content {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+</style>
+
+<%- include('partials/footer1') %> 

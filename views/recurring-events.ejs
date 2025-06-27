@@ -1,0 +1,195 @@
+<%- include('partials/header1') %>
+<%- include('partials/navbar1') %>
+
+<div class="container py-5">
+  <div class="row">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>📅 Recurring Events</h2>
+        <a href="/recurring-events/create" class="btn btn-primary">
+          <i class="fas fa-plus me-2"></i>Create Event
+        </a>
+      </div>
+
+      <% if (success) { %>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+          <%= success %>
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      <% } %>
+
+      <% if (error) { %>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+          <%= error %>
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      <% } %>
+
+      <!-- My Subscriptions -->
+      <% if (subscriptions && subscriptions.length > 0) { %>
+        <div class="card mb-4 border-success">
+          <div class="card-header bg-success text-white">
+            <h5 class="mb-0">
+              <i class="fas fa-check-circle me-2"></i>
+              My Subscriptions (<%= subscriptions.length %>)
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <% subscriptions.forEach(subscription => { %>
+                <div class="col-md-6 col-lg-4 mb-3">
+                  <div class="card h-100 border-success">
+                    <div class="card-body">
+                      <h6 class="card-title text-success">
+                        <i class="fas fa-calendar-check me-2"></i>
+                        <%= subscription.event_name %>
+                      </h6>
+                      <p class="card-text">
+                        <small class="text-muted">
+                          <i class="fas fa-child me-1"></i>
+                          <%= subscription.child_name %>
+                        </small>
+                      </p>
+                      <div class="d-flex justify-content-between">
+                        <a href="/recurring-events/<%= subscription.event_id %>/assignments" 
+                           class="btn btn-outline-success btn-sm">
+                          <i class="fas fa-tasks me-1"></i>Assignments
+                        </a>
+                        <form method="POST" action="/recurring-events/<%= subscription.event_id %>/unsubscribe" 
+                              style="display: inline;">
+                          <input type="hidden" name="child_id" value="<%= subscription.child_id %>">
+                          <button type="submit" class="btn btn-outline-danger btn-sm" 
+                                  onclick="return confirm('Unsubscribe from this event?')">
+                            <i class="fas fa-times me-1"></i>Unsubscribe
+                          </button>
+                        </form>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              <% }) %>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <!-- Available Events -->
+      <div class="card">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-calendar-alt me-2"></i>
+            Available Events (<%= events.length %>)
+          </h5>
+        </div>
+        <div class="card-body">
+          <% if (events.length === 0) { %>
+            <div class="text-center py-4">
+              <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+              <h5>No recurring events available</h5>
+              <p class="text-muted">Be the first to create a recurring event!</p>
+              <a href="/recurring-events/create" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Create First Event
+              </a>
+            </div>
+          <% } else { %>
+            <div class="row">
+              <% events.forEach(event => { %>
+                <div class="col-md-6 col-lg-4 mb-4">
+                  <div class="card h-100">
+                    <div class="card-header">
+                      <h6 class="mb-0">
+                        <i class="fas fa-<%= event.activity_type === 'Sport' ? 'futbol' : 
+                                          event.activity_type === 'Club' ? 'users' : 
+                                          event.activity_type === 'School' ? 'graduation-cap' : 'star' %> me-2"></i>
+                        <%= event.name %>
+                      </h6>
+                    </div>
+                    <div class="card-body">
+                      <p class="card-text"><%= event.description || 'No description' %></p>
+                      
+                      <div class="mb-3">
+                        <small class="text-muted">
+                          <i class="fas fa-clock me-1"></i>
+                          <%= event.day_of_week %>s, <%= event.start_time %> - <%= event.end_time %>
+                        </small>
+                      </div>
+                      
+                      <div class="mb-3">
+                        <small class="text-muted">
+                          <i class="fas fa-map-marker-alt me-1"></i>
+                          <%= event.location %>
+                        </small>
+                      </div>
+                      
+                      <div class="mb-3">
+                        <small class="text-muted">
+                          <i class="fas fa-users me-1"></i>
+                          <%= event.subscriber_count %> subscriber<%= event.subscriber_count !== 1 ? 's' : '' %>
+                        </small>
+                      </div>
+                      
+                      <div class="mb-3">
+                        <small class="text-muted">
+                          <i class="fas fa-user me-1"></i>
+                          Created by <%= event.created_by_name %>
+                        </small>
+                      </div>
+                    </div>
+                    <div class="card-footer">
+                      <div class="d-flex justify-content-between align-items-center">
+                        <a href="/recurring-events/<%= event.id %>/assignments" 
+                           class="btn btn-outline-primary btn-sm">
+                          <i class="fas fa-eye me-1"></i>View
+                        </a>
+                        
+                        <% if (children && children.length > 0) { %>
+                          <div class="dropdown">
+                            <button class="btn btn-success btn-sm dropdown-toggle" type="button" 
+                                    data-bs-toggle="dropdown">
+                              <i class="fas fa-plus me-1"></i>Subscribe
+                            </button>
+                            <ul class="dropdown-menu">
+                              <% children.forEach(child => { %>
+                                <li>
+                                  <form method="POST" action="/recurring-events/<%= event.id %>/subscribe" 
+                                        style="display: inline;">
+                                    <input type="hidden" name="child_id" value="<%= child.id %>">
+                                    <button type="submit" class="dropdown-item">
+                                      <i class="fas fa-child me-2"></i>
+                                      <%= child.name %>
+                                    </button>
+                                  </form>
+                                </li>
+                              <% }) %>
+                            </ul>
+                          </div>
+                        <% } %>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              <% }) %>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.dropdown-item:hover {
+  background-color: #e9ecef;
+}
+</style>
+
+<%- include('partials/footer1') %> 

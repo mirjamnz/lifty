@@ -41,6 +41,8 @@ const rideRequestRoutes = require('./routes/rideRequests');
 const rideRoutes = require('./routes/rides');
 const orgRoutes = require('./routes/organizations');
 const childDashboardRoutes = require('./routes/childDashboard');
+const messagesRouter = require('./routes/messages');
+const recurringEventsRouter = require('./routes/recurringEvents');
 
 app.use('/', authRoutes);
 app.use('/', dashboardRoutes);
@@ -48,6 +50,8 @@ app.use('/requests', rideRequestRoutes);
 app.use('/rides', rideRoutes);
 app.use('/organizations', orgRoutes);
 app.use('/', childDashboardRoutes);
+app.use('/messages', messagesRouter);
+app.use('/recurring-events', recurringEventsRouter);
 
 // Home page
 app.get('/', (req, res) => {
@@ -68,4 +72,22 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3033;
 app.listen(PORT, () => {
   console.log(`✅ Server running at http://localhost:${PORT}`);
+});
+
+app.use(async (req, res, next) => {
+  if (req.session && req.session.userId) {
+    try {
+      const db = require('./db');
+      const [[{ unreadCount }]] = await db.query(
+        'SELECT COUNT(*) AS unreadCount FROM Messages WHERE recipient_id = ? AND read_at IS NULL',
+        [req.session.userId]
+      );
+      res.locals.unreadCount = unreadCount;
+    } catch (err) {
+      res.locals.unreadCount = 0;
+    }
+  } else {
+    res.locals.unreadCount = 0;
+  }
+  next();
 });

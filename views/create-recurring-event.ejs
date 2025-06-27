@@ -1,0 +1,140 @@
+<%- include('partials/header1') %>
+<%- include('partials/navbar1') %>
+
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header bg-primary text-white">
+          <h4 class="mb-0">
+            <i class="fas fa-plus me-2"></i>
+            Create Recurring Event
+          </h4>
+        </div>
+        <div class="card-body">
+          <form method="POST" action="/recurring-events/create">
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label for="name" class="form-label">Event Name *</label>
+                <input type="text" class="form-control" id="name" name="name" 
+                       placeholder="e.g., Scouts, Soccer Practice" required>
+              </div>
+              
+              <div class="col-md-6 mb-3">
+                <label for="activity_type" class="form-label">Activity Type *</label>
+                <select class="form-select" id="activity_type" name="activity_type" required>
+                  <option value="">Select Type</option>
+                  <option value="School">School</option>
+                  <option value="Club">Club</option>
+                  <option value="Sport">Sport</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="description" class="form-label">Description</label>
+              <textarea class="form-control" id="description" name="description" rows="3" 
+                        placeholder="Brief description of the activity..."></textarea>
+            </div>
+
+            <div class="row">
+              <div class="col-md-4 mb-3">
+                <label for="day_of_week" class="form-label">Day of Week *</label>
+                <select class="form-select" id="day_of_week" name="day_of_week" required>
+                  <option value="">Select Day</option>
+                  <option value="Mon">Monday</option>
+                  <option value="Tue">Tuesday</option>
+                  <option value="Wed">Wednesday</option>
+                  <option value="Thu">Thursday</option>
+                  <option value="Fri">Friday</option>
+                  <option value="Sat">Saturday</option>
+                  <option value="Sun">Sunday</option>
+                </select>
+              </div>
+              
+              <div class="col-md-4 mb-3">
+                <label for="start_time" class="form-label">Start Time *</label>
+                <input type="time" class="form-control" id="start_time" name="start_time" required>
+              </div>
+              
+              <div class="col-md-4 mb-3">
+                <label for="end_time" class="form-label">End Time *</label>
+                <input type="time" class="form-control" id="end_time" name="end_time" required>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="location" class="form-label">Location *</label>
+              <input type="text" class="form-control" id="location" name="location" 
+                     placeholder="e.g., Scout Hall, 123 Main Street" required>
+            </div>
+
+            <div class="d-flex justify-content-between">
+              <a href="/recurring-events" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Cancel
+              </a>
+              <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save me-2"></i>Create Event
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Help Section -->
+      <div class="card mt-4">
+        <div class="card-header bg-info text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-question-circle me-2"></i>
+            How It Works
+          </h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6">
+              <h6><i class="fas fa-1 me-2"></i>Create Event</h6>
+              <p class="text-muted">Set up a recurring activity like Scouts every Thursday.</p>
+              
+              <h6><i class="fas fa-2 me-2"></i>Share & Subscribe</h6>
+              <p class="text-muted">Other parents can subscribe their children to your event.</p>
+            </div>
+            <div class="col-md-6">
+              <h6><i class="fas fa-3 me-2"></i>Assign Duties</h6>
+              <p class="text-muted">Parents can volunteer for drop-off or pickup on specific dates.</p>
+              
+              <h6><i class="fas fa-4 me-2"></i>Coordinate</h6>
+              <p class="text-muted">Use the built-in messaging to coordinate with other parents.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Validate that end time is after start time
+document.getElementById('end_time').addEventListener('change', function() {
+  const startTime = document.getElementById('start_time').value;
+  const endTime = this.value;
+  
+  if (startTime && endTime && startTime >= endTime) {
+    alert('End time must be after start time');
+    this.value = '';
+  }
+});
+
+// Auto-fill end time if not set
+document.getElementById('start_time').addEventListener('change', function() {
+  const endTime = document.getElementById('end_time');
+  if (!endTime.value && this.value) {
+    // Add 1 hour by default
+    const start = new Date(`2000-01-01T${this.value}`);
+    start.setHours(start.getHours() + 1);
+    endTime.value = start.toTimeString().slice(0, 5);
+  }
+});
+</script>
+
+<%- include('partials/footer1') %> 

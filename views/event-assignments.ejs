@@ -1,0 +1,275 @@
+<<!--views/event-assignments.ejs -->
+%- include('partials/header1') %>
+<%- include('partials/navbar1') %>
+
+<div class="container py-5">
+  <div class="row">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h2>
+            <i class="fas fa-<%= event.activity_type === 'Sport' ? 'futbol' : 
+                              event.activity_type === 'Club' ? 'users' : 
+                              event.activity_type === 'School' ? 'graduation-cap' : 'star' %> me-2"></i>
+            <%= event.name %> Assignments
+          </h2>
+          <p class="text-muted mb-0">
+            <%= event.day_of_week %>s, <%= event.start_time %> - <%= event.end_time %> at <%= event.location %>
+          </p>
+        </div>
+        <a href="/recurring-events" class="btn btn-outline-primary">
+          <i class="fas fa-arrow-left me-2"></i>Back to Events
+        </a>
+      </div>
+
+      <% if (req.query.success) { %>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+          <%= req.query.success %>
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      <% } %>
+
+      <% if (req.query.error) { %>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+          <%= req.query.error %>
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      <% } %>
+
+      <!-- Event Details -->
+      <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-info-circle me-2"></i>
+            Event Details
+          </h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6">
+              <p><strong>Description:</strong> <%= event.description || 'No description provided' %></p>
+              <p><strong>Created by:</strong> <%= event.created_by_name %></p>
+            </div>
+            <div class="col-md-6">
+              <p><strong>Subscribers:</strong> <%= subscribers.length %> family<%= subscribers.length !== 1 ? 'ies' : 'y' %></p>
+              <p><strong>Status:</strong> 
+                <span class="badge bg-<%= event.is_active ? 'success' : 'secondary' %>">
+                  <%= event.is_active ? 'Active' : 'Inactive' %>
+                </span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Assignment Form -->
+      <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-plus me-2"></i>
+            Assign Drop-off/Pickup
+          </h5>
+        </div>
+        <div class="card-body">
+          <form method="POST" action="/recurring-events/<%= event.id %>/assign">
+            <div class="row">
+              <div class="col-md-3">
+                <label for="event_date" class="form-label">Date</label>
+                <input type="date" class="form-control" id="event_date" name="event_date" 
+                       min="<%= new Date().toISOString().split('T')[0] %>" required>
+              </div>
+              <div class="col-md-3">
+                <label for="child_id" class="form-label">Child</label>
+                <select class="form-select" id="child_id" name="child_id" required>
+                  <option value="">Select Child</option>
+                  <% subscribers.forEach(subscriber => { %>
+                    <option value="<%= subscriber.child_id %>">
+                      <%= subscriber.child_name %> (<%= subscriber.parent_name %>)
+                    </option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label for="assignment_type" class="form-label">Type</label>
+                <select class="form-select" id="assignment_type" name="assignment_type" required>
+                  <option value="">Select Type</option>
+                  <option value="dropoff">Drop-off</option>
+                  <option value="pickup">Pickup</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label for="notes" class="form-label">Notes (Optional)</label>
+                <input type="text" class="form-control" id="notes" name="notes" 
+                       placeholder="Any special instructions...">
+              </div>
+            </div>
+            <div class="mt-3">
+              <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save me-2"></i>Create Assignment
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Upcoming Assignments -->
+      <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-calendar-check me-2"></i>
+            Upcoming Assignments (<%= assignments.length %>)
+          </h5>
+        </div>
+        <div class="card-body">
+          <% if (assignments.length === 0) { %>
+            <div class="text-center py-4">
+              <i class="fas fa-calendar-times fa-2x text-muted mb-3"></i>
+              <h6>No upcoming assignments</h6>
+              <p class="text-muted">Create assignments above to get started!</p>
+            </div>
+          <% } else { %>
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead class="table-light">
+                  <tr>
+                    <th>Date</th>
+                    <th>Child</th>
+                    <th>Type</th>
+                    <th>Assigned To</th>
+                    <th>Status</th>
+                    <th>Notes</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% assignments.forEach(assignment => { %>
+                    <tr>
+                      <td>
+                        <strong><%= new Date(assignment.event_date).toLocaleDateString() %></strong>
+                        <br><small class="text-muted"><%= new Date(assignment.event_date).toLocaleDateString('en-US', { weekday: 'long' }) %></small>
+                      </td>
+                      <td><%= assignment.child_name %></td>
+                      <td>
+                        <span class="badge bg-<%= assignment.assignment_type === 'dropoff' ? 'primary' : 'success' %>">
+                          <i class="fas fa-<%= assignment.assignment_type === 'dropoff' ? 'sign-in-alt' : 'sign-out-alt' %> me-1"></i>
+                          <%= assignment.assignment_type.charAt(0).toUpperCase() + assignment.assignment_type.slice(1) %>
+                        </span>
+                      </td>
+                      <td><%= assignment.assigned_parent_name %></td>
+                      <td>
+                        <span class="badge bg-<%= assignment.status === 'confirmed' ? 'success' : 
+                                                  assignment.status === 'pending' ? 'warning' : 
+                                                  assignment.status === 'completed' ? 'info' : 'secondary' %>">
+                          <%= assignment.status.charAt(0).toUpperCase() + assignment.status.slice(1) %>
+                        </span>
+                      </td>
+                      <td><%= assignment.notes || '—' %></td>
+                      <td>
+                        <button class="btn btn-outline-primary btn-sm" 
+                                onclick="sendMessage('<%= assignment.assigned_parent_name %>', '<%= assignment.user_id %>')">
+                          <i class="fas fa-envelope me-1"></i>Message
+                        </button>
+                      </td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+        </div>
+      </div>
+
+      <!-- Subscribers -->
+      <div class="card">
+        <div class="card-header bg-warning text-dark">
+          <h5 class="mb-0">
+            <i class="fas fa-users me-2"></i>
+            Event Subscribers (<%= subscribers.length %>)
+          </h5>
+        </div>
+        <div class="card-body">
+          <% if (subscribers.length === 0) { %>
+            <div class="text-center py-4">
+              <i class="fas fa-user-slash fa-2x text-muted mb-3"></i>
+              <h6>No subscribers yet</h6>
+              <p class="text-muted">Share this event with other parents to get started!</p>
+            </div>
+          <% } else { %>
+            <div class="row">
+              <% subscribers.forEach(subscriber => { %>
+                <div class="col-md-6 col-lg-4 mb-3">
+                  <div class="card border-warning">
+                    <div class="card-body">
+                      <h6 class="card-title">
+                        <i class="fas fa-child me-2"></i>
+                        <%= subscriber.child_name %>
+                      </h6>
+                      <p class="card-text">
+                        <small class="text-muted">
+                          <i class="fas fa-user me-1"></i>
+                          <%= subscriber.parent_name %>
+                        </small>
+                      </p>
+                      <button class="btn btn-outline-warning btn-sm" 
+                              onclick="sendMessage('<%= subscriber.parent_name %>', '<%= subscriber.user_id %>')">
+                        <i class="fas fa-envelope me-1"></i>Send Message
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              <% }) %>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Message Modal -->
+<div class="modal fade" id="messageModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Send Message</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="/recurring-events/<%= event.id %>/message">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="recipient_name" class="form-label">To:</label>
+            <input type="text" class="form-control" id="recipient_name" readonly>
+            <input type="hidden" id="recipient_id" name="recipient_id">
+          </div>
+          <div class="mb-3">
+            <label for="message" class="form-label">Message:</label>
+            <textarea class="form-control" id="message" name="message" rows="4" 
+                      placeholder="Type your message here..." required></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-paper-plane me-2"></i>Send Message
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function sendMessage(recipientName, recipientId) {
+  document.getElementById('recipient_name').value = recipientName;
+  document.getElementById('recipient_id').value = recipientId;
+  document.getElementById('message').value = '';
+  
+  const modal = new bootstrap.Modal(document.getElementById('messageModal'));
+  modal.show();
+}
+
+// Set minimum date to today
+document.getElementById('event_date').min = new Date().toISOString().split('T')[0];
+</script>
+
+<%- include('partials/footer1') %> 
