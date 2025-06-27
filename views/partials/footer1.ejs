@@ -67,5 +67,32 @@
 </script>
 <!-- Bootstrap 5 JS bundle -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+<% if (typeof unreadCount !== 'undefined' && unreadCount > 0) { %>
+  <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1100">
+    <div id="unreadToast" class="toast align-items-center text-bg-primary border-0 show" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="d-flex">
+        <div class="toast-body">
+          <i class="fas fa-envelope me-2"></i>
+          You have <strong><%= unreadCount %></strong> unread message<%= unreadCount !== 1 ? 's' : '' %>!
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+      <div class="mt-2 ms-3 mb-2">
+        <a href="/messages/inbox" class="btn btn-light btn-sm">
+          <i class="fas fa-inbox me-1"></i>View Inbox
+        </a>
+      </div>
+    </div>
+  </div>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      var toastEl = document.getElementById('unreadToast');
+      if (toastEl) {
+        var toast = new bootstrap.Toast(toastEl, { delay: 10000 });
+        toast.show();
+      }
+    });
+  </script>
+<% } %>
 </body>
 </html>

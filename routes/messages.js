@@ -89,4 +89,55 @@ router.get('/sent', async (req, res) => {
   res.render('messages-sent', { session: req.session, messages });
 });
 
+// GET /messages/thread/:userId - Show chat thread between logged-in user and another user
+router.get('/thread/:userId', async (req, res) => {
+  const userId = req.session.userId;
+  const otherUserId = req.params.userId;
+  if (!userId) return res.status(401).send('Not logged in');
+  if (!otherUserId) return res.status(400).send('Missing userId');
+
+  // Get the other user's name
+  const [[otherUser]] = await db.query('SELECT id, name FROM Users WHERE id = ?', [otherUserId]);
+  if (!otherUser) return res.status(404).send('User not found');
+
+  // Get all messages between the two users
+  const [messages] = await db.query(
+    `SELECT m.*, u1.name AS sender_name, u2.name AS recipient_name
+     FROM Messages m
+     JOIN Users u1 ON m.sender_id = u1.id
+     JOIN Users u2 ON m.recipient_id = u2.id
+     WHERE (m.sender_id = ? AND m.recipient_id = ?)
+        OR (m.sender_id = ? AND m.recipient_id = ?)
+     ORDER BY m.sent_at ASC`,
+    [userId, otherUserId, otherUserId, userId]
+  );
+
+  // Mark all messages from otherUser as read
+  await db.query(
+    'UPDATE Messages SET read_at = NOW() WHERE sender_id = ? AND recipient_id = ? AND read_at IS NULL',
+    [otherUserId, userId]
+  );
+
+  res.render('messages-thread', {
+    session: req.session,
+    messages,
+    otherUser
+  });
+});
+
+// POST /messages/thread/:userId/reply - Send a reply in a thread
+router.post('/thread/:userId/reply', async (req, res) => {
+  const senderId = req.session.userId;
+  const recipientId = req.params.userId;
+  const { message } = req.body;
+  if (!senderId || !recipientId || !message) {
+    return res.status(400).send('Missing required fields.');
+  }
+  await db.query(
+    'INSERT INTO Messages (sender_id, recipient_id, content) VALUES (?, ?, ?)',
+    [senderId, recipientId, message]
+  );
+  res.redirect(`/messages/thread/${recipientId}`);
+});
+
 module.exports = router; 

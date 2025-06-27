@@ -38,7 +38,20 @@
                       <% } %>
                       <h6 class="mb-0">
                         <i class="fas fa-user me-2 text-primary"></i>
-                        <%= message.sender_name %>
+                        <% if (message.sender_id !== session.userId) { %>
+                          <a href="/messages/thread/<%= message.sender_id %>" class="text-decoration-none text-primary fw-bold">
+                            <%= message.sender_name %>
+                          </a>
+                        <% } else { %>
+                          <%= message.sender_name %>
+                        <% } %>
+                        <% if (message.recipient_id && message.recipient_id !== session.userId) { %>
+                          <span class="ms-2">&rarr; 
+                            <a href="/messages/thread/<%= message.recipient_id %>" class="text-decoration-none text-primary fw-bold">
+                              <%= message.recipient_name || 'Recipient' %>
+                            </a>
+                          </span>
+                        <% } %>
                       </h6>
                     </div>
                     <p class="mb-1 text-muted">
