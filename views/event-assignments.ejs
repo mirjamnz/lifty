@@ -1,6 +1,8 @@
-<<!--views/event-assignments.ejs -->
-%- include('partials/header1') %>
+<%- include('partials/header1') %>
 <%- include('partials/navbar1') %>
+
+<!-- Hidden field for event day_of_week -->
+<input type="hidden" id="eventDayOfWeek" value="<%= event.day_of_week %>">
 
 <div class="container py-5">
   <div class="row">
@@ -22,16 +24,16 @@
         </a>
       </div>
 
-      <% if (req.query.success) { %>
+      <% if (success) { %>
         <div class="alert alert-success alert-dismissible fade show" role="alert">
-          <%= req.query.success %>
+          <%= success %>
           <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
       <% } %>
 
-      <% if (req.query.error) { %>
+      <% if (error) { %>
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
-          <%= req.query.error %>
+          <%= error %>
           <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
       <% } %>
@@ -72,29 +74,31 @@
         </div>
         <div class="card-body">
           <form method="POST" action="/recurring-events/<%= event.id %>/assign">
-            <div class="row">
+            <div class="row align-items-end">
               <div class="col-md-3">
                 <label for="event_date" class="form-label">Date</label>
-                <input type="date" class="form-control" id="event_date" name="event_date" 
-                       min="<%= new Date().toISOString().split('T')[0] %>" required>
+                <div class="input-group">
+                  <input type="text" class="form-control" id="event_date" name="event_date" placeholder="Select date" required readonly>
+                  <button type="button" class="btn btn-outline-secondary" id="nextEventBtn"></button>
+                </div>
               </div>
               <div class="col-md-3">
-                <label for="child_id" class="form-label">Child</label>
-                <select class="form-select" id="child_id" name="child_id" required>
-                  <option value="">Select Child</option>
+                <label for="child_id" class="form-label">Child(ren)</label>
+                <select class="form-select" id="child_id" name="child_id" multiple required>
                   <% subscribers.forEach(subscriber => { %>
                     <option value="<%= subscriber.child_id %>">
                       <%= subscriber.child_name %> (<%= subscriber.parent_name %>)
                     </option>
                   <% }) %>
                 </select>
+                <small class="text-muted">Hold Ctrl (Windows) or Cmd (Mac) to select multiple</small>
               </div>
               <div class="col-md-3">
                 <label for="assignment_type" class="form-label">Type</label>
                 <select class="form-select" id="assignment_type" name="assignment_type" required>
                   <option value="">Select Type</option>
-                  <option value="dropoff">Drop-off</option>
-                  <option value="pickup">Pickup</option>
+                  <option value="dropoff">Drop-off at event</option>
+                  <option value="pickup">Pickup from event</option>
                 </select>
               </div>
               <div class="col-md-3">
@@ -258,7 +262,55 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Map day_of_week to Flatpickr weekday (0=Sunday, 1=Monday, ...)
+  const dayMap = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
+  const eventDay = document.getElementById('eventDayOfWeek').value;
+  const flatpickrDay = dayMap[eventDay];
+
+  // Set button label
+  const nextEventBtn = document.getElementById('nextEventBtn');
+  nextEventBtn.textContent = `Next ${eventDay}`;
+
+  // Helper to get next occurrence of a weekday
+  function getNextWeekdayDate(weekday) {
+    const today = new Date();
+    let result = new Date(today);
+    result.setHours(0,0,0,0);
+    const day = result.getDay();
+    let diff = (weekday + 7 - day) % 7;
+    if (diff === 0) diff = 7; // always next week if today is the day
+    result.setDate(result.getDate() + diff);
+    return result;
+  }
+
+  // Flatpickr setup
+  const fp = flatpickr("#event_date", {
+    dateFormat: "Y-m-d",
+    minDate: "today",
+    disable: [
+      function(date) {
+        // Only enable the event's weekday
+        return date.getDay() !== flatpickrDay;
+      }
+    ],
+    locale: {
+      firstDayOfWeek: 1 // Monday as first day
+    }
+  });
+
+  // Set default date to next event day
+  const nextDate = getNextWeekdayDate(flatpickrDay);
+  fp.setDate(nextDate, true);
+
+  // Quick-select next event date
+  nextEventBtn.addEventListener('click', function() {
+    fp.setDate(getNextWeekdayDate(flatpickrDay), true);
+  });
+});
+
 function sendMessage(recipientName, recipientId) {
   document.getElementById('recipient_name').value = recipientName;
   document.getElementById('recipient_id').value = recipientId;
@@ -267,9 +319,6 @@ function sendMessage(recipientName, recipientId) {
   const modal = new bootstrap.Modal(document.getElementById('messageModal'));
   modal.show();
 }
-
-// Set minimum date to today
-document.getElementById('event_date').min = new Date().toISOString().split('T')[0];
 </script>
 
 <%- include('partials/footer1') %> 

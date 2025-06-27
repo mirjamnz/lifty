@@ -181,7 +181,9 @@ router.get('/:id/assignments', async (req, res) => {
       session: req.session,
       event,
       subscribers,
-      assignments
+      assignments,
+      success: req.query.success,
+      error: req.query.error
     });
   } catch (err) {
     console.error('GET /recurring-events/:id/assignments error:', err);
@@ -193,30 +195,39 @@ router.get('/:id/assignments', async (req, res) => {
 router.post('/:id/assign', async (req, res) => {
   const userId = req.session.userId;
   const eventId = req.params.id;
-  const { event_date, child_id, assignment_type, notes } = req.body;
+  let { event_date, child_id, assignment_type, notes } = req.body;
 
   if (!userId || !event_date || !child_id || !assignment_type) {
     return res.status(400).send('Missing required fields.');
   }
 
+  // Support multiple children
+  if (!Array.isArray(child_id)) {
+    child_id = [child_id];
+  }
+
   try {
-    // Check if assignment already exists
-    const [[existing]] = await db.query(
-      'SELECT id FROM EventAssignments WHERE event_id = ? AND event_date = ? AND child_id = ? AND assignment_type = ?',
-      [eventId, event_date, child_id, assignment_type]
-    );
-
-    if (existing) {
-      return res.redirect(`/recurring-events/${eventId}/assignments?error=Assignment already exists`);
+    let created = 0, skipped = 0;
+    for (const cid of child_id) {
+      // Check if assignment already exists
+      const [[existing]] = await db.query(
+        'SELECT id FROM EventAssignments WHERE event_id = ? AND event_date = ? AND child_id = ? AND assignment_type = ?',
+        [eventId, event_date, cid, assignment_type]
+      );
+      if (existing) {
+        skipped++;
+        continue;
+      }
+      await db.query(
+        `INSERT INTO EventAssignments (event_id, event_date, user_id, child_id, assignment_type, notes)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [eventId, event_date, userId, cid, assignment_type, notes]
+      );
+      created++;
     }
-
-    await db.query(
-      `INSERT INTO EventAssignments (event_id, event_date, user_id, child_id, assignment_type, notes)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [eventId, event_date, userId, child_id, assignment_type, notes]
-    );
-
-    res.redirect(`/recurring-events/${eventId}/assignments?success=Assignment created successfully`);
+    let msg = `${created} assignment(s) created.`;
+    if (skipped) msg += ` ${skipped} already existed.`;
+    res.redirect(`/recurring-events/${eventId}/assignments?success=${encodeURIComponent(msg)}`);
   } catch (err) {
     console.error('POST /recurring-events/:id/assign error:', err);
     res.status(500).send('Failed to create assignment.');
