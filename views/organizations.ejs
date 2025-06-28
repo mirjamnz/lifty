@@ -1,0 +1,160 @@
+<!--views/organizations.ejs -->
+<%- include('partials/header1') %>
+<%- include('partials/navbar1') %>
+
+<div class="container py-5">
+  <h2 class="mb-4">🏫 Schools & Clubs Management</h2>
+
+  <% if (session.success) { %>
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+      <%= session.success %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    <% session.success = null; %>
+  <% } %>
+
+  <div class="row">
+    <!-- 🏫 Clubs & Schools -->
+    <div class="col-md-8">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <h5 class="card-title mb-3">🏫 Your Organizations</h5>
+
+          <% if (organizations && organizations.length > 0) { %>
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead class="table-light">
+                  <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Address</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% organizations.forEach(org => { %>
+                    <tr>
+                      <td><strong><%= org.name %></strong></td>
+                      <td>
+                        <span class="badge bg-<%= org.type === 'school' ? 'primary' : org.type === 'club' ? 'success' : 'info' %>">
+                          <%= org.type.charAt(0).toUpperCase() + org.type.slice(1) %>
+                        </span>
+                      </td>
+                      <td><%= org.address || 'Not specified' %></td>
+                      <td>
+                        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#editForm<%= org.id %>">✏️</button>
+                        <a href="/organizations/<%= org.id %>/delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete <%= org.name %>?')">🗑</a>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colspan="4" class="p-0">
+                        <div class="collapse" id="editForm<%= org.id %>">
+                          <div class="p-3 bg-light">
+                            <form action="/organizations/<%= org.id %>/edit" method="POST" class="row g-2">
+                              <div class="col-md-4">
+                                <input type="text" name="name" value="<%= org.name %>" class="form-control" required>
+                              </div>
+                              <div class="col-md-3">
+                                <select name="type" class="form-select">
+                                  <option value="school" <%= org.type === 'school' ? 'selected' : '' %>>School</option>
+                                  <option value="club" <%= org.type === 'club' ? 'selected' : '' %>>Club</option>
+                                  <option value="event" <%= org.type === 'event' ? 'selected' : '' %>>Event</option>
+                                  <option value="other" <%= org.type === 'other' ? 'selected' : '' %>>Other</option>
+                                </select>
+                              </div>
+                              <div class="col-md-3">
+                                <input type="text" name="address" value="<%= org.address %>" class="form-control" placeholder="Address">
+                              </div>
+                              <div class="col-md-2">
+                                <button type="submit" class="btn btn-primary w-100">💾</button>
+                              </div>
+                            </form>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          <% } else { %>
+            <p class="text-muted">No organizations registered yet.</p>
+          <% } %>
+
+          <hr class="my-4">
+
+          <h6>➕ Add New Organization</h6>
+          <form action="/organizations/add" method="POST" class="row g-2">
+            <div class="col-md-4">
+              <input type="text" name="name" class="form-control" placeholder="Organization name" required>
+            </div>
+            <div class="col-md-3">
+              <select name="type" class="form-select" required>
+                <option value="" disabled selected>Type</option>
+                <option value="school">School</option>
+                <option value="club">Club</option>
+                <option value="event">Event</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <input type="text" name="address" class="form-control" placeholder="Address (optional)">
+            </div>
+            <div class="col-md-2">
+              <button type="submit" class="btn btn-success w-100">Add</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- 📋 Quick Stats -->
+    <div class="col-md-4">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">📊 Quick Stats</h5>
+          <div class="row text-center">
+            <div class="col-6">
+              <div class="border-end">
+                <h4 class="text-primary"><%= organizations ? organizations.filter(o => o.type === 'school').length : 0 %></h4>
+                <small class="text-muted">Schools</small>
+              </div>
+            </div>
+            <div class="col-6">
+              <h4 class="text-success"><%= organizations ? organizations.filter(o => o.type === 'club').length : 0 %></h4>
+              <small class="text-muted">Clubs</small>
+            </div>
+          </div>
+          <hr>
+          <div class="row text-center">
+            <div class="col-6">
+              <div class="border-end">
+                <h4 class="text-info"><%= organizations ? organizations.filter(o => o.type === 'event').length : 0 %></h4>
+                <small class="text-muted">Events</small>
+              </div>
+            </div>
+            <div class="col-6">
+              <h4 class="text-secondary"><%= organizations ? organizations.filter(o => o.type === 'other').length : 0 %></h4>
+              <small class="text-muted">Other</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 💡 Tips -->
+      <div class="card shadow-sm mt-3">
+        <div class="card-body">
+          <h6 class="card-title">💡 Tips</h6>
+          <ul class="list-unstyled small">
+            <li class="mb-2">• Add schools your children attend</li>
+            <li class="mb-2">• Include sports clubs and activities</li>
+            <li class="mb-2">• Add special events and field trips</li>
+            <li class="mb-2">• Organizations help with ride coordination</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer1') %> 

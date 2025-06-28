@@ -1,0 +1,218 @@
+<!--views/messages-all.ejs -->
+<%- include('partials/header1') %>
+<%- include('partials/navbar1') %>
+
+<div class="container py-5">
+  <div class="row">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>📬 All Messages</h2>
+        <div class="d-flex gap-2">
+          <a href="/messages/inbox" class="btn btn-outline-primary">
+            <i class="fas fa-inbox me-2"></i>Direct Messages
+          </a>
+          <a href="/rides" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Rides
+          </a>
+        </div>
+      </div>
+
+      <!-- Message Type Summary -->
+      <div class="row mb-4">
+        <div class="col-md-6">
+          <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+              <h5><i class="fas fa-envelope me-2"></i>Direct Messages</h5>
+              <h3><%= directCount %></h3>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card bg-info text-white">
+            <div class="card-body text-center">
+              <h5><i class="fas fa-comments me-2"></i>Group Messages</h5>
+              <h3><%= groupCount %></h3>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <% if (!items || items.length === 0) { %>
+        <div class="alert alert-info text-center" role="alert">
+          <i class="fas fa-inbox fa-2x mb-3"></i>
+          <h5>No messages yet</h5>
+          <p class="mb-0">When you receive messages, they'll appear here.</p>
+        </div>
+      <% } else { %>
+        <div class="card">
+          <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+              <i class="fas fa-envelope me-2"></i>
+              All Messages (<%= items.length %> item<%= items.length !== 1 ? 's' : '' %>)
+            </h5>
+          </div>
+          <div class="list-group list-group-flush">
+            <% items.forEach(item => { %>
+              <% if (item.type === 'direct') { %>
+                <!-- Direct Message -->
+                <% const message = item.data; %>
+                <div class="list-group-item message-item <%= !message.read_at ? 'unread' : '' %>" 
+                     data-message-id="<%= message.id %>">
+                  <div class="row align-items-center">
+                    <div class="col-md-8">
+                      <div class="d-flex align-items-center mb-2">
+                        <% if (!message.read_at) { %>
+                          <span class="badge bg-danger me-2">New</span>
+                        <% } %>
+                        <span class="badge bg-primary me-2">Direct</span>
+                        <h6 class="mb-0">
+                          <i class="fas fa-user me-2 text-primary"></i>
+                          <% if (message.sender_id !== session.userId) { %>
+                            <span class="text-primary fw-bold">
+                              <%= message.sender_name %>
+                            </span>
+                          <% } else { %>
+                            You
+                          <% } %>
+                        </h6>
+                      </div>
+                      <p class="mb-1 text-muted">
+                        <i class="fas fa-clock me-1"></i>
+                        <%= new Date(message.sent_at).toLocaleString() %>
+                      </p>
+                      <p class="mb-0 message-content">
+                        <%= message.content %>
+                      </p>
+                    </div>
+                    <div class="col-md-4 text-end">
+                      <% if (!message.read_at) { %>
+                        <button class="btn btn-sm btn-outline-success mark-read-btn" 
+                                data-message-id="<%= message.id %>"
+                                onclick="markAsRead(this.dataset.messageId)">
+                          <i class="fas fa-check me-1"></i>Mark as Read
+                        </button>
+                      <% } else { %>
+                        <span class="text-muted">
+                          <i class="fas fa-check-circle me-1"></i>Read
+                        </span>
+                      <% } %>
+                    </div>
+                  </div>
+                </div>
+              <% } else if (item.type === 'group_thread') { %>
+                <!-- Group Thread -->
+                <% const thread = item.data; %>
+                <div class="list-group-item message-item <%= thread.unread_count > 0 ? 'unread' : '' %>">
+                  <div class="row align-items-center">
+                    <div class="col-md-8">
+                      <div class="d-flex align-items-center mb-2">
+                        <% if (thread.unread_count > 0) { %>
+                          <span class="badge bg-danger me-2"><%= thread.unread_count %> New</span>
+                        <% } %>
+                        <span class="badge bg-info me-2">Group</span>
+                        <h6 class="mb-0">
+                          <i class="fas fa-comments me-2 text-info"></i>
+                          <span class="text-info fw-bold">
+                            <%= thread.child_name %>'s Ride Chat
+                          </span>
+                          <span class="ms-2 text-muted">
+                            (<%= thread.messages.length %> message<%= thread.messages.length !== 1 ? 's' : '' %>)
+                          </span>
+                        </h6>
+                      </div>
+                      <p class="mb-1 text-muted">
+                        <i class="fas fa-clock me-1"></i>
+                        Latest: <%= new Date(thread.latest_message.sent_at).toLocaleString() %>
+                        by <%= thread.latest_message.sender_id === session.userId ? 'You' : thread.latest_message.sender_name %>
+                      </p>
+                      <p class="mb-0 message-content">
+                        <em><%= thread.latest_message.content %></em>
+                      </p>
+                      <small class="text-info">
+                        <i class="fas fa-map-marker-alt me-1"></i>
+                        <%= thread.pickup_location %> → <%= thread.dropoff_location %>
+                      </small>
+                    </div>
+                    <div class="col-md-4 text-end">
+                      <a href="/messages/group/ride/<%= thread.ride_id %>" class="btn btn-sm btn-outline-info">
+                        <i class="fas fa-comments me-1"></i>View Chat
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              <% } %>
+            <% }) %>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<style>
+.message-item {
+  transition: background-color 0.2s ease;
+}
+
+.message-item:hover {
+  background-color: #f8f9fa;
+}
+
+.message-item.unread {
+  background-color: #e3f2fd;
+  border-left: 4px solid #2196f3;
+}
+
+.message-content {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.mark-read-btn {
+  transition: all 0.2s ease;
+}
+
+.mark-read-btn:hover {
+  transform: scale(1.05);
+}
+</style>
+
+<script>
+function markAsRead(messageId) {
+  fetch(`/messages/read/${messageId}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    }
+  })
+  .then(response => {
+    if (response.ok) {
+      // Update UI to show message as read
+      const messageItem = document.querySelector(`[data-message-id="${messageId}"]`);
+      if (messageItem) {
+        messageItem.classList.remove('unread');
+        const markReadBtn = messageItem.querySelector('.mark-read-btn');
+        if (markReadBtn) {
+          markReadBtn.innerHTML = '<i class="fas fa-check-circle me-1"></i>Read';
+          markReadBtn.classList.remove('btn-outline-success');
+          markReadBtn.classList.add('text-muted');
+          markReadBtn.disabled = true;
+        }
+        
+        // Remove the "New" badge
+        const newBadge = messageItem.querySelector('.badge');
+        if (newBadge) {
+          newBadge.remove();
+        }
+      }
+    } else {
+      console.error('Failed to mark message as read');
+    }
+  })
+  .catch(error => {
+    console.error('Error marking message as read:', error);
+  });
+}
+</script>
+
+<%- include('partials/footer1') %> 

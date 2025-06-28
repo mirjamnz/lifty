@@ -3,6 +3,37 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
+// GET /organizations — main page
+router.get('/', async (req, res) => {
+  if (!req.session.userId) return res.redirect('/login');
+  
+  try {
+    // Get all organizations
+    const [organizations] = await db.query(
+      'SELECT * FROM Organizations ORDER BY name'
+    );
+    
+    // Get quick stats
+    const [stats] = await db.query(`
+      SELECT 
+        COUNT(CASE WHEN type = 'school' THEN 1 END) as schools,
+        COUNT(CASE WHEN type = 'club' THEN 1 END) as clubs,
+        COUNT(CASE WHEN type = 'event' THEN 1 END) as events,
+        COUNT(CASE WHEN type = 'other' THEN 1 END) as others
+      FROM Organizations
+    `);
+    
+    res.render('organizations', { 
+      session: req.session, 
+      organizations,
+      stats: stats[0]
+    });
+  } catch (err) {
+    console.error('❌ Organizations page error:', err);
+    res.status(500).send('Could not load organizations.');
+  }
+});
+
 // GET /organizations/add — form
 router.get('/add', (req, res) => {
   if (!req.session.userId) return res.redirect('/login');
@@ -71,10 +102,53 @@ router.post('/add', async (req, res) => {
 
     // Set session flash message BEFORE redirect
     req.session.success = '✅ Organization added!';
-    res.redirect('/dashboard');
+    res.redirect('/organizations');
   } catch (err) {
     console.error('❌ Add Organization Error:', err.message, '\n', err.stack);
     res.status(500).send('Could not add organization.');
+  }
+});
+
+// POST /organizations/edit — update
+router.post('/edit/:id', async (req, res) => {
+  const { id } = req.params;
+  const { name, type, address } = req.body;
+  const userId = req.session.userId;
+
+  if (!name || !type || !address || !userId) {
+    return res.status(400).send('Missing required fields.');
+  }
+
+  try {
+    await db.query(
+      'UPDATE Organizations SET name = ?, type = ?, address = ? WHERE id = ?',
+      [name.trim(), type.trim(), address.trim(), id]
+    );
+
+    req.session.success = '✅ Organization updated!';
+    res.redirect('/organizations');
+  } catch (err) {
+    console.error('❌ Edit Organization Error:', err);
+    res.status(500).send('Could not update organization.');
+  }
+});
+
+// POST /organizations/delete — delete
+router.post('/delete/:id', async (req, res) => {
+  const { id } = req.params;
+  const userId = req.session.userId;
+
+  if (!userId) {
+    return res.status(401).send('Unauthorized.');
+  }
+
+  try {
+    await db.query('DELETE FROM Organizations WHERE id = ?', [id]);
+    req.session.success = '✅ Organization deleted!';
+    res.redirect('/organizations');
+  } catch (err) {
+    console.error('❌ Delete Organization Error:', err);
+    res.status(500).send('Could not delete organization.');
   }
 });
 

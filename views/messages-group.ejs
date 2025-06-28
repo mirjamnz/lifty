@@ -1,0 +1,70 @@
+<!-- views/messages-group.ejs -->
+<%- include('partials/header1') %>
+<%- include(session.role === 'child' ? 'partials/navbar-child' : 'partials/navbar1') %>
+
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <div class="card mb-4">
+        <div class="card-header bg-primary text-white d-flex align-items-center">
+          <i class="fas fa-comments me-2"></i>
+          <h5 class="mb-0">Group Chat for Ride #<%= ride.id %></h5>
+          <a href="<%= session.role === 'child' ? '/child-dashboard' : '/rides' %>" class="btn btn-light btn-sm ms-auto">
+            <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+          </a>
+        </div>
+        <div class="card-body" style="min-height: 300px; max-height: 500px; overflow-y: auto;">
+          <% if (!messages || messages.length === 0) { %>
+            <div class="alert alert-info text-center">
+              <i class="fas fa-comment-dots fa-2x mb-2"></i>
+              <div>No messages yet. Start the conversation below!</div>
+            </div>
+          <% } else { %>
+            <% messages.forEach(msg => { %>
+              <div class="d-flex mb-3 <%= msg.sender_id === session.userId ? 'justify-content-end' : 'justify-content-start' %>">
+                <div class="chat-bubble <%= msg.sender_id === session.userId ? 'sent' : 'received' %>">
+                  <div class="small text-muted mb-1">
+                    <%= msg.sender_id === session.userId ? 'You' : msg.sender_name %>
+                    <span class="ms-2"><%= new Date(msg.sent_at).toLocaleString() %></span>
+                  </div>
+                  <div><%= msg.content %></div>
+                </div>
+              </div>
+            <% }) %>
+          <% } %>
+        </div>
+        <div class="card-footer bg-light">
+          <form method="POST" action="/messages/group/ride/<%= ride.id %>/send" class="d-flex align-items-end gap-2">
+            <textarea name="message" class="form-control" rows="2" placeholder="Type your message..." required style="resize:none;"></textarea>
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-paper-plane me-1"></i>Send
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.chat-bubble {
+  max-width: 70%;
+  padding: 0.75rem 1rem;
+  border-radius: 1rem;
+  background: #f1f1f1;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  word-break: break-word;
+}
+.chat-bubble.sent {
+  background: #e3f2fd;
+  align-self: flex-end;
+  border-bottom-right-radius: 0.25rem;
+}
+.chat-bubble.received {
+  background: #fff;
+  border-bottom-left-radius: 0.25rem;
+  border: 1px solid #e3e3e3;
+}
+</style>
+
+<%- include('partials/footer1') %> 

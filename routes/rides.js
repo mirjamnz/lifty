@@ -73,15 +73,66 @@ router.get('/', async (req, res) => {
       ORDER BY ro.pickup_time DESC
     `, [userId]);
 
-    // Get bookings made by current user
+    // Get bookings made by current user (both as passenger and driver)
     const [myBookings] = await db.query(`
-      SELECT rb.*, ro.school, ro.pickup_time, u.name AS driver_name
+      SELECT 
+        rb.id,
+        rb.status,
+        rb.notes,
+        ro.school,
+        'Home' AS pickup_location,
+        ro.pickup_time,
+        u.name AS driver_name,
+        c.name AS child_name,
+        'passenger' AS booking_type,
+        rb.user_id AS booking_user_id,
+        'offer' AS ride_type
       FROM RideBookings rb
       JOIN RideOffers ro ON rb.offer_id = ro.id
       JOIN Users u ON ro.user_id = u.id
+      JOIN Children c ON rb.child_id = c.id
       WHERE rb.user_id = ? AND rb.status = 'confirmed'
-      ORDER BY ro.pickup_time DESC
-    `, [userId]);
+      
+      UNION ALL
+      
+      SELECT 
+        rb.id,
+        rb.status,
+        rb.notes,
+        ro.school,
+        'Home' AS pickup_location,
+        ro.pickup_time,
+        ? AS driver_name,
+        c.name AS child_name,
+        'driver' AS booking_type,
+        rb.user_id AS booking_user_id,
+        'offer' AS ride_type
+      FROM RideBookings rb
+      JOIN RideOffers ro ON rb.offer_id = ro.id
+      JOIN Children c ON rb.child_id = c.id
+      JOIN Users u ON rb.user_id = u.id
+      WHERE ro.user_id = ? AND rb.status = 'confirmed'
+      
+      UNION ALL
+      
+      SELECT 
+        rr.id,
+        'confirmed' AS status,
+        rr.note AS notes,
+        rr.dropoff_location AS school,
+        rr.pickup_location,
+        rr.pickup_time,
+        ? AS driver_name,
+        c.name AS child_name,
+        'driver' AS booking_type,
+        rr.user_id AS booking_user_id,
+        'request' AS ride_type
+      FROM RideRequests rr
+      JOIN Children c ON rr.child_id = c.id
+      WHERE rr.assigned_user_id = ? AND rr.pickup_time > NOW()
+      
+      ORDER BY pickup_time DESC
+    `, [userId, req.session.userName, userId, req.session.userName, userId]);
 
     res.render('rides', {
       session: req.session,

@@ -5,13 +5,23 @@ const db = require('../db');
 // POST /messages/send - Send a message
 router.post('/send', async (req, res) => {
   const senderId = req.session.userId;
-  const { target_type, target_id, message } = req.body;
+  const { target_type, target_id, message, include_child } = req.body;
 
   if (!senderId || !target_type || !target_id || !message) {
     return res.status(400).send('Missing required fields.');
   }
 
-  // Determine recipient based on target_type and target_id
+  // If include_child is checked and this is a ride request, send as group message
+  if (include_child && target_type === 'request') {
+    // Insert group message (recipient_id=NULL, related_type='request', related_id=target_id)
+    await db.query(
+      'INSERT INTO Messages (sender_id, recipient_id, content, related_type, related_id) VALUES (?, NULL, ?, ?, ?)',
+      [senderId, message, 'request', target_id]
+    );
+    return res.redirect(req.get('Referer') || '/messages/inbox');
+  }
+
+  // Otherwise, send as direct message as before
   let recipientId = null;
   if (target_type === 'request') {
     // Message about a ride request
@@ -138,6 +148,197 @@ router.post('/thread/:userId/reply', async (req, res) => {
     [senderId, recipientId, message]
   );
   res.redirect(`/messages/thread/${recipientId}`);
+});
+
+// GROUP CHAT FOR ASSIGNED RIDE
+// GET /messages/group/ride/:rideRequestId
+router.get('/group/ride/:rideRequestId', async (req, res) => {
+  const userId = req.session.userId;
+  const userRole = req.session.role;
+  const rideRequestId = req.params.rideRequestId;
+  if (!userId || !rideRequestId) return res.status(401).send('Not logged in');
+
+  // Get ride request and involved users
+  const [[ride]] = await db.query('SELECT * FROM RideRequests WHERE id = ?', [rideRequestId]);
+  if (!ride) return res.status(404).send('Ride request not found');
+  const [[child]] = await db.query('SELECT * FROM Children WHERE id = ?', [ride.child_id]);
+  const [[childUser]] = await db.query('SELECT * FROM Users WHERE child_profile_id = ?', [child.id]);
+  
+  // Get all parents of this child (support multiple parents)
+  // Find the parent user for this child (Children.user_id points to parent)
+  const [[parentUserLookup]] = await db.query('SELECT * FROM Users WHERE id = ?', [child.user_id]);
+  const parentUsers = parentUserLookup ? [parentUserLookup] : [];
+  
+  const [[driverUser]] = ride.assigned_user_id ? await db.query('SELECT * FROM Users WHERE id = ?', [ride.assigned_user_id]) : [null];
+
+  // Allow child, any parent, or assigned driver
+  const allowedUserIds = [
+    childUser?.id, 
+    ...parentUsers.map(p => p.id), 
+    driverUser?.id
+  ].filter(Boolean);
+  
+  if (!allowedUserIds.includes(userId)) return res.status(403).send('Access denied');
+
+  // Get all group messages for this ride
+  const [messages] = await db.query(
+    `SELECT m.*, u.name AS sender_name
+     FROM Messages m
+     JOIN Users u ON m.sender_id = u.id
+     WHERE m.related_type = 'request' AND m.related_id = ?
+     ORDER BY m.sent_at ASC`,
+    [rideRequestId]
+  );
+
+  // Mark all group messages as read for this user
+  await db.query(
+    'UPDATE Messages SET read_at = NOW() WHERE related_type = "request" AND related_id = ? AND sender_id != ? AND read_at IS NULL',
+    [rideRequestId, userId]
+  );
+
+  // For display: get names (use first parent for display purposes)
+  const parentUser = parentUsers[0] || null;
+  
+  res.render('messages-group', {
+    session: req.session,
+    ride,
+    child,
+    parentUser,
+    driverUser,
+    messages
+  });
+});
+
+// POST /messages/group/ride/:rideRequestId/send - Send message to group chat
+router.post('/group/ride/:rideRequestId/send', async (req, res) => {
+  const senderId = req.session.userId;
+  const rideRequestId = req.params.rideRequestId;
+  const { message } = req.body;
+  if (!senderId || !rideRequestId || !message) return res.status(400).send('Missing required fields.');
+
+  // Get ride request and involved users
+  const [[ride]] = await db.query('SELECT * FROM RideRequests WHERE id = ?', [rideRequestId]);
+  if (!ride) return res.status(404).send('Ride request not found');
+  const [[child]] = await db.query('SELECT * FROM Children WHERE id = ?', [ride.child_id]);
+  const [[childUser]] = await db.query('SELECT * FROM Users WHERE child_profile_id = ?', [child.id]);
+  
+  // Get all parents of this child (support multiple parents)
+  // Find the parent user for this child (Children.user_id points to parent)
+  const [[parentUserLookup]] = await db.query('SELECT * FROM Users WHERE id = ?', [child.user_id]);
+  const parentUsers = parentUserLookup ? [parentUserLookup] : [];
+  
+  const [[driverUser]] = ride.assigned_user_id ? await db.query('SELECT * FROM Users WHERE id = ?', [ride.assigned_user_id]) : [null];
+  
+  // Allow child, any parent, or assigned driver
+  const allowedUserIds = [
+    childUser?.id, 
+    ...parentUsers.map(p => p.id), 
+    driverUser?.id
+  ].filter(Boolean);
+  
+  if (!allowedUserIds.includes(senderId)) return res.status(403).send('Access denied');
+
+  // Send message to all group members (store as related_type='request', related_id=rideRequestId)
+  // For group chat, store one message per send, all can read
+  // Note: recipient_id is NULL for group chat messages
+  await db.query(
+    'INSERT INTO Messages (sender_id, recipient_id, content, related_type, related_id) VALUES (?, NULL, ?, ?, ?)',
+    [senderId, message, 'request', rideRequestId]
+  );
+  res.redirect(`/messages/group/ride/${rideRequestId}`);
+});
+
+// GET /messages/all - Get all messages (direct + group) for the logged-in user
+router.get('/all', async (req, res) => {
+  const userId = req.session.userId;
+  if (!userId) return res.status(401).send('Not logged in');
+
+  // Get direct messages
+  const [directMessages] = await db.query(
+    `SELECT m.*, u.name AS sender_name, 'direct' as message_type
+     FROM Messages m
+     JOIN Users u ON m.sender_id = u.id
+     WHERE m.recipient_id = ?
+     ORDER BY m.sent_at DESC
+     LIMIT 50`,
+    [userId]
+  );
+
+  // Get group messages where user is involved
+  const [groupRides] = await db.query(`
+    SELECT DISTINCT rr.id as ride_id, rr.pickup_location, rr.dropoff_location, c.name as child_name
+    FROM RideRequests rr
+    JOIN Children c ON rr.child_id = c.id
+    JOIN Users childUser ON childUser.child_profile_id = c.id
+    WHERE childUser.id = ? OR c.user_id = ? OR rr.assigned_user_id = ?
+  `, [userId, userId, userId]);
+
+  let groupThreads = [];
+  if (groupRides.length > 0) {
+    const rideIds = groupRides.map(r => r.ride_id);
+    
+    // Get all group messages for these rides
+    const [allGroupMessages] = await db.query(
+      `SELECT m.*, u.name AS sender_name, 'group' as message_type, 
+              rr.pickup_location, rr.dropoff_location, c.name as child_name
+       FROM Messages m
+       JOIN Users u ON m.sender_id = u.id
+       JOIN RideRequests rr ON m.related_id = rr.id
+       JOIN Children c ON rr.child_id = c.id
+       WHERE m.related_type = "request" AND m.related_id IN (?)
+       ORDER BY m.sent_at ASC`,
+      [rideIds]
+    );
+
+    // Group messages by ride_id
+    const groupedByRide = {};
+    allGroupMessages.forEach(msg => {
+      if (!groupedByRide[msg.related_id]) {
+        groupedByRide[msg.related_id] = {
+          ride_id: msg.related_id,
+          child_name: msg.child_name,
+          pickup_location: msg.pickup_location,
+          dropoff_location: msg.dropoff_location,
+          messages: [],
+          unread_count: 0,
+          latest_message: null
+        };
+      }
+      groupedByRide[msg.related_id].messages.push(msg);
+      
+      // Count unread messages (excluding user's own messages)
+      if (!msg.read_at && msg.sender_id !== userId) {
+        groupedByRide[msg.related_id].unread_count++;
+      }
+      
+      // Track latest message
+      if (!groupedByRide[msg.related_id].latest_message || 
+          new Date(msg.sent_at) > new Date(groupedByRide[msg.related_id].latest_message.sent_at)) {
+        groupedByRide[msg.related_id].latest_message = msg;
+      }
+    });
+
+    // Convert to array and sort by latest message time
+    groupThreads = Object.values(groupedByRide)
+      .sort((a, b) => new Date(b.latest_message.sent_at) - new Date(a.latest_message.sent_at));
+  }
+
+  // Combine direct messages and group threads
+  const allItems = [
+    ...directMessages.map(msg => ({ type: 'direct', data: msg })),
+    ...groupThreads.map(thread => ({ type: 'group_thread', data: thread }))
+  ].sort((a, b) => {
+    const aTime = a.type === 'direct' ? a.data.sent_at : a.data.latest_message.sent_at;
+    const bTime = b.type === 'direct' ? b.data.sent_at : b.data.latest_message.sent_at;
+    return new Date(bTime) - new Date(aTime);
+  });
+
+  res.render('messages-all', { 
+    session: req.session, 
+    items: allItems,
+    directCount: directMessages.length,
+    groupCount: groupThreads.length
+  });
 });
 
 module.exports = router; 

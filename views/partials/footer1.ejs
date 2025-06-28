@@ -67,6 +67,73 @@
 </script>
 <!-- Bootstrap 5 JS bundle -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Create New Ride Modal -->
+<div class="modal fade" id="createRideModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title"><i class="fas fa-plus me-2"></i>Create New Ride</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-4">
+          <!-- Offer a Ride -->
+          <div class="col-md-6">
+            <div class="card h-100 border-success">
+              <div class="card-body text-center">
+                <div class="mb-3">
+                  <i class="fas fa-car fa-3x text-success"></i>
+                </div>
+                <h5 class="card-title text-success">🚘 Offer a Ride</h5>
+                <p class="card-text">Share your ride with other children going to the same school or event.</p>
+                <button class="btn btn-success w-100" onclick="showOfferForm()">
+                  <i class="fas fa-plus me-1"></i>Create Offer
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Request a Pickup -->
+          <div class="col-md-6">
+            <div class="card h-100 border-primary">
+              <div class="card-body text-center">
+                <div class="mb-3">
+                  <i class="fas fa-hand-paper fa-3x text-primary"></i>
+                </div>
+                <h5 class="card-title text-primary">📣 Request a Pickup</h5>
+                <p class="card-text">Ask for help getting your child to school or an activity.</p>
+                <button class="btn btn-primary w-100" onclick="showRequestForm()">
+                  <i class="fas fa-plus me-1"></i>Create Request
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showOfferForm() {
+  // Close modal and redirect to rides page with offer form focus
+  const modal = bootstrap.Modal.getInstance(document.getElementById('createRideModal'));
+  modal.hide();
+  window.location.href = '/rides#offer-ride';
+}
+
+function showRequestForm() {
+  // Close modal and redirect to rides page with request form focus
+  const modal = bootstrap.Modal.getInstance(document.getElementById('createRideModal'));
+  modal.hide();
+  window.location.href = '/rides#request-ride';
+}
+</script>
+
 <% if (typeof unreadCount !== 'undefined' && unreadCount > 0) { %>
   <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1100">
     <div id="unreadToast" class="toast align-items-center text-bg-primary border-0 show" role="alert" aria-live="assertive" aria-atomic="true">
@@ -78,8 +145,8 @@
         <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
       </div>
       <div class="mt-2 ms-3 mb-2">
-        <a href="/messages/inbox" class="btn btn-light btn-sm">
-          <i class="fas fa-inbox me-1"></i>View Inbox
+        <a href="/messages/all" class="btn btn-light btn-sm">
+          <i class="fas fa-envelope me-1"></i>View All Messages
         </a>
       </div>
     </div>

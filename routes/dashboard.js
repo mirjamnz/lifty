@@ -17,19 +17,12 @@ router.get('/dashboard', async (req, res) => {
       FROM Users
       WHERE home_lat IS NOT NULL AND id != ?
     `, [userId]);
-    const [organizations] = await db.query(`
-      SELECT id, name, type
-      FROM Organizations
-      ORDER BY name ASC
-      LIMIT 50
-    `);
 
     res.render('dashboard', {
       session: req.session,
       user,
       children,
-      neighbors,
-      organizations
+      neighbors
     });
   } catch (err) {
     console.error('Dashboard error:', err);
@@ -172,37 +165,6 @@ router.get('/delete-child/:id', async (req, res) => {
   } catch (err) {
     console.error('Delete child error:', err);
     res.status(500).send('Failed to delete child.');
-  }
-});
-
-// POST /add-organization
-router.post('/add', async (req, res) => {
-  const { name, type, address, lat, lng } = req.body;
-  const userId = req.session.userId;
-
-  if (!name || !type || !address || !userId) {
-    return res.status(400).send('Missing required fields.');
-  }
-
-  const safeLat = lat && !isNaN(parseFloat(lat)) ? parseFloat(lat) : null;
-  const safeLng = lng && !isNaN(parseFloat(lng)) ? parseFloat(lng) : null;
-
-  try {
-    await db.query(
-      'INSERT INTO Organizations (name, type, address, lat, lng, created_by) VALUES (?, ?, ?, ?, ?, ?)',
-      [name.trim(), type.trim(), address.trim(), safeLat, safeLng, userId]
-    );
-
-    req.session.success = '✅ Organization added!';
-    return res.redirect('/dashboard');
-  } catch (err) {
-    if (err.code === 'ER_DUP_ENTRY') {
-      req.session.error = `❌ '${name}' already exists.`;
-      return res.redirect('/organizations/add');
-    }
-
-    console.error('❌ Add Organization Error:', err.message, '\n', err.stack);
-    res.status(500).send('Could not add organization.');
   }
 });
 

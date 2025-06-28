@@ -37,12 +37,36 @@ app.use(async (req, res, next) => {
   if (req.session && req.session.userId) {
     try {
       const db = require('./db');
-      const [[{ unreadCount }]] = await db.query(
-        'SELECT COUNT(*) AS unreadCount FROM Messages WHERE recipient_id = ? AND read_at IS NULL',
+      
+      // Count direct messages (recipient_id = userId AND read_at IS NULL)
+      const [[{ directUnreadCount }]] = await db.query(
+        'SELECT COUNT(*) AS directUnreadCount FROM Messages WHERE recipient_id = ? AND read_at IS NULL',
         [req.session.userId]
       );
-      res.locals.unreadCount = unreadCount;
-      console.log('DEBUG unreadCount for user', req.session.userId, ':', unreadCount); // Debug line
+      
+      // Count group messages where user is part of the group
+      // Find rides where user is child, parent, or driver
+      const [groupRides] = await db.query(`
+        SELECT DISTINCT rr.id as ride_id
+        FROM RideRequests rr
+        JOIN Children c ON rr.child_id = c.id
+        JOIN Users childUser ON childUser.child_profile_id = c.id
+        WHERE childUser.id = ? OR c.user_id = ? OR rr.assigned_user_id = ?
+      `, [req.session.userId, req.session.userId, req.session.userId]);
+      
+      let groupUnreadCount = 0;
+      if (groupRides.length > 0) {
+        const rideIds = groupRides.map(r => r.ride_id);
+        const [[{ count }]] = await db.query(
+          'SELECT COUNT(*) as count FROM Messages WHERE related_type = "request" AND related_id IN (?) AND read_at IS NULL AND sender_id != ?',
+          [rideIds, req.session.userId]
+        );
+        groupUnreadCount = count;
+      }
+      
+      const totalUnreadCount = directUnreadCount + groupUnreadCount;
+      res.locals.unreadCount = totalUnreadCount;
+      console.log('DEBUG unreadCount for user', req.session.userId, ':', totalUnreadCount, '(direct:', directUnreadCount, 'group:', groupUnreadCount, ')'); // Debug line
     } catch (err) {
       res.locals.unreadCount = 0;
       console.log('DEBUG unreadCount error:', err);
