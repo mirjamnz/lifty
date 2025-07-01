@@ -1,0 +1,117 @@
+<%- include('partials/header1') %>
+<%- include('partials/navbar1') %>
+
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+      <div class="card shadow-lg border-success">
+        <div class="card-header bg-success text-white">
+          <h4 class="mb-0"><i class="fas fa-car me-2"></i>Offer a Ride</h4>
+        </div>
+        <div class="card-body">
+          <form action="/rides/offer-ride" method="POST">
+            <div class="mb-3">
+              <label for="school" class="form-label">School or Destination <span class="text-danger">*</span></label>
+              <input name="school" id="school" type="text" class="form-control autocomplete" data-type="school" placeholder="e.g. Northcote College" required autocomplete="off">
+              <div class="form-text">Enter the school or event you are driving to.</div>
+            </div>
+            <div class="mb-3">
+              <label for="available_seats" class="form-label">Available Seats <span class="text-danger">*</span></label>
+              <input type="number" name="available_seats" id="available_seats" class="form-control" placeholder="e.g. 3" min="1" required>
+              <div class="form-text">How many children can you take (excluding your own)?</div>
+            </div>
+            <div class="mb-3">
+              <label for="pickup_time" class="form-label">Pickup Time <span class="text-danger">*</span></label>
+              <input type="text" name="pickup_time" id="pickup_time" class="form-control flatpickr-input" placeholder="Select date & time" required autocomplete="off">
+              <div class="form-text">When will you leave for the destination?</div>
+            </div>
+            <div class="mb-3">
+              <label for="notes" class="form-label">Notes (optional)</label>
+              <textarea name="notes" id="notes" class="form-control" placeholder="Any special instructions or requirements?"></textarea>
+            </div>
+            <div class="mb-3">
+              <label for="requirements" class="form-label">Special Requirements (optional)</label>
+              <input type="text" name="requirements" id="requirements" class="form-control" placeholder="e.g. Booster seat, allergy info">
+            </div>
+            <div class="d-grid">
+              <button class="btn btn-success btn-lg" type="submit">Offer Ride</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@10.2.7/dist/css/autoComplete.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@10.2.7/dist/autoComplete.min.js"></script>
+<style>
+.autoComplete_highlighted {
+  background-color: #e3f0ff !important;
+  color: #222 !important;
+}
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  flatpickr("#pickup_time", {
+    enableTime: true,
+    dateFormat: "Y-m-d H:i",
+    minDate: "today"
+  });
+
+  document.querySelectorAll('.autocomplete').forEach(input => {
+    const type = input.dataset.type || 'organization';
+    const userHome = "<%= session.user && session.user.home_address ? session.user.home_address.replace(/\"/g, '&quot;') : '' %>";
+    new autoComplete({
+      selector: () => input,
+      threshold: 1,
+      debounce: 200,
+      searchEngine: "loose",
+      data: {
+        src: async (query) => {
+          let results = [];
+          if (query.trim().toLowerCase() === 'home' && userHome) {
+            results.push({ label: `🏠 Home Address (${userHome})`, value: userHome });
+          }
+          try {
+            const res = await fetch(`/organizations/autocomplete?term=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}`);
+            const orgs = await res.json();
+            results = results.concat(orgs);
+          } catch (err) {
+            console.error("Autocomplete fetch error", err);
+          }
+          return results;
+        },
+        keys: ["label"]
+      },
+      resultsList: {
+        noResults: true,
+        maxResults: 10,
+        render: true
+      },
+      resultItem: {
+        highlight: true,
+        content: (data) => data.label
+      },
+      onSelection: (feedback) => {
+        const selected = feedback.selection.value;
+        input.value = selected.value || selected.label || "";
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      },
+      events: {
+        input: {
+          selection: (event) => {
+            const feedback = event.detail;
+            const selected = feedback.selection.value;
+            event.target.value = selected.value || selected.label || "";
+            event.target.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+      }
+    });
+  });
+});
+</script>
+<%- include('partials/footer1') %> 

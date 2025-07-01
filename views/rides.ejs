@@ -44,10 +44,13 @@
               <% myBookings.forEach(booking => { %>
                 <tr>
                   <td>
-                    <strong><%= booking.child_name %></strong>
+                    <strong><%= booking.child_names %></strong>
+                    <% if (booking.child_count > 1) { %>
+                      <br><small class="text-muted"><%= booking.child_count %> children</small>
+                    <% } %>
                     <br><small class="text-muted">
                       <% if (booking.booking_type === 'passenger') { %>
-                        My child
+                        My children
                       <% } else { %>
                         I'm driving
                       <% } %>

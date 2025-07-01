@@ -73,17 +73,18 @@ router.get('/', async (req, res) => {
       ORDER BY ro.pickup_time DESC
     `, [userId]);
 
-    // Get bookings made by current user (both as passenger and driver)
+    // Get bookings made by current user (both as passenger and driver) - consolidated by ride
     const [myBookings] = await db.query(`
       SELECT 
-        rb.id,
-        rb.status,
-        rb.notes,
+        ro.id,
+        'confirmed' AS status,
+        ro.notes,
         ro.school,
         'Home' AS pickup_location,
         ro.pickup_time,
         u.name AS driver_name,
-        c.name AS child_name,
+        GROUP_CONCAT(c.name SEPARATOR ', ') AS child_names,
+        COUNT(c.id) AS child_count,
         'passenger' AS booking_type,
         rb.user_id AS booking_user_id,
         'offer' AS ride_type
@@ -92,18 +93,20 @@ router.get('/', async (req, res) => {
       JOIN Users u ON ro.user_id = u.id
       JOIN Children c ON rb.child_id = c.id
       WHERE rb.user_id = ? AND rb.status = 'confirmed'
+      GROUP BY ro.id, ro.school, ro.pickup_time, ro.notes, u.name, rb.user_id
       
       UNION ALL
       
       SELECT 
-        rb.id,
-        rb.status,
-        rb.notes,
+        ro.id,
+        'confirmed' AS status,
+        ro.notes,
         ro.school,
         'Home' AS pickup_location,
         ro.pickup_time,
         ? AS driver_name,
-        c.name AS child_name,
+        GROUP_CONCAT(c.name SEPARATOR ', ') AS child_names,
+        COUNT(c.id) AS child_count,
         'driver' AS booking_type,
         rb.user_id AS booking_user_id,
         'offer' AS ride_type
@@ -112,6 +115,7 @@ router.get('/', async (req, res) => {
       JOIN Children c ON rb.child_id = c.id
       JOIN Users u ON rb.user_id = u.id
       WHERE ro.user_id = ? AND rb.status = 'confirmed'
+      GROUP BY ro.id, ro.school, ro.pickup_time, ro.notes, rb.user_id
       
       UNION ALL
       
@@ -123,7 +127,8 @@ router.get('/', async (req, res) => {
         rr.pickup_location,
         rr.pickup_time,
         ? AS driver_name,
-        c.name AS child_name,
+        c.name AS child_names,
+        1 AS child_count,
         'driver' AS booking_type,
         rr.user_id AS booking_user_id,
         'request' AS ride_type
@@ -342,6 +347,20 @@ router.post('/cancel-offer/:id', async (req, res) => {
     console.error('Cancel Ride Offer Error:', err);
     res.status(500).send('Could not cancel the offer.');
   }
+});
+
+// GET /rides/offer — dedicated offer a ride page
+router.get('/offer', async (req, res) => {
+  if (!req.session.userId) return res.redirect('/login');
+  res.render('rides-offer', { session: req.session });
+});
+
+// GET /rides/request — dedicated request a pickup page
+router.get('/request', async (req, res) => {
+  if (!req.session.userId) return res.redirect('/login');
+  // Get children for the dropdown
+  const [children] = await db.query('SELECT * FROM Children WHERE user_id = ?', [req.session.userId]);
+  res.render('rides-request', { session: req.session, children });
 });
 
 module.exports = router;
