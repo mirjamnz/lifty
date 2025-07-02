@@ -67,6 +67,15 @@
               <% if (request.status === 'Assigned') { %>
                 <a href="/messages/group/ride/<%= request.id %>" class="btn btn-sm btn-outline-primary ms-2">Chat</a>
               <% } %>
+              <% if (request.status !== 'completed') { %>
+                <form action="/child-dashboard/complete-request/<%= request.id %>" method="POST" style="display:inline;">
+                  <button type="submit" class="btn btn-sm btn-success ms-2">Mark as Complete</button>
+                </form>
+              <% } else { %>
+                <form action="/child-dashboard/undo-complete/<%= request.id %>" method="POST" style="display:inline;">
+                  <button type="submit" class="btn btn-sm btn-warning ms-2">Undo Complete</button>
+                </form>
+              <% } %>
             </div>
           </div>
         </div>

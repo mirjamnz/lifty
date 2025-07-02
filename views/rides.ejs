@@ -252,10 +252,12 @@
                 <td><%= request.note || '—' %></td>
                 <td><span data-time="<%= request.pickup_time %>"><%= new Date(request.pickup_time).toLocaleString() %></span></td>
                 <td>
-                  <% if (!request.assigned_user_id) { %>
-                    <span class="badge bg-warning text-dark">Waiting</span>
+                  <% if (request.status === 'completed') { %>
+                    <span class="badge bg-success">Completed</span>
+                  <% } else if (!request.assigned_user_id) { %>
+                    <span class="badge bg-warning text-dark">Pending</span>
                   <% } else { %>
-                    <span class="badge bg-success">Assigned</span><br><small><%= request.assigned_driver_name %></small>
+                    <span class="badge bg-primary">Assigned</span><br><small><%= request.assigned_driver_name %></small>
                   <% } %>
                 </td>
                 <td class="d-flex gap-1">
