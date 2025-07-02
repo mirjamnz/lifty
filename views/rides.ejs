@@ -3,7 +3,12 @@
 <%- include('partials/navbar1') %>
 
 <div class="container py-5">
-  <h2 class="mb-4">🚗 My Rides, <%= session.userName %>!</h2>
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">🚗 My Rides, <%= session.userName %>!</h2>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createRideModal">
+      <i class="fas fa-plus me-2"></i>Quick Create
+    </button>
+  </div>
 
   <!-- Success Messages -->
   <% if (typeof success !== 'undefined' && success) { %>
@@ -22,129 +27,140 @@
   <% } %>
 
   <!-- My Bookings Section - Moved to top for importance -->
-  <% if (myBookings && myBookings.length > 0) { %>
+  <% const drivingBookings = myBookings.filter(b => b.booking_type === 'driver'); %>
+  <% const childBookings = myBookings.filter(b => b.booking_type === 'passenger'); %>
+
+  <% if (drivingBookings.length > 0 || childBookings.length > 0) { %>
     <div class="card mb-4 border-success">
       <div class="card-header bg-success text-white">
         <h5 class="mb-0"><i class="fas fa-calendar-check me-2"></i>📋 My Bookings</h5>
       </div>
       <div class="card-body">
-        <div class="table-responsive">
-          <table class="table table-hover">
-            <thead class="table-light">
-              <tr>
-                <th>Child</th>
-                <th>Route</th>
-                <th>Driver</th>
-                <th>Pickup Time</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% myBookings.forEach(booking => { %>
+        <% if (drivingBookings.length > 0) { %>
+          <h6 class="mb-3 text-success"><i class="fas fa-car me-2"></i>🚗 I'm Driving</h6>
+          <div class="table-responsive mb-4">
+            <table class="table table-hover table-bordered align-middle">
+              <thead class="table-light">
                 <tr>
-                  <td>
-                    <strong><%= booking.child_names %></strong>
-                    <% if (booking.child_count > 1) { %>
-                      <br><small class="text-muted"><%= booking.child_count %> children</small>
-                    <% } %>
-                    <br><small class="text-muted">
-                      <% if (booking.booking_type === 'passenger') { %>
-                        My children
-                      <% } else { %>
-                        I'm driving
-                      <% } %>
-                    </small>
-                  </td>
-                  <td>
-                    <div class="d-flex align-items-center">
-                      <i class="fas fa-map-marker-alt text-danger me-1"></i>
-                      <% if (booking.ride_type === 'request') { %>
-                        <small><%= booking.pickup_location || 'Pickup' %></small>
-                      <% } else { %>
-                        <small>Home</small>
-                      <% } %>
-                      <i class="fas fa-arrow-right mx-2 text-muted"></i>
-                      <i class="fas fa-flag-checkered text-success me-1"></i>
-                      <small><%= booking.school %></small>
-                    </div>
-                  </td>
-                  <td>
-                    <strong><%= booking.driver_name %></strong>
-                    <% if (booking.booking_type === 'driver') { %>
-                      <br><small class="text-success">(You)</small>
-                    <% } %>
-                  </td>
-                  <td><span data-time="<%= booking.pickup_time %>"><%= new Date(booking.pickup_time).toLocaleString() %></span></td>
-                  <td>
-                    <span class="badge bg-success">Confirmed</span>
-                    <% if (booking.booking_type === 'driver') { %>
-                      <br><small class="text-muted">Driver</small>
-                    <% } %>
-                  </td>
-                  <td>
-                    <% if (booking.booking_type === 'passenger' && booking.ride_type === 'offer') { %>
-                      <form action="/rides/cancel-booking/<%= booking.id %>" method="POST" onsubmit="return confirm('Are you sure you want to cancel this booking?')" style="display: inline;">
-                        <button class="btn btn-sm btn-outline-danger">Cancel</button>
-                      </form>
-                    <% } else if (booking.ride_type === 'request') { %>
-                      <a href="/messages/group/ride/<%= booking.id %>" class="btn btn-sm btn-outline-info">
-                        <i class="fas fa-comments me-1"></i>Chat
-                      </a>
-                    <% } else { %>
-                      <span class="text-muted">Driver commitment</span>
-                    <% } %>
-                  </td>
+                  <th>Child(ren)</th>
+                  <th>Route</th>
+                  <th>Driver</th>
+                  <th>Pickup Time</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
-              <% }) %>
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                <% drivingBookings.forEach(booking => { %>
+                  <tr class="table-success">
+                    <td>
+                      <strong><%= booking.child_names %></strong>
+                      <% if (booking.child_count > 1) { %>
+                        <br><small class="text-muted"><%= booking.child_count %> children</small>
+                      <% } %>
+                      <br><small class="text-muted">I'm driving</small>
+                    </td>
+                    <td>
+                      <div class="d-flex align-items-center">
+                        <i class="fas fa-map-marker-alt text-danger me-1"></i>
+                        <% if (booking.ride_type === 'request') { %>
+                          <small><%= booking.pickup_location || 'Pickup' %></small>
+                        <% } else { %>
+                          <small>Home</small>
+                        <% } %>
+                        <i class="fas fa-arrow-right mx-2 text-muted"></i>
+                        <i class="fas fa-flag-checkered text-success me-1"></i>
+                        <small><%= booking.school %></small>
+                      </div>
+                    </td>
+                    <td>
+                      <strong><%= booking.driver_name %></strong>
+                      <br><small class="text-success">(You)</small>
+                    </td>
+                    <td><span data-time="<%= booking.pickup_time %>"><%= new Date(booking.pickup_time).toLocaleString() %></span></td>
+                    <td>
+                      <span class="badge bg-success">Confirmed</span>
+                      <br><small class="text-muted">Driver</small>
+                    </td>
+                    <td>
+                      <% if (booking.ride_type === 'request') { %>
+                        <a href="/messages/group/ride/<%= booking.id %>" class="btn btn-sm btn-outline-info">
+                          <i class="fas fa-comments me-1"></i>Chat
+                        </a>
+                      <% } else { %>
+                        <span class="text-muted">Driver commitment</span>
+                      <% } %>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+        <% if (childBookings.length > 0) { %>
+          <h6 class="mb-3 text-primary"><i class="fas fa-child me-2"></i>🧒 My Kids' Rides</h6>
+          <div class="table-responsive">
+            <table class="table table-hover table-bordered align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Child(ren)</th>
+                  <th>Route</th>
+                  <th>Driver</th>
+                  <th>Pickup Time</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% childBookings.forEach(booking => { %>
+                  <tr class="table-primary">
+                    <td>
+                      <strong><%= booking.child_names %></strong>
+                      <% if (booking.child_count > 1) { %>
+                        <br><small class="text-muted"><%= booking.child_count %> children</small>
+                      <% } %>
+                      <br><small class="text-muted">My children</small>
+                    </td>
+                    <td>
+                      <div class="d-flex align-items-center">
+                        <i class="fas fa-map-marker-alt text-danger me-1"></i>
+                        <% if (booking.ride_type === 'request') { %>
+                          <small><%= booking.pickup_location || 'Pickup' %></small>
+                        <% } else { %>
+                          <small>Home</small>
+                        <% } %>
+                        <i class="fas fa-arrow-right mx-2 text-muted"></i>
+                        <i class="fas fa-flag-checkered text-success me-1"></i>
+                        <small><%= booking.school %></small>
+                      </div>
+                    </td>
+                    <td>
+                      <strong><%= booking.driver_name %></strong>
+                    </td>
+                    <td><span data-time="<%= booking.pickup_time %>"><%= new Date(booking.pickup_time).toLocaleString() %></span></td>
+                    <td>
+                      <span class="badge bg-success">Confirmed</span>
+                    </td>
+                    <td>
+                      <% if (booking.ride_type === 'offer') { %>
+                        <form action="/rides/cancel-booking/<%= booking.id %>" method="POST" onsubmit="return confirm('Are you sure you want to cancel this booking?')" style="display: inline;">
+                          <button class="btn btn-sm btn-outline-danger">Cancel</button>
+                        </form>
+                      <% } else if (booking.ride_type === 'request') { %>
+                        <a href="/messages/group/ride/<%= booking.id %>" class="btn btn-sm btn-outline-info">
+                          <i class="fas fa-comments me-1"></i>Chat
+                        </a>
+                      <% } %>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
       </div>
     </div>
   <% } %>
-
-  <!-- Quick Create Section (Less prominent since navbar has Create New) -->
-  <div class="card mb-4 border-primary">
-    <div class="card-header bg-primary text-white">
-      <h5 class="mb-0">➕ Quick Create</h5>
-    </div>
-    <div class="card-body">
-      <div class="row g-4">
-        <div class="col-md-6">
-          <div class="p-3 bg-light border rounded shadow-sm h-100 d-flex flex-column justify-content-between">
-            <h5>🚘 Offer a Ride</h5>
-            <form action="/rides/offer-ride" method="POST" class="flex-grow-1 d-flex flex-column">
-              <input name="school" type="text" class="form-control mb-2 autocomplete" data-type="school" placeholder="School Name" required>
-              <input type="number" name="available_seats" class="form-control mb-2" placeholder="Seats Available" min="1" required>
-              <input type="text" name="pickup_time" class="form-control flatpickr-input mb-2" id="offerPickupTime" placeholder="Select Date & Time" required>
-              <textarea name="notes" class="form-control mb-2" placeholder="Optional notes..."></textarea>
-              <button class="btn btn-primary w-100">🚗 Offer Ride</button>
-            </form>
-          </div>
-        </div>
-
-        <div class="col-md-6">
-          <div class="p-3 bg-light border rounded shadow-sm h-100 d-flex flex-column justify-content-between">
-            <h5>📣 Request a Pickup</h5>
-            <form action="/requests/request-ride" method="POST" class="flex-grow-1 d-flex flex-column">
-              <input name="pickup_location" id="pickup_location" type="text" class="form-control mb-2 autocomplete" data-type="organization" placeholder="Search School, Club, or Event" required>
-              <input name="dropoff_location" id="dropoff_location" type="text" class="form-control mb-2 autocomplete" data-type="organization" placeholder="Search School, Club, or Event" required>
-              <input type="text" name="pickup_time" class="form-control flatpickr-input mb-2" id="requestPickupTime" placeholder="Select Date & Time" required>
-              <select name="child_id" class="form-select mb-2" required>
-                <option disabled selected>Select Your Child</option>
-                <% children.forEach(child => { %>
-                  <option value="<%= child.id %>"><%= child.name %> – <%= child.school %></option>
-                <% }) %>
-              </select>
-              <textarea name="note" class="form-control mb-2" placeholder="Additional details..."></textarea>
-              <button class="btn btn-primary w-100">📣 Request Pickup</button>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- Current Listings Section -->
   <div class="card mb-4 border-success">

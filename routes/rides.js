@@ -352,15 +352,17 @@ router.post('/cancel-offer/:id', async (req, res) => {
 // GET /rides/offer — dedicated offer a ride page
 router.get('/offer', async (req, res) => {
   if (!req.session.userId) return res.redirect('/login');
-  res.render('rides-offer', { session: req.session });
+  const [[user]] = await db.query('SELECT * FROM Users WHERE id = ?', [req.session.userId]);
+  res.render('rides-offer', { session: req.session, user });
 });
 
 // GET /rides/request — dedicated request a pickup page
 router.get('/request', async (req, res) => {
   if (!req.session.userId) return res.redirect('/login');
+  const [[user]] = await db.query('SELECT * FROM Users WHERE id = ?', [req.session.userId]);
   // Get children for the dropdown
   const [children] = await db.query('SELECT * FROM Children WHERE user_id = ?', [req.session.userId]);
-  res.render('rides-request', { session: req.session, children });
+  res.render('rides-request', { session: req.session, user, children });
 });
 
 module.exports = router;

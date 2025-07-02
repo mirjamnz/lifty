@@ -52,6 +52,10 @@
   background-color: #e3f0ff !important;
   color: #222 !important;
 }
+input.form-control.autocomplete:focus, input.form-control.autocomplete:active, input.form-control.autocomplete.filled {
+  background-color: #e3f0ff !important;
+  color: #222 !important;
+}
 </style>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -63,7 +67,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   document.querySelectorAll('.autocomplete').forEach(input => {
     const type = input.dataset.type || 'organization';
-    const userHome = "<%= session.user && session.user.home_address ? session.user.home_address.replace(/\"/g, '&quot;') : '' %>";
+    const userHome = "<%= user && user.home_address ? user.home_address.replace(/\"/g, '&quot;') : '' %>";
     new autoComplete({
       selector: () => input,
       threshold: 1,
@@ -98,6 +102,7 @@ document.addEventListener('DOMContentLoaded', function() {
       onSelection: (feedback) => {
         const selected = feedback.selection.value;
         input.value = selected.value || selected.label || "";
+        input.classList.add('filled');
         input.dispatchEvent(new Event('input', { bubbles: true }));
       },
       events: {
@@ -106,6 +111,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const feedback = event.detail;
             const selected = feedback.selection.value;
             event.target.value = selected.value || selected.label || "";
+            event.target.classList.add('filled');
             event.target.dispatchEvent(new Event('input', { bubbles: true }));
           }
         }
