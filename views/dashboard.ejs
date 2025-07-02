@@ -40,6 +40,7 @@
           <h5 class="card-title mb-3">👶 Your Children</h5>
 
           <% if (children.length > 0) { %>
+            <h5 class="card-title mb-3">👨‍👩‍👧‍👦 My Family / Whānau</h5>
             <ul class="list-group mb-4">
               <% children.forEach(child => { %>
                 <li class="list-group-item">
@@ -47,6 +48,12 @@
                     <div>
                       <strong><%= child.name %></strong> – <%= child.school %>
                       <% if (child.club) { %> | Club: <%= child.club %> <% } %>
+                      <% if (child.parents && child.parents.length > 0) { %>
+                        <br>
+                        <small class="text-muted">
+                          Parents: <%= child.parents.map(p => p.name + ' (' + p.email + ')').join(', ') %>
+                        </small>
+                      <% } %>
                     </div>
                     <div>
                       <button class="btn btn-sm btn-outline-secondary me-2" data-bs-toggle="collapse" data-bs-target="#editForm<%= child.id %>">✏️</button>
@@ -69,6 +76,16 @@
                       </div>
                     </form>
                   </div>
+                  <% if (child.parents && child.parents.some(p => p.id === session.userId)) { %>
+                    <form action="/children/<%= child.id %>/invite-parent" method="POST" class="row g-2 mt-2">
+                      <div class="col">
+                        <input type="text" name="invite_email_or_username" class="form-control" placeholder="Invite/link parent by email or username" required>
+                      </div>
+                      <div class="col-auto">
+                        <button type="submit" class="btn btn-outline-primary btn-sm">Add Parent</button>
+                      </div>
+                    </form>
+                  <% } %>
                 </li>
               <% }) %>
             </ul>

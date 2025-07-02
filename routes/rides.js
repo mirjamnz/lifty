@@ -360,8 +360,12 @@ router.get('/offer', async (req, res) => {
 router.get('/request', async (req, res) => {
   if (!req.session.userId) return res.redirect('/login');
   const [[user]] = await db.query('SELECT * FROM Users WHERE id = ?', [req.session.userId]);
-  // Get children for the dropdown
-  const [children] = await db.query('SELECT * FROM Children WHERE user_id = ?', [req.session.userId]);
+  // Get children for the dropdown using ParentChild join
+  const [children] = await db.query(`
+    SELECT c.* FROM Children c
+    JOIN ParentChild pc ON pc.child_id = c.id
+    WHERE pc.parent_id = ?
+  `, [req.session.userId]);
   res.render('rides-request', { session: req.session, user, children });
 });
 

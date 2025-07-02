@@ -11,12 +11,36 @@ router.get('/dashboard', async (req, res) => {
 
   try {
     const [[user]] = await db.query('SELECT * FROM Users WHERE id = ?', [userId]);
-    const [children] = await db.query('SELECT * FROM Children WHERE user_id = ?', [userId]);
+    const [children] = await db.query(`
+      SELECT c.* FROM Children c
+      JOIN ParentChild pc ON pc.child_id = c.id
+      WHERE pc.parent_id = ?
+    `, [userId]);
     const [neighbors] = await db.query(`
       SELECT id, name, home_lat, home_lng
       FROM Users
       WHERE home_lat IS NOT NULL AND id != ?
     `, [userId]);
+
+    // Fetch all parents for these children
+    const childIds = children.map(c => c.id);
+    let parentsByChild = {};
+    if (childIds.length > 0) {
+      const [parents] = await db.query(`
+        SELECT pc.child_id, u.id, u.name, u.email
+        FROM ParentChild pc
+        JOIN Users u ON u.id = pc.parent_id
+        WHERE pc.child_id IN (?)
+      `, [childIds]);
+      parentsByChild = parents.reduce((acc, p) => {
+        if (!acc[p.child_id]) acc[p.child_id] = [];
+        acc[p.child_id].push({ id: p.id, name: p.name, email: p.email });
+        return acc;
+      }, {});
+      children.forEach(child => {
+        child.parents = parentsByChild[child.id] || [];
+      });
+    }
 
     res.render('dashboard', {
       session: req.session,
@@ -57,7 +81,7 @@ router.post('/add-child', async (req, res) => {
   const parentId = req.session.userId;
   if (!parentId) return res.redirect('/login');
 
-  const { name, school, club, child_username, child_password } = req.body;
+  const { name, school, club, child_username, child_password, invite_email_or_username } = req.body;
 
   if (!name || !school) {
     req.session.error = "Name and school are required.";
@@ -71,6 +95,29 @@ router.post('/add-child', async (req, res) => {
     );
 
     const childId = childResult.insertId;
+
+    await db.query(
+      'INSERT INTO ParentChild (parent_id, child_id) VALUES (?, ?)',
+      [parentId, childId]
+    );
+
+    // Handle invite/link for another parent/caregiver
+    if (invite_email_or_username) {
+      const [[otherParent]] = await db.query(
+        'SELECT id FROM Users WHERE email = ? OR username = ?',
+        [invite_email_or_username, invite_email_or_username]
+      );
+      if (otherParent) {
+        await db.query(
+          'INSERT IGNORE INTO ParentChild (parent_id, child_id) VALUES (?, ?)',
+          [otherParent.id, childId]
+        );
+        // Optionally: send notification/invite email here
+      } else {
+        // Optionally: create a new user and link, or show error
+        // For now, just ignore if not found
+      }
+    }
 
     if (child_username && child_password) {
       const hashed = await bcrypt.hash(child_password, 10);
@@ -107,7 +154,7 @@ router.post('/add-child', async (req, res) => {
 router.post('/edit-child/:id', async (req, res) => {
   const parentId = req.session.userId;
   const childId = req.params.id;
-  const { name, school, club } = req.body;
+  const { name, school, club, invite_email_or_username } = req.body;
 
   if (!parentId || !childId || !name || !school) {
     return res.status(400).send('Parent ID, child ID, name, and school are required.');
@@ -127,6 +174,24 @@ router.post('/edit-child/:id', async (req, res) => {
       'UPDATE Children SET name = ?, school = ?, club = ? WHERE id = ?',
       [name.trim(), school.trim(), club?.trim() || null, childId]
     );
+
+    // Handle invite/link for another parent/caregiver
+    if (invite_email_or_username) {
+      const [[otherParent]] = await db.query(
+        'SELECT id FROM Users WHERE email = ? OR username = ?',
+        [invite_email_or_username, invite_email_or_username]
+      );
+      if (otherParent) {
+        await db.query(
+          'INSERT IGNORE INTO ParentChild (parent_id, child_id) VALUES (?, ?)',
+          [otherParent.id, childId]
+        );
+        // Optionally: send notification/invite email here
+      } else {
+        // Optionally: create a new user and link, or show error
+        // For now, just ignore if not found
+      }
+    }
 
     // Update the associated User record if it exists
     const [[user]] = await db.query(
@@ -157,14 +222,50 @@ router.get('/delete-child/:id', async (req, res) => {
   if (!userId) return res.redirect('/login');
 
   try {
-    await db.query(
-      'DELETE FROM Children WHERE id = ? AND user_id = ?',
-      [childId, userId]
-    );
+    await db.query('DELETE FROM ParentChild WHERE child_id = ? AND parent_id = ?', [childId, userId]);
+    const [[linkCount]] = await db.query('SELECT COUNT(*) as cnt FROM ParentChild WHERE child_id = ?', [childId]);
+    if (linkCount.cnt === 0) {
+      await db.query('DELETE FROM Children WHERE id = ?', [childId]);
+    }
     res.redirect('/dashboard');
   } catch (err) {
     console.error('Delete child error:', err);
     res.status(500).send('Failed to delete child.');
+  }
+});
+
+// POST /children/:id/invite-parent
+router.post('/children/:id/invite-parent', async (req, res) => {
+  const parentId = req.session.userId;
+  const childId = req.params.id;
+  const { invite_email_or_username } = req.body;
+
+  if (!parentId || !childId || !invite_email_or_username) {
+    req.session.error = "All fields are required.";
+    return res.redirect('/dashboard');
+  }
+
+  try {
+    // Allow lookup by email, username, or name (unique name enforcement can be added later)
+    const [[otherParent]] = await db.query(
+      'SELECT id, name, email, username FROM Users WHERE email = ? OR username = ? OR name = ?',
+      [invite_email_or_username, invite_email_or_username, invite_email_or_username]
+    );
+    console.log('Invite lookup:', invite_email_or_username, otherParent);
+    if (otherParent) {
+      await db.query(
+        'INSERT IGNORE INTO ParentChild (parent_id, child_id) VALUES (?, ?)',
+        [otherParent.id, childId]
+      );
+      req.session.success = `Parent '${otherParent.name}' linked successfully!`;
+    } else {
+      req.session.error = "Parent not found.";
+    }
+    res.redirect('/dashboard');
+  } catch (err) {
+    console.error('Invite parent error:', err);
+    req.session.error = "Something went wrong while inviting the parent.";
+    res.redirect('/dashboard');
   }
 });
 
