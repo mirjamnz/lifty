@@ -70,6 +70,52 @@
                      placeholder="e.g., Scout Hall, 123 Main Street" required>
             </div>
 
+            <!-- Group Event Options -->
+            <div class="card mb-4 border-info">
+              <div class="card-header bg-info text-white">
+                <h6 class="mb-0">
+                  <i class="fas fa-users me-2"></i>
+                  Group Event Options
+                </h6>
+              </div>
+              <div class="card-body">
+                <div class="form-check mb-3">
+                  <input class="form-check-input" type="checkbox" id="is_group_event" name="is_group_event">
+                  <label class="form-check-label" for="is_group_event">
+                    <strong>This is a group event</strong> - Multiple families can join and coordinate together
+                  </label>
+                </div>
+
+                <div id="groupOptions" style="display: none;">
+                  <div class="row">
+                    <div class="col-md-6 mb-3">
+                      <label for="max_participants" class="form-label">Maximum Participants</label>
+                      <input type="number" class="form-control" id="max_participants" name="max_participants" 
+                             min="1" placeholder="Leave empty for unlimited">
+                      <small class="text-muted">Maximum number of families that can join</small>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="auto_assign" name="auto_assign">
+                        <label class="form-check-label" for="auto_assign">
+                          <strong>Auto-assign drivers</strong>
+                        </label>
+                        <br><small class="text-muted">Automatically rotate driving duties among group members</small>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="mb-3">
+                    <label for="group_description" class="form-label">Group Description</label>
+                    <textarea class="form-control" id="group_description" name="group_description" rows="3" 
+                              placeholder="Special instructions for group members, coordination details, etc..."></textarea>
+                    <small class="text-muted">This will be shown to all group members</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="d-flex justify-content-between">
               <a href="/recurring-events" class="btn btn-outline-secondary">
                 <i class="fas fa-arrow-left me-2"></i>Cancel
@@ -96,8 +142,11 @@
               <h6><i class="fas fa-1 me-2"></i>Create Event</h6>
               <p class="text-muted">Set up a recurring activity like Scouts every Thursday.</p>
               
-              <h6><i class="fas fa-2 me-2"></i>Share & Subscribe</h6>
-              <p class="text-muted">Other parents can subscribe their children to your event.</p>
+              <h6><i class="fas fa-2 me-2"></i>Choose Type</h6>
+              <p class="text-muted">
+                <strong>Individual:</strong> Parents subscribe their children individually.<br>
+                <strong>Group:</strong> Multiple families join together and coordinate.
+              </p>
             </div>
             <div class="col-md-6">
               <h6><i class="fas fa-3 me-2"></i>Assign Duties</h6>
@@ -107,6 +156,20 @@
               <p class="text-muted">Use the built-in messaging to coordinate with other parents.</p>
             </div>
           </div>
+
+          <!-- Group Event Benefits -->
+          <div class="mt-4 p-3 bg-light rounded">
+            <h6 class="text-info">
+              <i class="fas fa-users me-2"></i>
+              Group Events - Perfect for:
+            </h6>
+            <ul class="mb-0">
+              <li><strong>Scouts/Girl Guides:</strong> Weekly meetings with rotating parent drivers</li>
+              <li><strong>Sports Teams:</strong> Practice sessions and game transportation</li>
+              <li><strong>Music Lessons:</strong> Group classes with shared pickup/dropoff</li>
+              <li><strong>School Clubs:</strong> After-school activities with parent coordination</li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>
@@ -114,6 +177,21 @@
 </div>
 
 <script>
+// Toggle group options visibility
+document.getElementById('is_group_event').addEventListener('change', function() {
+  const groupOptions = document.getElementById('groupOptions');
+  groupOptions.style.display = this.checked ? 'block' : 'none';
+  
+  // Update form validation
+  const groupFields = ['max_participants', 'group_description'];
+  groupFields.forEach(field => {
+    const element = document.getElementById(field);
+    if (element) {
+      element.required = this.checked && element.hasAttribute('data-required');
+    }
+  });
+});
+
 // Validate that end time is after start time
 document.getElementById('end_time').addEventListener('change', function() {
   const startTime = document.getElementById('start_time').value;
@@ -133,6 +211,18 @@ document.getElementById('start_time').addEventListener('change', function() {
     const start = new Date(`2000-01-01T${this.value}`);
     start.setHours(start.getHours() + 1);
     endTime.value = start.toTimeString().slice(0, 5);
+  }
+});
+
+// Form validation
+document.querySelector('form').addEventListener('submit', function(e) {
+  const isGroupEvent = document.getElementById('is_group_event').checked;
+  const maxParticipants = document.getElementById('max_participants').value;
+  
+  if (isGroupEvent && maxParticipants && parseInt(maxParticipants) < 1) {
+    e.preventDefault();
+    alert('Maximum participants must be at least 1');
+    return false;
   }
 });
 </script>

@@ -10,47 +10,63 @@ router.get('/dashboard', async (req, res) => {
   if (!userId) return res.redirect('/login');
 
   try {
-    const [[user]] = await db.query('SELECT * FROM Users WHERE id = ?', [userId]);
+    // Get current user data (for home address display)
+    const [[user]] = await db.query(
+      'SELECT id, name, email, home_address, home_lat, home_lng FROM Users WHERE id = ?',
+      [userId]
+    );
+
+    // Get user's children using ParentChild join
     const [children] = await db.query(`
       SELECT c.* FROM Children c
       JOIN ParentChild pc ON pc.child_id = c.id
       WHERE pc.parent_id = ?
     `, [userId]);
+
+    // Get all parents for each child
+    for (let child of children) {
+      const [parents] = await db.query(`
+        SELECT u.id, u.name, u.email FROM Users u
+        JOIN ParentChild pc ON pc.parent_id = u.id
+        WHERE pc.child_id = ?
+      `, [child.id]);
+      child.parents = parents;
+    }
+
+    // Get other users with locations (for map display)
     const [neighbors] = await db.query(`
-      SELECT id, name, home_lat, home_lng
-      FROM Users
-      WHERE home_lat IS NOT NULL AND id != ?
+      SELECT id, name, home_address, home_lat, home_lng 
+      FROM Users 
+      WHERE id != ? AND home_lat IS NOT NULL AND home_lng IS NOT NULL AND home_address IS NOT NULL
+      ORDER BY name
     `, [userId]);
 
-    // Fetch all parents for these children
-    const childIds = children.map(c => c.id);
-    let parentsByChild = {};
-    if (childIds.length > 0) {
-      const [parents] = await db.query(`
-        SELECT pc.child_id, u.id, u.name, u.email
-        FROM ParentChild pc
-        JOIN Users u ON u.id = pc.parent_id
-        WHERE pc.child_id IN (?)
-      `, [childIds]);
-      parentsByChild = parents.reduce((acc, p) => {
-        if (!acc[p.child_id]) acc[p.child_id] = [];
-        acc[p.child_id].push({ id: p.id, name: p.name, email: p.email });
-        return acc;
-      }, {});
-      children.forEach(child => {
-        child.parents = parentsByChild[child.id] || [];
-      });
-    }
+    // Get group invitations for this user
+    const [groupInvitations] = await db.query(`
+      SELECT egi.*, re.name AS event_name, re.day_of_week, re.start_time, re.end_time, re.location, u.name AS inviter_name
+      FROM EventGroupInvitations egi
+      JOIN RecurringEvents re ON egi.event_id = re.id
+      JOIN Users u ON egi.inviter_id = u.id
+      WHERE egi.invitee_email = (SELECT email FROM Users WHERE id = ?) AND egi.status = 'pending'
+      ORDER BY egi.invited_at DESC
+    `, [userId]);
 
     res.render('dashboard', {
       session: req.session,
       user,
       children,
-      neighbors
+      neighbors,
+      groupInvitations,
+      success: req.session.success,
+      error: req.session.error
     });
+
+    // Clear session messages
+    delete req.session.success;
+    delete req.session.error;
   } catch (err) {
     console.error('Dashboard error:', err);
-    res.status(500).send('Error loading dashboard.');
+    res.status(500).send('Failed to load dashboard.');
   }
 });
 
@@ -59,20 +75,34 @@ router.post('/update-address', async (req, res) => {
   const userId = req.session.userId;
   const { home_address, home_lat, home_lng } = req.body;
 
-  if (!home_address || !home_lat || !home_lng) {
-    return res.status(400).send('Missing address details');
+  console.log('Update address request:', { home_address, home_lat, home_lng });
+
+  if (!home_address) {
+    req.session.error = "Home address is required.";
+    return res.redirect('/dashboard');
+  }
+
+  // If coordinates are missing, try to geocode the address
+  let lat = home_lat;
+  let lng = home_lng;
+
+  if (!lat || !lng) {
+    req.session.error = "Please select an address from the dropdown suggestions to get coordinates.";
+    return res.redirect('/dashboard');
   }
 
   try {
     await db.query(
       'UPDATE Users SET home_address = ?, home_lat = ?, home_lng = ? WHERE id = ?',
-      [home_address, parseFloat(home_lat), parseFloat(home_lng), userId]
+      [home_address, parseFloat(lat), parseFloat(lng), userId]
     );
 
+    req.session.success = "✅ Home address updated successfully!";
     res.redirect('/dashboard');
   } catch (err) {
     console.error('Update address error:', err);
-    res.status(500).send('Failed to update address.');
+    req.session.error = "Failed to update address. Please try again.";
+    res.redirect('/dashboard');
   }
 });
 

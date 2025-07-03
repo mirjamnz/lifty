@@ -12,6 +12,65 @@
         </a>
       </div>
 
+      <!-- Group Invitations Section -->
+      <% if (groupInvitations && groupInvitations.length > 0) { %>
+        <div class="card mb-4 border-warning">
+          <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0">
+              <i class="fas fa-envelope me-2"></i>
+              Group Invitations (<%= groupInvitations.length %>)
+            </h5>
+          </div>
+          <div class="card-body">
+            <% groupInvitations.forEach(invitation => { %>
+              <div class="card mb-3 border-warning">
+                <div class="card-body">
+                  <h6 class="card-title">
+                    <i class="fas fa-users me-2"></i>
+                    <%= invitation.event_name %>
+                  </h6>
+                  <p class="card-text">
+                    <small class="text-muted">
+                      <i class="fas fa-calendar me-1"></i>
+                      <%= invitation.day_of_week %>s, <%= invitation.start_time %> - <%= invitation.end_time %>
+                    </small>
+                    <br>
+                    <small class="text-muted">
+                      <i class="fas fa-map-marker-alt me-1"></i>
+                      <%= invitation.location %>
+                    </small>
+                    <br>
+                    <small class="text-muted">
+                      <i class="fas fa-user me-1"></i>
+                      Invited by <%= invitation.inviter_name %>
+                    </small>
+                    <br>
+                    <small class="text-muted">
+                      <i class="fas fa-clock me-1"></i>
+                      Invited <%= new Date(invitation.invited_at).toLocaleDateString() %>
+                    </small>
+                  </p>
+                  <div class="d-flex gap-2">
+                    <form method="POST" action="/recurring-events/<%= invitation.event_id %>/join" style="display: inline;">
+                      <button type="submit" class="btn btn-success btn-sm">
+                        <i class="fas fa-check me-1"></i>Accept Invitation
+                      </button>
+                    </form>
+                    <form method="POST" action="/recurring-events/<%= invitation.event_id %>/decline-invitation" style="display: inline;">
+                      <input type="hidden" name="invitation_id" value="<%= invitation.id %>">
+                      <button type="submit" class="btn btn-outline-danger btn-sm" 
+                              onclick="return confirm('Are you sure you want to decline this invitation?')">
+                        <i class="fas fa-times me-1"></i>Decline
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            <% }) %>
+          </div>
+        </div>
+      <% } %>
+
       <% if (!messages || messages.length === 0) { %>
         <div class="alert alert-info text-center" role="alert">
           <i class="fas fa-inbox fa-2x mb-3"></i>
@@ -64,7 +123,11 @@
                     <% if (message.related_type && message.related_id) { %>
                       <small class="text-info">
                         <i class="fas fa-link me-1"></i>
-                        Related to: <%= message.related_type === 'request' ? 'Ride Request' : 'Ride Offer' %> #<%= message.related_id %>
+                        Related to: <%= message.related_type === 'request' ? 'Ride Request' : 
+                                       message.related_type === 'group_invitation' ? 'Group Invitation' :
+                                       message.related_type === 'group_invitation_accepted' ? 'Group Invitation Accepted' :
+                                       message.related_type === 'group_invitation_declined' ? 'Group Invitation Declined' :
+                                       'Ride Offer' %> #<%= message.related_id %>
                       </small>
                     <% } %>
                   </div>

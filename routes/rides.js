@@ -139,6 +139,58 @@ router.get('/', async (req, res) => {
       ORDER BY pickup_time DESC
     `, [userId, req.session.userName, userId, req.session.userName, userId]);
 
+    // --- Recurring Event Assignments ---
+    // Get all children for this user (via ParentChild join)
+    const [myChildren] = await db.query(`
+      SELECT c.* FROM Children c
+      JOIN ParentChild pc ON pc.child_id = c.id
+      WHERE pc.parent_id = ?
+    `, [userId]);
+
+    // For each child, get their next upcoming assignment (dropoff/pickup) for each event
+    let recurringAssignments = [];
+    if (myChildren.length > 0) {
+      const childIds = myChildren.map(c => c.id);
+      // Get all upcoming assignments for these children
+      const [allAssignments] = await db.query(`
+        SELECT ea.*, re.name AS event_name, re.location, re.day_of_week, re.start_time, re.end_time, c.name AS child_name, u.name AS assigned_parent_name, c.user_id as child_parent_id
+        FROM EventAssignments ea
+        JOIN RecurringEvents re ON ea.event_id = re.id
+        JOIN Children c ON ea.child_id = c.id
+        JOIN Users u ON ea.user_id = u.id
+        WHERE ea.child_id IN (?) AND ea.event_date >= CURDATE() AND ea.status != 'cancelled' AND ea.is_cancelled = FALSE
+        ORDER BY ea.event_id, ea.child_id, ea.assignment_type, ea.event_date ASC
+      `, [childIds]);
+      // Group by event_id, child_id, assignment_type, and take only the soonest (first) for each
+      const seen = new Set();
+      for (const a of allAssignments) {
+        const key = `${a.event_id}_${a.child_id}_${a.assignment_type}`;
+        if (!seen.has(key)) {
+          recurringAssignments.push(a);
+          seen.add(key);
+        }
+      }
+    }
+    // Optionally: Get assignments where the user is the assigned parent (driver/helper)
+    const [userAssignments] = await db.query(`
+      SELECT ea.*, re.name AS event_name, re.location, re.day_of_week, re.start_time, re.end_time, c.name AS child_name, u.name AS assigned_parent_name, c.user_id as child_parent_id
+      FROM EventAssignments ea
+      JOIN RecurringEvents re ON ea.event_id = re.id
+      JOIN Children c ON ea.child_id = c.id
+      JOIN Users u ON ea.user_id = u.id
+      WHERE ea.user_id = ? AND ea.event_date >= CURDATE() AND ea.status != 'cancelled' AND ea.is_cancelled = FALSE
+      ORDER BY ea.event_id, ea.child_id, ea.assignment_type, ea.event_date ASC
+    `, [userId]);
+    // Group by event_id, child_id, assignment_type, and take only the soonest (first) for each
+    const seenUser = new Set(recurringAssignments.map(a => `${a.event_id}_${a.child_id}_${a.assignment_type}`));
+    for (const a of userAssignments) {
+      const key = `${a.event_id}_${a.child_id}_${a.assignment_type}`;
+      if (!seenUser.has(key)) {
+        recurringAssignments.push(a);
+        seenUser.add(key);
+      }
+    }
+
     res.render('rides', {
       session: req.session,
       children,
@@ -148,7 +200,8 @@ router.get('/', async (req, res) => {
       myBookings,
       filter,
       expired,
-      success: req.query.success
+      success: req.query.success,
+      recurringAssignments
     });
   } catch (err) {
     console.error('GET /rides error:', err);

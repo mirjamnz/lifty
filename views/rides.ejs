@@ -147,6 +147,11 @@
                           <button class="btn btn-sm btn-outline-danger">Cancel</button>
                         </form>
                       <% } else if (booking.ride_type === 'request') { %>
+                        <% if (booking.status !== 'completed') { %>
+                          <form action="/rides/cancel-booking/<%= booking.id %>" method="POST" onsubmit="return confirm('Are you sure you want to cancel this booking?')" style="display: inline;">
+                            <button class="btn btn-sm btn-outline-danger">Cancel</button>
+                          </form>
+                        <% } %>
                         <a href="/messages/group/ride/<%= booking.id %>" class="btn btn-sm btn-outline-info">
                           <i class="fas fa-comments me-1"></i>Chat
                         </a>
@@ -158,6 +163,78 @@
             </table>
           </div>
         <% } %>
+      </div>
+    </div>
+  <% } %>
+
+  <!-- Next Upcoming Recurring Event Rides -->
+  <% if (recurringAssignments && recurringAssignments.length > 0) { %>
+    <div class="card mb-4 border-info">
+      <div class="card-header bg-info text-white">
+        <h5 class="mb-0"><i class="fas fa-calendar-alt me-2"></i>🗓️ Upcoming Recurring Event Rides</h5>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover table-bordered align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Event</th>
+                <th>Child</th>
+                <th>Type</th>
+                <th>Date</th>
+                <th>Assigned To</th>
+                <th>Location</th>
+                <th>Status</th>
+                <th>Notes</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% recurringAssignments.forEach(a => { %>
+                <tr class="<%= a.group_assignment ? 'table-info' : '' %>" 
+                    data-assignment-id="<%= a.id %>" 
+                    data-event-id="<%= a.event_id %>">
+                  <td>
+                    <strong><%= a.event_name %></strong>
+                    <br><small class="text-muted"><%= a.day_of_week %>s, <%= a.start_time %>-<%= a.end_time %></small>
+                    <% if (a.group_assignment) { %>
+                      <br><span class="badge bg-info text-white">Group Event</span>
+                    <% } %>
+                  </td>
+                  <td><%= a.child_name %></td>
+                  <td>
+                    <span class="badge bg-<%= a.assignment_type === 'dropoff' ? 'primary' : 'success' %>">
+                      <i class="fas fa-<%= a.assignment_type === 'dropoff' ? 'sign-in-alt' : 'sign-out-alt' %> me-1"></i>
+                      <%= a.assignment_type.charAt(0).toUpperCase() + a.assignment_type.slice(1) %>
+                    </span>
+                  </td>
+                  <td><span data-time="<%= a.event_date %>"><%= new Date(a.event_date).toLocaleDateString() %></span></td>
+                  <td><%= a.assigned_parent_name %></td>
+                  <td><%= a.location %></td>
+                  <td>
+                    <span class="badge bg-<%= a.status === 'confirmed' ? 'success' : a.status === 'pending' ? 'warning text-dark' : a.status === 'completed' ? 'info' : 'secondary' %>">
+                      <%= a.status.charAt(0).toUpperCase() + a.status.slice(1) %>
+                    </span>
+                  </td>
+                  <td><%= a.notes || '—' %></td>
+                  <td>
+                    <% if (a.group_assignment) { %>
+                      <a href="/recurring-events/<%= a.event_id %>/group" class="btn btn-sm btn-outline-info">
+                        <i class="fas fa-users me-1"></i>Group
+                      </a>
+                    <% } %>
+                    <% if (a.user_id === session.userId || a.child_parent_id === session.userId) { %>
+                      <button class="btn btn-sm btn-outline-danger" 
+                              onclick="showCancelAssignmentModal('<%= a.id %>', '<%= a.child_name %>', '<%= a.event_date %>')">
+                        <i class="fas fa-times me-1"></i>Cancel
+                      </button>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   <% } %>
@@ -261,25 +338,21 @@
                   <% } %>
                 </td>
                 <td class="d-flex gap-1">
-                  <% if (!request.assigned_user_id && request.user_id !== session.userId) { %>
-                    <form action="/requests/assign-request/<%= request.id %>" method="POST" onsubmit="return confirmHelp('<%= request.child_name %>', '<%= request.user_name %>', '<%= request.pickup_location %>', '<%= request.dropoff_location %>', '<%= request.pickup_time %>');">
-                      <button class="btn btn-sm btn-outline-success">Help</button>
-                    </form>
-                  <% } %>
-                  <% if (request.user_id === session.userId) { %>
-                    <form action="/requests/cancel-request/<%= request.id %>" method="POST" onsubmit="return confirm('Are you sure you want to cancel this ride request?');">
-                      <button class="btn btn-sm btn-outline-danger">Cancel</button>
-                    </form>
-                  <% } %>
-                  <% if (request.assigned_user_id) { %>
+                  <% if (request.status !== 'completed') { %>
+                    <% if (!request.assigned_user_id && request.user_id !== session.userId) { %>
+                      <form action="/requests/assign-request/<%= request.id %>" method="POST" onsubmit="return confirmHelp('<%= request.child_name %>', '<%= request.user_name %>', '<%= request.pickup_location %>', '<%= request.dropoff_location %>', '<%= request.pickup_time %>');">
+                        <button class="btn btn-sm btn-outline-success">Help</button>
+                      </form>
+                    <% } %>
+                    <% if (request.user_id === session.userId) { %>
+                      <form action="/requests/cancel-request/<%= request.id %>" method="POST" onsubmit="return confirm('Are you sure you want to cancel this ride request?');">
+                        <button class="btn btn-sm btn-outline-danger">Cancel</button>
+                      </form>
+                    <% } %>
                     <a href="/messages/group/ride/<%= request.id %>" class="btn btn-sm btn-outline-info">
                       <i class="fas fa-comments me-1"></i>Chat
                     </a>
                   <% } %>
-                  <button class="btn btn-sm btn-outline-primary" 
-                          data-request-id="<%= request.id %>" 
-                          data-user-name="<%= request.user_name.replace(/"/g, '&quot;') %>"
-                          onclick="showMessageModal('request', this.dataset.requestId, this.dataset.userName)">Message</button>
                 </td>
               </tr>
             <% }) %>
@@ -719,6 +792,60 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('messageForm').action = '/messages/send';
     const modal = new bootstrap.Modal(document.getElementById('messageModal'));
     modal.show();
+  }
+
+  // Cancel assignment functionality for recurring events
+  window.showCancelAssignmentModal = function(assignmentId, childName, eventDate) {
+    document.getElementById('cancelAssignmentId').value = assignmentId;
+    document.getElementById('cancelChildName').textContent = childName;
+    document.getElementById('cancelEventDate').textContent = new Date(eventDate).toLocaleDateString();
+    const modal = new bootstrap.Modal(document.getElementById('cancelAssignmentModal'));
+    modal.show();
+  }
+});
+</script>
+
+<!-- Cancel Assignment Modal -->
+<div class="modal fade" id="cancelAssignmentModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Cancel Recurring Assignment</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="cancelAssignmentForm" method="POST">
+        <div class="modal-body">
+          <input type="hidden" id="cancelAssignmentId" name="assignment_id">
+          <p>Are you sure you want to cancel the assignment for <strong id="cancelChildName"></strong> on <strong id="cancelEventDate"></strong>?</p>
+          <div class="mb-3">
+            <label for="cancellation_reason" class="form-label">Reason (Optional)</label>
+            <textarea class="form-control" id="cancellation_reason" name="cancellation_reason" 
+                      placeholder="e.g., Child is sick, family emergency..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Keep Assignment</button>
+          <button type="submit" class="btn btn-danger">Cancel Assignment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+// Set up cancel assignment form action
+document.addEventListener('DOMContentLoaded', function() {
+  const cancelForm = document.getElementById('cancelAssignmentForm');
+  if (cancelForm) {
+    cancelForm.addEventListener('submit', function(e) {
+      const assignmentId = document.getElementById('cancelAssignmentId').value;
+      // Find the event ID from the assignment row
+      const assignmentRow = document.querySelector(`tr[data-assignment-id="${assignmentId}"]`);
+      if (assignmentRow) {
+        const eventId = assignmentRow.getAttribute('data-event-id');
+        this.action = `/recurring-events/${eventId}/cancel-assignment`;
+      }
+    });
   }
 });
 </script>

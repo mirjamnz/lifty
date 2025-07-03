@@ -54,6 +54,7 @@ router.get('/inbox', async (req, res) => {
   const userId = req.session.userId;
   if (!userId) return res.status(401).send('Not logged in');
 
+  // Get regular messages
   const [messages] = await db.query(
     `SELECT m.*, u.name AS sender_name
      FROM Messages m
@@ -64,7 +65,21 @@ router.get('/inbox', async (req, res) => {
     [userId]
   );
 
-  res.render('messages-inbox', { session: req.session, messages });
+  // Get group invitations for this user
+  const [groupInvitations] = await db.query(`
+    SELECT egi.*, re.name AS event_name, re.day_of_week, re.start_time, re.end_time, re.location, u.name AS inviter_name
+    FROM EventGroupInvitations egi
+    JOIN RecurringEvents re ON egi.event_id = re.id
+    JOIN Users u ON egi.inviter_id = u.id
+    WHERE egi.invitee_email = (SELECT email FROM Users WHERE id = ?) AND egi.status = 'pending'
+    ORDER BY egi.invited_at DESC
+  `, [userId]);
+
+  res.render('messages-inbox', { 
+    session: req.session, 
+    messages,
+    groupInvitations
+  });
 });
 
 // POST /messages/read/:id - Mark a message as read

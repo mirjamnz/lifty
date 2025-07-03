@@ -3,62 +3,167 @@
 <%- include('partials/navbar1') %>
 
 <div class="container py-5">
-  <% if (session.success) { %>
-    <div class="alert alert-success alert-dismissible fade show" role="alert">
-      <%= session.success %>
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-    <% session.success = null; %>
-  <% } %>
-
-  <h2 class="mb-4 fw-semibold">👋 Welcome, <%= session.userName %>!</h2>
-
-  <!-- Home Address -->
-  <div class="card mb-4 shadow-sm rounded-4">
-    <div class="card-body">
-      <h5 class="card-title fw-semibold">🏠 Your Home Address</h5>
-      <form action="/update-address" method="POST" class="row g-2" onsubmit="return validateCoords();">
-        <div class="col-md-8">
-          <input type="text" name="home_address" id="homeAddress" class="form-control rounded-pill" value="<%= user.home_address || '' %>" required autocomplete="home">
-        </div>
-        <input type="hidden" name="home_lat" id="homeLat">
-        <input type="hidden" name="home_lng" id="homeLng">
-        <div class="col-md-4">
-          <button type="submit" class="btn btn-success w-100 rounded-pill">📍 Save</button>
-        </div>
-      </form>
-      <div id="map" class="mt-3 rounded shadow-sm" style="height: 300px;"></div>
-    </div>
-  </div>
-
-  <!-- Children + Organizations in 2 columns -->
   <div class="row">
-    <!-- 👶 Your Children -->
-    <div class="col-md-8 mb-4">
-      <div class="card shadow-sm h-100">
-        <div class="card-body">
-          <h5 class="card-title mb-3">👶 Your Children</h5>
+    <div class="col-md-8">
+      <h2>Welcome back, <%= session.userName %>! 👋</h2>
+      
+      <% if (success) { %>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+          <%= success %>
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      <% } %>
 
-          <% if (children.length > 0) { %>
-            <h5 class="card-title mb-3">👨‍👩‍👧‍👦 My Family / Whānau</h5>
-            <ul class="list-group mb-4">
+      <% if (error) { %>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+          <%= error %>
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      <% } %>
+
+      <!-- Group Invitations Section -->
+      <% if (groupInvitations && groupInvitations.length > 0) { %>
+        <div class="card mb-4 border-warning">
+          <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0">
+              <i class="fas fa-envelope me-2"></i>
+              Group Invitations (<%= groupInvitations.length %>)
+            </h5>
+          </div>
+          <div class="card-body">
+            <% groupInvitations.forEach(invitation => { %>
+              <div class="card mb-3 border-warning">
+                <div class="card-body">
+                  <h6 class="card-title">
+                    <i class="fas fa-users me-2"></i>
+                    <%= invitation.event_name %>
+                  </h6>
+                  <p class="card-text">
+                    <small class="text-muted">
+                      <i class="fas fa-calendar me-1"></i>
+                      <%= invitation.day_of_week %>s, <%= invitation.start_time %> - <%= invitation.end_time %>
+                    </small>
+                    <br>
+                    <small class="text-muted">
+                      <i class="fas fa-map-marker-alt me-1"></i>
+                      <%= invitation.location %>
+                    </small>
+                    <br>
+                    <small class="text-muted">
+                      <i class="fas fa-user me-1"></i>
+                      Invited by <%= invitation.inviter_name %>
+                    </small>
+                    <br>
+                    <small class="text-muted">
+                      <i class="fas fa-clock me-1"></i>
+                      Invited <%= new Date(invitation.invited_at).toLocaleDateString() %>
+                    </small>
+                  </p>
+                  <div class="d-flex gap-2">
+                    <form method="POST" action="/recurring-events/<%= invitation.event_id %>/join" style="display: inline;">
+                      <button type="submit" class="btn btn-success btn-sm">
+                        <i class="fas fa-check me-1"></i>Accept Invitation
+                      </button>
+                    </form>
+                    <form method="POST" action="/recurring-events/<%= invitation.event_id %>/decline-invitation" style="display: inline;">
+                      <input type="hidden" name="invitation_id" value="<%= invitation.id %>">
+                      <button type="submit" class="btn btn-outline-danger btn-sm" 
+                              onclick="return confirm('Are you sure you want to decline this invitation?')">
+                        <i class="fas fa-times me-1"></i>Decline
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            <% }) %>
+          </div>
+        </div>
+      <% } %>
+
+      <!-- Home Address Section -->
+      <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-home me-2"></i>
+            Home Address
+          </h5>
+        </div>
+        <div class="card-body">
+          <% if (user && user.home_address) { %>
+            <div class="row">
+              <div class="col-md-8">
+                <p class="mb-2">
+                  <strong>Current Address:</strong> <%= user.home_address %>
+                </p>
+                <small class="text-muted">
+                  <i class="fas fa-map-marker-alt me-1"></i>
+                  Coordinates: <%= user.home_lat %>, <%= user.home_lng %>
+                </small>
+              </div>
+              <div class="col-md-4 text-end">
+                <button class="btn btn-outline-primary btn-sm" 
+                        data-bs-toggle="collapse" 
+                        data-bs-target="#addressForm">
+                  <i class="fas fa-edit me-1"></i>Update Address
+                </button>
+              </div>
+            </div>
+          <% } else { %>
+            <p class="text-muted mb-3">No home address set. Please add your address to help with ride coordination.</p>
+          <% } %>
+          
+          <div class="collapse <%= !user || !user.home_address ? 'show' : '' %>" id="addressForm">
+            <form action="/update-address" method="POST" class="mt-3">
+              <div class="row g-2">
+                <div class="col-md-8">
+                  <input type="text" name="home_address" id="home_address" class="form-control" 
+                         placeholder="Enter your home address" required
+                         value="<%= user && user.home_address ? user.home_address : '' %>">
+                </div>
+                <div class="col-md-4">
+                  <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-save me-1"></i>Save Address
+                  </button>
+                </div>
+              </div>
+              <input type="hidden" name="home_lat" id="home_lat" value="<%= user && user.home_lat ? user.home_lat : '' %>">
+              <input type="hidden" name="home_lng" id="home_lng" value="<%= user && user.home_lng ? user.home_lng : '' %>">
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Your Children Section -->
+      <div class="card">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-child me-2"></i>
+            Your Children (<%= children.length %>)
+          </h5>
+        </div>
+        <div class="card-body">
+          <% if (children && children.length > 0) { %>
+            <ul class="list-group list-group-flush">
               <% children.forEach(child => { %>
-                <li class="list-group-item">
-                  <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                      <strong><%= child.name %></strong> – <%= child.school %>
-                      <% if (child.club) { %> | Club: <%= child.club %> <% } %>
-                      <% if (child.parents && child.parents.length > 0) { %>
-                        <br>
-                        <small class="text-muted">
-                          Parents: <%= child.parents.map(p => p.name + ' (' + p.email + ')').join(', ') %>
-                        </small>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                  <div class="flex-grow-1">
+                    <h6 class="mb-1"><%= child.name %></h6>
+                    <small class="text-muted">
+                      <i class="fas fa-graduation-cap me-1"></i><%= child.school %>
+                      <% if (child.club) { %>
+                        <br><i class="fas fa-users me-1"></i><%= child.club %>
                       <% } %>
-                    </div>
-                    <div>
-                      <button class="btn btn-sm btn-outline-secondary me-2" data-bs-toggle="collapse" data-bs-target="#editForm<%= child.id %>">✏️</button>
-                      <a href="/delete-child/<%= child.id %>" class="btn btn-sm btn-outline-danger">🗑</a>
-                    </div>
+                      <% if (child.parents && child.parents.length > 1) { %>
+                        <br><i class="fas fa-users me-1"></i>Linked parents: <%= child.parents.map(p => p.name).join(', ') %>
+                      <% } %>
+                    </small>
+                  </div>
+                  <div class="d-flex gap-2">
+                    <button class="btn btn-outline-primary btn-sm" 
+                            data-bs-toggle="collapse" 
+                            data-bs-target="#editForm<%= child.id %>">
+                      <i class="fas fa-edit"></i>
+                    </button>
                   </div>
                   <div class="collapse mt-2" id="editForm<%= child.id %>">
                     <form action="/edit-child/<%= child.id %>" method="POST" class="row g-2">
@@ -92,154 +197,199 @@
           <% } else { %>
             <p class="text-muted">No children registered yet.</p>
           <% } %>
-
-          <form action="/add-child" method="POST" class="row g-2 mt-2 align-items-end">
-            <div class="col-md-6">
-              <label class="form-label">Child's Name</label>
-              <input type="text" name="name" class="form-control rounded-pill" placeholder="Child's Name" required autocomplete="name">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">School</label>
-              <input name="school" type="text" class="form-control rounded-pill autocomplete" data-type="school" placeholder="School Name" required autocomplete="off">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Username</label>
-              <input type="text" name="child_username" class="form-control rounded-pill" placeholder="Username" autocomplete="username">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Password</label>
-              <input type="password" name="child_password" class="form-control rounded-pill" placeholder="Password" autocomplete="new-password">
-            </div>
-            <!-- Add button below all fields -->
-            <div class="col-12 mt-3">
-              <button type="submit" class="btn btn-success w-100">Add</button>
-            </div>
-          </form>
         </div>
       </div>
     </div>
 
-    <!-- 🏫 Organizations Management -->
-    <div class="col-md-4 mb-4">
-      <div class="card shadow-sm h-100">
-        <div class="card-body d-flex flex-column">
-          <h5 class="card-title">🏫 Schools & Clubs</h5>
-          
-          <div class="text-center py-4">
-            <div class="mb-3">
-              <i class="fas fa-school fa-3x text-primary"></i>
+    <div class="col-md-4">
+      <!-- Add Child Section -->
+      <div class="card">
+        <div class="card-header bg-success text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-plus me-2"></i>
+            Add Child
+          </h5>
+        </div>
+        <div class="card-body">
+          <form action="/add-child" method="POST">
+            <div class="row g-2">
+              <div class="col-md-6">
+                <input type="text" name="name" class="form-control" placeholder="Child's Name" required autocomplete="name">
+              </div>
+              <div class="col-md-6">
+                <input name="school" type="text" class="form-control autocomplete" data-type="school" placeholder="School Name" required autocomplete="off">
+              </div>
             </div>
-            <h6 class="text-muted mb-3">Manage your schools and clubs</h6>
-            <p class="text-muted small mb-4">
-              Add, edit, and organize all the schools, clubs, and events your children attend.
+            <div class="row g-2 mt-2">
+              <div class="col-md-6">
+                <input type="text" name="club" class="form-control autocomplete" data-type="club" placeholder="Club (Optional)" autocomplete="off">
+              </div>
+              <div class="col-md-6">
+                <button type="submit" class="btn btn-success w-100">Add</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Community Map Section -->
+      <% if (neighbors && neighbors.length > 0) { %>
+        <div class="card mt-3">
+          <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0">
+              <i class="fas fa-map me-2"></i>
+              Community Map (<%= neighbors.length %> neighbors)
+            </h5>
+          </div>
+          <div class="card-body">
+            <div id="map" style="height: 300px; width: 100%; border-radius: 8px; border: 1px solid #ddd; background-color: #f8f9fa;"></div>
+            <div class="mt-3">
+              <small class="text-muted">
+                <i class="fas fa-info-circle me-1"></i>
+                Showing other registered users in your area
+              </small>
+              <div id="map-debug" class="mt-2 small text-muted"></div>
+            </div>
+          </div>
+        </div>
+      <% } else { %>
+        <div class="card mt-3">
+          <div class="card-header bg-light text-muted">
+            <h5 class="mb-0">
+              <i class="fas fa-map me-2"></i>
+              Community Map
+            </h5>
+          </div>
+          <div class="card-body text-center">
+            <p class="text-muted mb-0">
+              <i class="fas fa-info-circle me-1"></i>
+              No other users with addresses found yet
             </p>
-            <a href="/organizations" class="btn btn-primary w-100">🏫 Manage Organizations</a>
+          </div>
+        </div>
+      <% } %>
+
+      <!-- Quick Actions -->
+      <div class="card mt-3">
+        <div class="card-header bg-info text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-bolt me-2"></i>
+            Quick Actions
+          </h5>
+        </div>
+        <div class="card-body">
+          <div class="d-grid gap-2">
+            <a href="/rides" class="btn btn-outline-primary">
+              <i class="fas fa-car me-2"></i>View Rides
+            </a>
+            <a href="/recurring-events" class="btn btn-outline-success">
+              <i class="fas fa-calendar me-2"></i>Recurring Events
+            </a>
+            <a href="/messages/all" class="btn btn-outline-info">
+              <i class="fas fa-envelope me-2"></i>Messages
+            </a>
           </div>
         </div>
       </div>
     </div>
   </div>
-
-  <script>
-    function validateCoords() {
-      const lat = document.getElementById('homeLat').value;
-      const lng = document.getElementById('homeLng').value;
-      if (!lat || !lng) {
-        alert("Please select an address from the suggestions.");
-        return false;
-      }
-      return true;
-    }
-
-    function initMap() {
-      const userLoc = {
-        lat: <%= user.home_lat || -36.8485 %>,
-        lng: <%= user.home_lng || 174.7633 %>
-      };
-      const map = new google.maps.Map(document.getElementById('map'), {
-        center: userLoc,
-        zoom: 12
-      });
-      new google.maps.Marker({ position: userLoc, map, title: "Your Home" });
-
-      <% neighbors.forEach(n => { %>
-        new google.maps.Marker({
-          position: { lat: <%= n.home_lat %>, lng: <%= n.home_lng %> },
-          map,
-          title: "<%= n.name %>"
-        });
-      <% }); %>
-
-      const autocomplete = new google.maps.places.Autocomplete(document.getElementById('homeAddress'));
-      autocomplete.addListener('place_changed', function () {
-        const place = autocomplete.getPlace();
-        if (place.geometry) {
-          document.getElementById('homeLat').value = place.geometry.location.lat();
-          document.getElementById('homeLng').value = place.geometry.location.lng();
-        }
-      });
-    }
-
-    // Modern autocomplete for school and club using AutoComplete.js
-    document.addEventListener('DOMContentLoaded', function() {
-      document.querySelectorAll('.autocomplete').forEach(input => {
-        const type = input.dataset.type || 'organization';
-        new autoComplete({
-          selector: () => input,
-          threshold: 1,
-          debounce: 200,
-          searchEngine: "loose",
-          data: {
-            src: async (query) => {
-              try {
-                const res = await fetch(`/organizations/autocomplete?term=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}`);
-                return await res.json();
-              } catch (err) {
-                console.error("Autocomplete fetch error", err);
-                return [];
-              }
-            },
-            keys: ["label"]
-          },
-          resultsList: {
-            noResults: true,
-            maxResults: 10,
-            render: true
-          },
-          resultItem: {
-            highlight: true,
-            content: (data) => data.label
-          },
-          onSelection: (feedback) => {
-            const selected = feedback.selection.value;
-            input.value = selected.value || selected.label || "";
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-          },
-          events: {
-            input: {
-              selection: (event) => {
-                const feedback = event.detail;
-                const selected = feedback.selection.value;
-                event.target.value = selected.value || selected.label || "";
-                event.target.dispatchEvent(new Event('input', { bubbles: true }));
-              }
-            }
-          }
-        });
-      });
-    });
-  </script>
-
-  <script async defer src="https://maps.googleapis.com/maps/api/js?key=<%= GMAPS_API_KEY %>&libraries=places&callback=initMap"></script>
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <!-- Remove bootstrap-autocomplete for school/club fields -->
-  <!--<script src="https://cdn.jsdelivr.net/npm/bootstrap-autocomplete@1.0.7/dist/bootstrap-autocomplete.min.js"></script>-->
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@10.2.7/dist/css/autoComplete.min.css">
-<script src="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@10.2.7/dist/autoComplete.min.js"></script>
+</div>
 
 <script>
+// School/club autocomplete (not Google Maps)
+document.addEventListener('DOMContentLoaded', function() {
+  const autocompleteInputs = document.querySelectorAll('.autocomplete');
+  autocompleteInputs.forEach(input => {
+    const type = input.dataset.type;
+    new autoComplete({
+      selector: () => input,
+      threshold: 1,
+      debounce: 200,
+      searchEngine: "loose",
+      data: {
+        src: async (query) => {
+          try {
+            const res = await fetch(`/organizations/autocomplete?term=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}`);
+            return await res.json();
+          } catch (err) {
+            console.error("Autocomplete fetch error", err);
+            return [];
+          }
+        },
+        keys: ["label"]
+      },
+      resultsList: {
+        noResults: true,
+        maxResults: 10,
+        render: true
+      },
+      resultItem: {
+        highlight: true,
+        content: (data) => data.label
+      },
+      onSelection: (feedback) => {
+        const selected = feedback.selection.value;
+        input.value = selected.value || selected.label || "";
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    });
+  });
+});
 
-  </script>
-  <%- include('partials/footer1') %>
+// Google Maps/Places callback for address autocomplete and map
+function initLiftyMaps() {
+  // Home address autocomplete
+  var homeAddressInput = document.getElementById('home_address');
+  if (homeAddressInput && typeof google !== 'undefined' && google.maps) {
+    var autocomplete = new google.maps.places.Autocomplete(homeAddressInput);
+    autocomplete.addListener('place_changed', function() {
+      var place = autocomplete.getPlace();
+      if (place.geometry) {
+        document.getElementById('home_lat').value = place.geometry.location.lat();
+        document.getElementById('home_lng').value = place.geometry.location.lng();
+      }
+    });
+  }
+
+  // Community map
+  var mapElement = document.getElementById('map');
+  if (mapElement && typeof google !== 'undefined' && google.maps) {
+    var userLat = <%- user && user.home_lat ? user.home_lat : 'null' %>;
+    var userLng = <%- user && user.home_lng ? user.home_lng : 'null' %>;
+    var neighbors = <%- JSON.stringify(neighbors || []) %>;
+    var map = new google.maps.Map(mapElement, {
+      zoom: 12,
+      center: userLat && userLng ? { lat: parseFloat(userLat), lng: parseFloat(userLng) } : { lat: -36.8485, lng: 174.7633 }
+    });
+    if (userLat && userLng) {
+      new google.maps.Marker({
+        position: { lat: parseFloat(userLat), lng: parseFloat(userLng) },
+        map: map,
+        title: 'Your Location',
+        icon: { url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png' }
+      });
+    }
+    neighbors.forEach(function(neighbor) {
+      if (neighbor.home_lat && neighbor.home_lng) {
+        var marker = new google.maps.Marker({
+          position: { lat: parseFloat(neighbor.home_lat), lng: parseFloat(neighbor.home_lng) },
+          map: map,
+          title: neighbor.name,
+          icon: { url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png' }
+        });
+        var infowindow = new google.maps.InfoWindow({
+          content: '<div><strong>' + neighbor.name + '</strong><br>' + neighbor.home_address + '</div>'
+        });
+        marker.addListener('click', function() {
+          infowindow.open(map, marker);
+        });
+      }
+    });
+  }
+}
+</script>
+
+<!-- Google Maps API: only load ONCE, with callback -->
+<script async defer src="https://maps.googleapis.com/maps/api/js?key=<%= GMAPS_API_KEY %>&libraries=places&callback=initLiftyMaps"></script>
+
+<%- include('partials/footer1') %>

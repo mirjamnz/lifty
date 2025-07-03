@@ -1,0 +1,458 @@
+<%- include('partials/header1') %>
+<%- include('partials/navbar1') %>
+
+<!-- Hidden field for event day_of_week -->
+<input type="hidden" id="eventDayOfWeek" value="<%= event.day_of_week %>">
+
+<div class="container py-5">
+  <div class="row">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h2>
+            <i class="fas fa-users me-2"></i>
+            <%= event.name %> - Group Dashboard
+          </h2>
+          <p class="text-muted mb-0">
+            <%= event.day_of_week %>s, <%= event.start_time %> - <%= event.end_time %> at <%= event.location %>
+          </p>
+          <% if (event.group_description) { %>
+            <p class="text-info mb-0"><%= event.group_description %></p>
+          <% } %>
+        </div>
+        <div>
+          <a href="/recurring-events" class="btn btn-outline-primary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Events
+          </a>
+        </div>
+      </div>
+
+      <% if (success) { %>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+          <%= success %>
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      <% } %>
+
+      <% if (error) { %>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+          <%= error %>
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      <% } %>
+
+      <!-- Group Members Section -->
+      <div class="card mb-4">
+        <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">
+            <i class="fas fa-users me-2"></i>
+            Group Members (<%= members.length %>)
+          </h5>
+          <button class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#inviteModal">
+            <i class="fas fa-plus me-1"></i>Invite Parent
+          </button>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <% 
+              // Group members by user (parents)
+              const parentMembers = members.filter(m => m.role === 'parent' || m.role === 'admin');
+              const childMembers = members.filter(m => m.role === 'child');
+            %>
+            
+            <!-- Parents -->
+            <% parentMembers.forEach(member => { %>
+              <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card border-info">
+                  <div class="card-body">
+                    <h6 class="card-title">
+                      <i class="fas fa-user me-2"></i>
+                      <%= member.user_name %>
+                      <% if (member.role === 'admin') { %>
+                        <span class="badge bg-warning text-dark ms-2">Admin</span>
+                      <% } %>
+                    </h6>
+                    <p class="card-text">
+                      <small class="text-muted">
+                        <i class="fas fa-envelope me-1"></i>
+                        <%= member.email %>
+                      </small>
+                    </p>
+                    <p class="card-text">
+                      <small class="text-muted">
+                        <i class="fas fa-calendar me-1"></i>
+                        Joined <%= new Date(member.joined_at).toLocaleDateString() %>
+                      </small>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            <% }) %>
+          </div>
+
+          <!-- Children -->
+          <% if (childMembers.length > 0) { %>
+            <h6 class="mt-4 mb-3 text-info">
+              <i class="fas fa-child me-2"></i>
+              Children in Group (<%= childMembers.length %>)
+            </h6>
+            <div class="row">
+              <% childMembers.forEach(member => { %>
+                <div class="col-md-6 col-lg-4 mb-3">
+                  <div class="card border-warning">
+                    <div class="card-body">
+                      <h6 class="card-title">
+                        <i class="fas fa-child me-2"></i>
+                        <%= member.child_name %>
+                      </h6>
+                      <p class="card-text">
+                        <small class="text-muted">
+                          <i class="fas fa-user me-1"></i>
+                          <%= member.user_name %>
+                        </small>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              <% }) %>
+            </div>
+          <% } %>
+        </div>
+      </div>
+
+      <!-- Pending Invitations -->
+      <% if (invitations.length > 0) { %>
+        <div class="card mb-4 border-warning">
+          <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0">
+              <i class="fas fa-envelope me-2"></i>
+              Pending Invitations (<%= invitations.length %>)
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Email</th>
+                    <th>Name</th>
+                    <th>Invited By</th>
+                    <th>Invited On</th>
+                    <th>Expires</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% invitations.forEach(invitation => { %>
+                    <tr>
+                      <td><%= invitation.invitee_email %></td>
+                      <td><%= invitation.invitee_name || '—' %></td>
+                      <td><%= invitation.inviter_name %></td>
+                      <td><%= new Date(invitation.invited_at).toLocaleDateString() %></td>
+                      <td>
+                        <% if (invitation.expires_at) { %>
+                          <%= new Date(invitation.expires_at).toLocaleDateString() %>
+                        <% } else { %>
+                          Never
+                        <% } %>
+                      </td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <!-- Assignment Management -->
+      <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-tasks me-2"></i>
+            Assignment Management
+          </h5>
+        </div>
+        <div class="card-body">
+          <!-- Create Assignment Form -->
+          <form method="POST" action="/recurring-events/<%= event.id %>/assign" class="mb-4">
+            <div class="row align-items-end">
+              <div class="col-md-3">
+                <label for="event_date" class="form-label">Date</label>
+                <div class="input-group">
+                  <input type="text" class="form-control" id="event_date" name="event_date" placeholder="Select date" required readonly>
+                  <button type="button" class="btn btn-outline-secondary" id="nextEventBtn"></button>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <label for="child_id" class="form-label">Child(ren)</label>
+                <select class="form-select" id="child_id" name="child_id" multiple required>
+                  <% childMembers.forEach(member => { %>
+                    <option value="<%= member.child_id %>">
+                      <%= member.child_name %> (<%= member.user_name %>)
+                    </option>
+                  <% }) %>
+                </select>
+                <small class="text-muted">Hold Ctrl (Windows) or Cmd (Mac) to select multiple</small>
+              </div>
+              <div class="col-md-2">
+                <label for="assignment_type" class="form-label">Type</label>
+                <select class="form-select" id="assignment_type" name="assignment_type" required>
+                  <option value="">Select Type</option>
+                  <option value="dropoff">Drop-off at event</option>
+                  <option value="pickup">Pickup from event</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label for="notes" class="form-label">Notes (Optional)</label>
+                <input type="text" class="form-control" id="notes" name="notes" 
+                       placeholder="Any special instructions...">
+              </div>
+              <div class="col-md-1">
+                <button type="submit" class="btn btn-success">
+                  <i class="fas fa-plus"></i>
+                </button>
+              </div>
+            </div>
+          </form>
+
+          <!-- Upcoming Assignments -->
+          <h6 class="mb-3">Upcoming Assignments</h6>
+          <% if (assignments.length === 0) { %>
+            <div class="text-center py-4">
+              <i class="fas fa-calendar-times fa-2x text-muted mb-3"></i>
+              <h6>No upcoming assignments</h6>
+              <p class="text-muted">Create assignments above to get started!</p>
+            </div>
+          <% } else { %>
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead class="table-light">
+                  <tr>
+                    <th>Date</th>
+                    <th>Child</th>
+                    <th>Type</th>
+                    <th>Assigned To</th>
+                    <th>Notes</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% assignments.forEach(assignment => { %>
+                    <tr>
+                      <td>
+                        <strong><%= new Date(assignment.event_date).toLocaleDateString() %></strong>
+                        <br><small class="text-muted"><%= new Date(assignment.event_date).toLocaleDateString('en-US', { weekday: 'long' }) %></small>
+                      </td>
+                      <td><%= assignment.child_name %></td>
+                      <td>
+                        <span class="badge bg-<%= assignment.assignment_type === 'dropoff' ? 'primary' : 'success' %>">
+                          <i class="fas fa-<%= assignment.assignment_type === 'dropoff' ? 'sign-in-alt' : 'sign-out-alt' %> me-1"></i>
+                          <%= assignment.assignment_type.charAt(0).toUpperCase() + assignment.assignment_type.slice(1) %>
+                        </span>
+                      </td>
+                      <td><%= assignment.assigned_parent_name %></td>
+                      <td><%= assignment.notes || '—' %></td>
+                      <td>
+                        <button class="btn btn-outline-danger btn-sm" 
+                                onclick="showCancelModal('<%= assignment.id %>', '<%= assignment.child_name %>')">
+                          <i class="fas fa-times me-1"></i>Cancel
+                        </button>
+                      </td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+        </div>
+      </div>
+
+      <!-- Group Chat -->
+      <div class="card">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-comments me-2"></i>
+            Group Chat
+          </h5>
+        </div>
+        <div class="card-body">
+          <!-- Chat Messages -->
+          <div id="chatMessages" class="mb-3" style="max-height: 400px; overflow-y: auto;">
+            <% if (messages.length === 0) { %>
+              <div class="text-center py-4">
+                <i class="fas fa-comments fa-2x text-muted mb-3"></i>
+                <h6>No messages yet</h6>
+                <p class="text-muted">Start the conversation!</p>
+              </div>
+            <% } else { %>
+              <% messages.reverse().forEach(message => { %>
+                <div class="d-flex mb-3 <%= message.sender_id === session.userId ? 'justify-content-end' : 'justify-content-start' %>">
+                  <div class="<%= message.sender_id === session.userId ? 'bg-primary text-white' : 'bg-light' %> rounded p-3" style="max-width: 70%;">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                      <small class="<%= message.sender_id === session.userId ? 'text-white-50' : 'text-muted' %>">
+                        <%= message.sender_name %>
+                      </small>
+                      <small class="<%= message.sender_id === session.userId ? 'text-white-50' : 'text-muted' %>">
+                        <%= new Date(message.sent_at).toLocaleString() %>
+                      </small>
+                    </div>
+                    <div><%= message.message %></div>
+                    <% if (message.message_type !== 'general') { %>
+                      <small class="<%= message.sender_id === session.userId ? 'text-white-50' : 'text-muted' %>">
+                        <i class="fas fa-<%= message.message_type === 'assignment' ? 'tasks' : 
+                                          message.message_type === 'reminder' ? 'bell' : 
+                                          message.message_type === 'cancellation' ? 'times' : 'comment' %> me-1"></i>
+                        <%= message.message_type.charAt(0).toUpperCase() + message.message_type.slice(1) %>
+                      </small>
+                    <% } %>
+                  </div>
+                </div>
+              <% }) %>
+            <% } %>
+          </div>
+
+          <!-- Send Message Form -->
+          <form method="POST" action="/recurring-events/<%= event.id %>/message">
+            <div class="input-group">
+              <input type="text" class="form-control" name="message" placeholder="Type your message..." required>
+              <select class="form-select" name="message_type" style="max-width: 150px;">
+                <option value="general">General</option>
+                <option value="assignment">Assignment</option>
+                <option value="reminder">Reminder</option>
+              </select>
+              <button class="btn btn-primary" type="submit">
+                <i class="fas fa-paper-plane"></i>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Invite Modal -->
+<div class="modal fade" id="inviteModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Invite Parent to Group</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="/recurring-events/<%= event.id %>/invite">
+        <div class="modal-body">
+          <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>In-App Invitation System</strong><br>
+            The parent must be registered on the platform to receive the invitation. 
+            They will get a message in their inbox and can accept/decline from there.
+          </div>
+          <div class="mb-3">
+            <label for="invitee_email" class="form-label">Email Address *</label>
+            <input type="email" class="form-control" id="invitee_email" name="invitee_email" required>
+            <small class="text-muted">Must be the email of a registered user</small>
+          </div>
+          <div class="mb-3">
+            <label for="invitee_name" class="form-label">Name (Optional)</label>
+            <input type="text" class="form-control" id="invitee_name" name="invitee_name" placeholder="Parent's name">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Send Invitation</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Cancel Assignment Modal -->
+<div class="modal fade" id="cancelModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Cancel Assignment</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="/recurring-events/<%= event.id %>/cancel-assignment">
+        <div class="modal-body">
+          <input type="hidden" id="cancel_assignment_id" name="assignment_id">
+          <p>Are you sure you want to cancel the assignment for <strong id="cancel_child_name"></strong>?</p>
+          <div class="mb-3">
+            <label for="cancellation_reason" class="form-label">Reason (Optional)</label>
+            <textarea class="form-control" id="cancellation_reason" name="cancellation_reason" 
+                      placeholder="e.g., Child is sick, family emergency..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Keep Assignment</button>
+          <button type="submit" class="btn btn-danger">Cancel Assignment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Map day_of_week to Flatpickr weekday (0=Sunday, 1=Monday, ...)
+  const dayMap = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
+  const eventDay = document.getElementById('eventDayOfWeek').value;
+  const flatpickrDay = dayMap[eventDay];
+
+  // Set button label
+  const nextEventBtn = document.getElementById('nextEventBtn');
+  nextEventBtn.textContent = `Next ${eventDay}`;
+
+  // Helper to get next occurrence of a weekday
+  function getNextWeekdayDate(weekday) {
+    const today = new Date();
+    let result = new Date(today);
+    result.setHours(0,0,0,0);
+    const day = result.getDay();
+    let diff = (weekday + 7 - day) % 7;
+    if (diff === 0) diff = 7; // always next week if today is the day
+    result.setDate(result.getDate() + diff);
+    return result;
+  }
+
+  // Flatpickr setup
+  const fp = flatpickr("#event_date", {
+    dateFormat: "Y-m-d",
+    minDate: "today",
+    disable: [
+      function(date) {
+        // Only enable the event's weekday
+        return date.getDay() !== flatpickrDay;
+      }
+    ],
+    locale: {
+      firstDayOfWeek: 1 // Monday as first day
+    }
+  });
+
+  // Set default date to next event day
+  const nextDate = getNextWeekdayDate(flatpickrDay);
+  fp.setDate(nextDate, true);
+
+  // Quick-select next event date
+  nextEventBtn.addEventListener('click', function() {
+    fp.setDate(getNextWeekdayDate(flatpickrDay), true);
+  });
+
+  // Scroll chat to bottom
+  const chatMessages = document.getElementById('chatMessages');
+  if (chatMessages) {
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+});
+
+function showCancelModal(assignmentId, childName) {
+  document.getElementById('cancel_assignment_id').value = assignmentId;
+  document.getElementById('cancel_child_name').textContent = childName;
+  const modal = new bootstrap.Modal(document.getElementById('cancelModal'));
+  modal.show();
+}
+</script>
+
+<%- include('partials/footer1') %> 
