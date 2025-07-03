@@ -252,9 +252,13 @@ router.get('/delete-child/:id', async (req, res) => {
   if (!userId) return res.redirect('/login');
 
   try {
+    // Remove parent-child link
     await db.query('DELETE FROM ParentChild WHERE child_id = ? AND parent_id = ?', [childId, userId]);
     const [[linkCount]] = await db.query('SELECT COUNT(*) as cnt FROM ParentChild WHERE child_id = ?', [childId]);
     if (linkCount.cnt === 0) {
+      // Delete any user accounts linked to this child
+      await db.query('DELETE FROM Users WHERE child_profile_id = ?', [childId]);
+      // Now delete the child
       await db.query('DELETE FROM Children WHERE id = ?', [childId]);
     }
     res.redirect('/dashboard');

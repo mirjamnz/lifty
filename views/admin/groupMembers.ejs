@@ -1,0 +1,100 @@
+<%- include('../partials/header1') %>
+<%- include(session && session.is_admin ? '../partials/navbar2' : '../partials/navbar1') %>
+
+<div class="container py-5">
+  <h2 class="mb-4 text-primary">👥 Manage Members for <%= group.name %></h2>
+  <p class="text-muted mb-3">
+    <strong>Schedule:</strong> <%= group.day_of_week %>s, <%= group.start_time %> - <%= group.end_time %><br>
+    <strong>Location:</strong> <%= group.location %>
+  </p>
+
+  <h4 class="mt-4">Members</h4>
+  <div class="table-responsive mb-4">
+    <table class="table table-bordered table-sm table-striped rounded shadow-sm">
+      <thead class="table-light">
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Role</th>
+          <th>Child</th>
+          <th>School</th>
+          <th>Club</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (members && members.length > 0) { %>
+          <% members.forEach(member => { %>
+            <tr>
+              <td><%= member.user_name %></td>
+              <td><%= member.email %></td>
+              <td><%= member.role %></td>
+              <td><%= member.child_name || '-' %></td>
+              <td><%= member.school || '-' %></td>
+              <td><%= member.club || '-' %></td>
+              <td>
+                <form action="/admin/groups/<%= group.id %>/remove-member" method="POST" style="display:inline;" onsubmit="return confirm('Remove this member?');">
+                  <input type="hidden" name="member_id" value="<%= member.id %>">
+                  <button type="submit" class="btn btn-sm btn-danger">Remove</button>
+                </form>
+                <% if (member.role === 'parent' || member.role === 'admin') { %>
+                  <form action="/admin/groups/<%= group.id %>/promote-demote" method="POST" style="display:inline; margin-left: 5px;">
+                    <input type="hidden" name="member_id" value="<%= member.id %>">
+                    <input type="hidden" name="new_role" value="<%= member.role === 'admin' ? 'parent' : 'admin' %>">
+                    <button type="submit" class="btn btn-sm btn-warning">
+                      <%= member.role === 'admin' ? 'Demote to Parent' : 'Promote to Admin' %>
+                    </button>
+                  </form>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        <% } else { %>
+          <tr><td colspan="7" class="text-center text-muted">No members found.</td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Pending Invitations</h4>
+  <div class="table-responsive">
+    <table class="table table-bordered table-sm table-striped rounded shadow-sm">
+      <thead class="table-light">
+        <tr>
+          <th>Email</th>
+          <th>Name</th>
+          <th>Invited By</th>
+          <th>Invited On</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (invitations && invitations.length > 0) { %>
+          <% invitations.forEach(invite => { %>
+            <tr>
+              <td><%= invite.invitee_email %></td>
+              <td><%= invite.invitee_name || '-' %></td>
+              <td><%= invite.inviter_name %></td>
+              <td><%= new Date(invite.invited_at).toLocaleDateString() %></td>
+              <td>
+                <form action="/admin/groups/<%= group.id %>/invites/<%= invite.id %>/resend" method="POST" style="display:inline;">
+                  <button type="submit" class="btn btn-sm btn-info">Resend</button>
+                </form>
+                <form action="/admin/groups/<%= group.id %>/invites/<%= invite.id %>/approve" method="POST" style="display:inline; margin-left: 5px;">
+                  <button type="submit" class="btn btn-sm btn-success">Approve</button>
+                </form>
+                <form action="/admin/groups/<%= group.id %>/invites/<%= invite.id %>/decline" method="POST" style="display:inline; margin-left: 5px;">
+                  <button type="submit" class="btn btn-sm btn-danger">Decline</button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        <% } else { %>
+          <tr><td colspan="5" class="text-center text-muted">No pending invitations.</td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('../partials/footer1') %> 

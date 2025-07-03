@@ -1,0 +1,42 @@
+<%- include('../partials/header1') %>
+<%- include(session && session.is_admin ? '../partials/navbar2' : '../partials/navbar1') %>
+
+<div class="container py-5">
+  <h2 class="mb-4 fw-bold text-success">🏫 Organizations</h2>
+  <a href="/admin/organizations/add" class="btn btn-success mb-3">➕ Add New Organization</a>
+  <div class="table-responsive">
+    <table class="table table-bordered table-sm table-striped rounded shadow-sm" id="organizationsTable">
+      <thead class="table-light">
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Address</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (organizations && organizations.length > 0) { %>
+          <% organizations.forEach(org => { %>
+            <tr>
+              <td><%= org.name %></td>
+              <td><%= org.type %></td>
+              <td><%= org.address %></td>
+              <td>
+                <form action="/admin/organizations/<%= org.id %>/edit" method="GET" style="display:inline;">
+                  <button type="submit" class="btn btn-sm btn-outline-success" title="Edit Organization">✏️</button>
+                </form>
+                <form action="/admin/organizations/<%= org.id %>/delete" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete <%= org.name %>?');">
+                  <button type="submit" class="btn btn-sm btn-danger" title="Delete Organization">🗑️</button>
+                </form>
+              </td>
+            </tr>
+          <% }); %>
+        <% } else { %>
+          <tr><td colspan="4" class="text-center text-muted">No organizations found.</td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('../partials/footer1') %> 

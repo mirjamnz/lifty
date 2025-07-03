@@ -1,0 +1,36 @@
+<%- include('../partials/header1') %>
+<%- include(session && session.is_admin ? '../partials/navbar2' : '../partials/navbar1') %>
+
+<div class="container py-5">
+  <h2 class="mb-4 text-primary">👥 Groups / Events</h2>
+  <div class="table-responsive">
+    <table class="table table-bordered table-sm table-striped rounded shadow-sm" id="groupsTable">
+      <thead class="table-light">
+        <tr>
+          <th>Name</th>
+          <th>Schedule</th>
+          <th>Location</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (groups && groups.length > 0) { %>
+          <% groups.forEach(group => { %>
+            <tr>
+              <td><%= group.name %></td>
+              <td><%= group.day_of_week %>s, <%= group.start_time %> - <%= group.end_time %></td>
+              <td><%= group.location %></td>
+              <td>
+                <a href="/admin/groups/<%= group.id %>/members" class="btn btn-sm btn-outline-primary">Manage Members</a>
+              </td>
+            </tr>
+          <% }) %>
+        <% } else { %>
+          <tr><td colspan="4" class="text-center text-muted">No groups found.</td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('../partials/footer1') %> 

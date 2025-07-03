@@ -133,6 +133,49 @@
         </div>
       </div>
 
+      <!-- Add Child Section -->
+      <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-plus me-2"></i>
+            Add Child
+          </h5>
+        </div>
+        <div class="card-body">
+          <form action="/add-child" method="POST">
+            <div class="row g-2">
+              <div class="col-md-6">
+                <input type="text" name="name" class="form-control" placeholder="Child's Name" required autocomplete="name">
+              </div>
+              <div class="col-md-6">
+                <input name="school" type="text" class="form-control autocomplete" data-type="school" placeholder="School Name" required autocomplete="off">
+              </div>
+            </div>
+            <div class="row g-2 mt-2">
+              <div class="col-md-6">
+                <input type="text" name="club" class="form-control autocomplete" data-type="club" placeholder="Club (Optional)" autocomplete="off">
+              </div>
+              <div class="col-md-6">
+                <input type="text" name="child_username" class="form-control" placeholder="Child Username (for login)" required autocomplete="username">
+              </div>
+            </div>
+            <div class="row g-2 mt-2">
+              <div class="col-md-6">
+                <input type="password" name="child_password" class="form-control" placeholder="Child Password (for login)" required autocomplete="new-password">
+              </div>
+              <div class="col-md-6 d-flex align-items-center">
+                <button type="submit" class="btn btn-success w-100">Add Child</button>
+              </div>
+            </div>
+            <div class="row mt-2">
+              <div class="col">
+                <small class="text-muted">Can't find your school? <a href="/organizations/add" target="_blank">Add a new school</a></small>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
       <!-- Your Children Section -->
       <div class="card">
         <div class="card-header bg-primary text-white">
@@ -164,6 +207,11 @@
                             data-bs-target="#editForm<%= child.id %>">
                       <i class="fas fa-edit"></i>
                     </button>
+                    <form action="/delete-child/<%= child.id %>" method="get" style="display:inline;">
+                      <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Are you sure you want to delete this child? This cannot be undone.')">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </form>
                   </div>
                   <div class="collapse mt-2" id="editForm<%= child.id %>">
                     <form action="/edit-child/<%= child.id %>" method="POST" class="row g-2">
@@ -202,36 +250,6 @@
     </div>
 
     <div class="col-md-4">
-      <!-- Add Child Section -->
-      <div class="card">
-        <div class="card-header bg-success text-white">
-          <h5 class="mb-0">
-            <i class="fas fa-plus me-2"></i>
-            Add Child
-          </h5>
-        </div>
-        <div class="card-body">
-          <form action="/add-child" method="POST">
-            <div class="row g-2">
-              <div class="col-md-6">
-                <input type="text" name="name" class="form-control" placeholder="Child's Name" required autocomplete="name">
-              </div>
-              <div class="col-md-6">
-                <input name="school" type="text" class="form-control autocomplete" data-type="school" placeholder="School Name" required autocomplete="off">
-              </div>
-            </div>
-            <div class="row g-2 mt-2">
-              <div class="col-md-6">
-                <input type="text" name="club" class="form-control autocomplete" data-type="club" placeholder="Club (Optional)" autocomplete="off">
-              </div>
-              <div class="col-md-6">
-                <button type="submit" class="btn btn-success w-100">Add</button>
-              </div>
-            </div>
-          </form>
-        </div>
-      </div>
-
       <!-- Community Map Section -->
       <% if (neighbors && neighbors.length > 0) { %>
         <div class="card mt-3">
@@ -330,7 +348,19 @@ document.addEventListener('DOMContentLoaded', function() {
       onSelection: (feedback) => {
         const selected = feedback.selection.value;
         input.value = selected.value || selected.label || "";
+        input.style.color = '#222';
         input.dispatchEvent(new Event('input', { bubbles: true }));
+      },
+      events: {
+        input: {
+          selection: (event) => {
+            const feedback = event.detail;
+            const selected = feedback.selection.value;
+            event.target.value = selected.value || selected.label || "";
+            event.target.style.color = '#222';
+            event.target.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
       }
     });
   });
@@ -354,8 +384,8 @@ function initLiftyMaps() {
   // Community map
   var mapElement = document.getElementById('map');
   if (mapElement && typeof google !== 'undefined' && google.maps) {
-    var userLat = <%- user && user.home_lat ? user.home_lat : 'null' %>;
-    var userLng = <%- user && user.home_lng ? user.home_lng : 'null' %>;
+    var userLat = <%= user && user.home_lat ? user.home_lat : 'null' %>;
+    var userLng = <%= user && user.home_lng ? user.home_lng : 'null' %>;
     var neighbors = <%- JSON.stringify(neighbors || []) %>;
     var map = new google.maps.Map(mapElement, {
       zoom: 12,

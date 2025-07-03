@@ -13,11 +13,57 @@ router.get('/dashboard', async (req, res) => {
     const [organizations] = await db.query('SELECT * FROM Organizations ORDER BY name ASC');
     const [users] = await db.query('SELECT * FROM Users ORDER BY id DESC');
     const [children] = await db.query('SELECT * FROM Children');
+    // Fetch all groups/events
+    const [groups] = await db.query(`
+      SELECT re.*, u.name AS created_by_name,
+        (SELECT COUNT(*) FROM EventGroupMembers WHERE event_id = re.id AND is_active = TRUE) AS group_member_count
+      FROM RecurringEvents re
+      JOIN Users u ON re.created_by = u.id
+      ORDER BY re.day_of_week, re.start_time
+    `);
+    // --- Statistics ---
+    const [[userStats]] = await db.query(`
+      SELECT COUNT(*) AS total_users,
+        SUM(role = 'parent') AS total_parents,
+        SUM(role = 'child') AS total_children,
+        SUM(is_admin = 1) AS total_admins
+      FROM Users
+    `);
+    const [[groupStats]] = await db.query('SELECT COUNT(*) AS total_groups FROM RecurringEvents');
+    const [[childStats]] = await db.query('SELECT COUNT(*) AS total_children FROM Children');
+    const [[activeMembersStats]] = await db.query('SELECT COUNT(*) AS total_active_group_members FROM EventGroupMembers WHERE is_active = TRUE');
+    const [[pendingInvitesStats]] = await db.query('SELECT COUNT(*) AS total_pending_invitations FROM EventGroupInvitations WHERE status = "pending"');
+    const [[recentSignupsStats]] = await db.query('SELECT COUNT(*) AS recent_signups FROM Users WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)');
+    const [[mostActiveGroup]] = await db.query(`
+      SELECT re.name, COUNT(egm.id) AS member_count
+      FROM RecurringEvents re
+      JOIN EventGroupMembers egm ON egm.event_id = re.id AND egm.is_active = TRUE
+      GROUP BY re.id
+      ORDER BY member_count DESC
+      LIMIT 1
+    `);
+    const stats = {
+      total_users: userStats.total_users,
+      total_parents: userStats.total_parents,
+      total_children: userStats.total_children,
+      total_admins: userStats.total_admins,
+      total_groups: groupStats.total_groups,
+      total_children_table: childStats.total_children,
+      total_active_group_members: activeMembersStats.total_active_group_members,
+      total_pending_invitations: pendingInvitesStats.total_pending_invitations,
+      recent_signups: recentSignupsStats.recent_signups,
+      most_active_group: mostActiveGroup ? mostActiveGroup.name : null,
+      most_active_group_count: mostActiveGroup ? mostActiveGroup.member_count : 0
+    };
+    // --- End Statistics ---
     res.render('admin/dashboard', {
       organizations,
       users,
       children,
-      session: req.session
+      groups,
+      stats,
+      session: req.session,
+      activePage: 'dashboard'
     });
   } catch (err) {
     console.error('Admin dashboard error:', err);
@@ -96,6 +142,7 @@ router.post('/users/:id/delete', async (req, res) => {
 router.get('/organizations/:id/edit', async (req, res) => {
   try {
     const [[org]] = await db.query('SELECT * FROM Organizations WHERE id = ?', [req.params.id]);
+    if (!org) return res.status(404).send('Organization not found');
     res.render('admin/editOrg', { org, session: req.session });
   } catch (err) {
     console.error('Load org error:', err);
@@ -111,7 +158,7 @@ router.post('/organizations/:id/edit', async (req, res) => {
       'UPDATE Organizations SET name = ?, address = ?, type = ? WHERE id = ?',
       [name.trim(), address.trim(), type.trim(), req.params.id]
     );
-    res.redirect('/admin/dashboard');
+    res.redirect('/admin/organizations');
   } catch (err) {
     console.error('Update org error:', err);
     res.status(500).send('Could not update organization: ' + err.message);
@@ -314,38 +361,148 @@ router.post('/children/:id/delete', async (req, res) => {
   }
 });
 
-// Manage Block Status (GET)
-router.get('/users/:id/manage-block', async (req, res) => {
+// List all groups/events
+router.get('/groups', async (req, res) => {
   try {
-    const [users] = await db.query('SELECT * FROM Users WHERE id = ?', [req.params.id]);
-    if (!users || users.length === 0) {
-      return res.status(404).send('User not found');
-    }
-    const user = users[0];
-    res.render('admin/manageBlock', { user, session: req.session });
+    const [groups] = await db.query(`
+      SELECT re.*, u.name AS created_by_name
+      FROM RecurringEvents re
+      JOIN Users u ON re.created_by = u.id
+      ORDER BY re.day_of_week, re.start_time
+    `);
+    res.render('admin/groups', { groups, session: req.session });
   } catch (err) {
-    console.error('Load manage block error:', err);
-    res.status(500).send('Could not load block management');
+    console.error('Admin groups error:', err);
+    res.status(500).send('Failed to load groups');
   }
 });
 
-// Manage Block Status (POST)
-router.post('/users/:id/:action', async (req, res) => {
-  const userId = req.params.id;
-  const action = req.params.action; // 'block' or 'unblock'
-  const newStatus = action === 'block';
+// View/manage members for a group
+router.get('/groups/:id/members', async (req, res) => {
+  const groupId = req.params.id;
   try {
-    await db.query('START TRANSACTION');
-    await db.query('UPDATE Users SET is_blocked = ? WHERE id = ?', [newStatus, userId]);
-    await db.query('UPDATE Children SET is_blocked = ? WHERE user_id = ?', [newStatus, userId]);
-    await db.query('COMMIT');
-    req.session.success = `✅ User and associated children have been ${action}ed successfully.`;
-    res.redirect('/admin/dashboard');
+    // Get group details
+    const [[group]] = await db.query(
+      `SELECT re.*, u.name AS created_by_name
+       FROM RecurringEvents re
+       JOIN Users u ON re.created_by = u.id
+       WHERE re.id = ?`,
+      [groupId]
+    );
+    if (!group) return res.status(404).send('Group not found');
+    // Get all group members (parents and children)
+    const [members] = await db.query(`
+      SELECT egm.*, u.name AS user_name, u.email, c.name AS child_name, c.school, c.club
+      FROM EventGroupMembers egm
+      JOIN Users u ON egm.user_id = u.id
+      LEFT JOIN Children c ON egm.child_id = c.id
+      WHERE egm.event_id = ? AND egm.is_active = TRUE
+      ORDER BY egm.role DESC, u.name, c.name
+    `, [groupId]);
+    // Get pending invitations
+    const [invitations] = await db.query(`
+      SELECT egi.*, u.name AS inviter_name
+      FROM EventGroupInvitations egi
+      JOIN Users u ON egi.inviter_id = u.id
+      WHERE egi.event_id = ? AND egi.status = 'pending'
+      ORDER BY egi.invited_at DESC
+    `, [groupId]);
+    res.render('admin/groupMembers', { group, members, invitations, session: req.session });
   } catch (err) {
-    await db.query('ROLLBACK');
-    console.error('Block/unblock error:', err);
-    req.session.error = `Failed to ${action} user and children`;
-    res.redirect(`/admin/users/${userId}/manage-block`);
+    console.error('Admin group members error:', err);
+    res.status(500).send('Failed to load group members');
+  }
+});
+
+// Remove a member from the group
+router.post('/groups/:id/remove-member', async (req, res) => {
+  const groupId = req.params.id;
+  const { member_id } = req.body;
+  try {
+    await db.query('UPDATE EventGroupMembers SET is_active = FALSE WHERE id = ?', [member_id]);
+    res.redirect(`/admin/groups/${groupId}/members?success=Member removed`);
+  } catch (err) {
+    console.error('Remove member error:', err);
+    res.redirect(`/admin/groups/${groupId}/members?error=Failed to remove member`);
+  }
+});
+
+// Promote/demote a parent (admin/parent role)
+router.post('/groups/:id/promote-demote', async (req, res) => {
+  const groupId = req.params.id;
+  const { member_id, new_role } = req.body;
+  try {
+    await db.query('UPDATE EventGroupMembers SET role = ? WHERE id = ?', [new_role, member_id]);
+    res.redirect(`/admin/groups/${groupId}/members?success=Role updated`);
+  } catch (err) {
+    console.error('Promote/demote error:', err);
+    res.redirect(`/admin/groups/${groupId}/members?error=Failed to update role`);
+  }
+});
+
+// Resend invitation
+router.post('/groups/:id/invites/:inviteId/resend', async (req, res) => {
+  const groupId = req.params.id;
+  const inviteId = req.params.inviteId;
+  try {
+    // Get invite details
+    const [[invite]] = await db.query('SELECT * FROM EventGroupInvitations WHERE id = ?', [inviteId]);
+    if (!invite) return res.redirect(`/admin/groups/${groupId}/members?error=Invite not found`);
+    // Resend logic: update invited_at and (optionally) send notification
+    await db.query('UPDATE EventGroupInvitations SET invited_at = NOW() WHERE id = ?', [inviteId]);
+    // TODO: Optionally send in-app or email notification here
+    res.redirect(`/admin/groups/${groupId}/members?success=Invitation resent`);
+  } catch (err) {
+    console.error('Resend invite error:', err);
+    res.redirect(`/admin/groups/${groupId}/members?error=Failed to resend invitation`);
+  }
+});
+
+// Approve a pending invite (manual override)
+router.post('/groups/:id/invites/:inviteId/approve', async (req, res) => {
+  const groupId = req.params.id;
+  const inviteId = req.params.inviteId;
+  try {
+    await db.query('UPDATE EventGroupInvitations SET status = "accepted", responded_at = NOW() WHERE id = ?', [inviteId]);
+    res.redirect(`/admin/groups/${groupId}/members?success=Invitation approved`);
+  } catch (err) {
+    console.error('Approve invite error:', err);
+    res.redirect(`/admin/groups/${groupId}/members?error=Failed to approve invitation`);
+  }
+});
+
+// Decline a pending invite (manual override)
+router.post('/groups/:id/invites/:inviteId/decline', async (req, res) => {
+  const groupId = req.params.id;
+  const inviteId = req.params.inviteId;
+  try {
+    await db.query('UPDATE EventGroupInvitations SET status = "declined", responded_at = NOW() WHERE id = ?', [inviteId]);
+    res.redirect(`/admin/groups/${groupId}/members?success=Invitation declined`);
+  } catch (err) {
+    console.error('Decline invite error:', err);
+    res.redirect(`/admin/groups/${groupId}/members?error=Failed to decline invitation`);
+  }
+});
+
+// GET /admin/organizations - List all organizations
+router.get('/organizations', async (req, res) => {
+  try {
+    const [organizations] = await db.query('SELECT * FROM Organizations ORDER BY name ASC');
+    res.render('admin/organizations', { organizations, session: req.session, activePage: 'organizations' });
+  } catch (err) {
+    console.error('Admin organizations error:', err);
+    res.status(500).send('Failed to load organizations');
+  }
+});
+
+// POST /admin/organizations/:id/delete - Delete organization
+router.post('/organizations/:id/delete', async (req, res) => {
+  try {
+    await db.query('DELETE FROM Organizations WHERE id = ?', [req.params.id]);
+    res.redirect('/admin/organizations');
+  } catch (err) {
+    console.error('Delete org error:', err);
+    res.status(500).send('Could not delete organization: ' + err.message);
   }
 });
 

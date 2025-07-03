@@ -5,43 +5,78 @@
 <div class="container py-5">
   <h2 class="mb-4 fw-bold text-primary">🛠 Admin Dashboard</h2>
 
-  <div class="row">
-    <!-- Organizations -->
-    <div class="col-md-6">
-      <h4 class="text-success">🏫 Organizations</h4>
-      <a href="/admin/organizations/add" class="btn btn-success mb-3">➕ Add New Organization</a>
-      <div class="table-responsive">
-        <table class="table table-bordered table-sm table-striped rounded shadow-sm" id="organizationsTable">
-          <thead class="table-light">
-            <tr>
-              <th>Name <a href="#" class="sort text-dark" data-sort="name">🔽</a></th>
-              <th>Type <a href="#" class="sort text-dark" data-sort="type">🔽</a></th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% if (organizations && organizations.length > 0) { %>
-              <% organizations.forEach(org => { %>
-                <tr>
-                  <td><%= org.name %></td>
-                  <td><%= org.type %></td>
-                  <td>
-                    <form action="/admin/organizations/<%= org.id %>/edit" method="GET" style="display:inline;">
-                      <button type="submit" class="btn btn-sm btn-outline-success" title="Edit Organization">✏️</button>
-                    </form>
-                  </td>
-                </tr>
-              <% }); %>
-            <% } else { %>
-              <tr><td colspan="3" class="text-center text-muted">No organizations found.</td></tr>
-            <% } %>
-          </tbody>
-        </table>
+  <% if (typeof stats !== 'undefined') { %>
+    <div class="row mb-4 g-3">
+      <div class="col-md-2">
+        <div class="card shadow-sm border-primary">
+          <div class="card-body text-center">
+            <h6 class="text-primary">Total Users</h6>
+            <div class="fw-bold fs-4"><%= stats.total_users %></div>
+            <small>Parents: <%= stats.total_parents %> | Children: <%= stats.total_children %> | Admins: <%= stats.total_admins %></small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="card shadow-sm border-success">
+          <div class="card-body text-center">
+            <h6 class="text-success">Groups/Events</h6>
+            <div class="fw-bold fs-4"><%= stats.total_groups %></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="card shadow-sm border-info">
+          <div class="card-body text-center">
+            <h6 class="text-info">Children</h6>
+            <div class="fw-bold fs-4"><%= stats.total_children_table %></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="card shadow-sm border-warning">
+          <div class="card-body text-center">
+            <h6 class="text-warning">Active Group Members</h6>
+            <div class="fw-bold fs-4"><%= stats.total_active_group_members %></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="card shadow-sm border-danger">
+          <div class="card-body text-center">
+            <h6 class="text-danger">Pending Invitations</h6>
+            <div class="fw-bold fs-4"><%= stats.total_pending_invitations %></div>
+            <small>Recent Signups (7d): <%= stats.recent_signups %></small>
+          </div>
+        </div>
       </div>
     </div>
+    <div class="row mb-3">
+      <div class="col-md-6 col-lg-4 col-xl-3">
+        <div class="card shadow-sm border-secondary">
+          <div class="card-body text-center">
+            <h6 class="text-secondary mb-0">Most Active Group</h6>
+            <% if (stats.most_active_group) { %>
+              <span class="fw-bold"><%= stats.most_active_group %></span> (<%= stats.most_active_group_count %> members)
+            <% } else { %>
+              <span class="text-muted">No group data</span>
+            <% } %>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6 col-lg-8 col-xl-9 d-flex align-items-center">
+        <div class="d-flex flex-wrap gap-2 w-100 justify-content-md-end justify-content-center mt-3 mt-md-0">
+          <a href="/admin/organizations" class="btn btn-outline-success">🏫 Manage Organizations</a>
+          <a href="/admin/groups" class="btn btn-outline-primary">👥 Manage Groups/Events</a>
+          <a href="/admin/users/add" class="btn btn-outline-success">➕ Add Parent</a>
+          <a href="/admin/children/add" class="btn btn-outline-success">➕ Add Child</a>
+        </div>
+      </div>
+    </div>
+  <% } %>
 
+  <div class="row g-4">
     <!-- Parents -->
-    <div class="col-md-6">
+    <div class="col-lg-6">
       <h4 class="text-success">👤 Parents</h4>
       <a href="/admin/users/add" class="btn btn-success mb-3">➕ Add New Parent</a>
       <div class="table-responsive">
@@ -82,7 +117,7 @@
     </div>
 
     <!-- Children -->
-    <div class="col-md-12 mt-4">
+    <div class="col-lg-6">
       <h4 class="text-success">👶 Children</h4>
       <a href="/admin/children/add" class="btn btn-success mb-3">➕ Add New Child</a>
       <div class="table-responsive">
@@ -148,6 +183,43 @@
               <% }); %>
             <% } else { %>
               <tr><td colspan="3" class="text-center text-muted">No children or users found.</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Groups / Events -->
+  <div class="row mt-4">
+    <div class="col-12">
+      <h4 class="text-primary">👥 Groups / Events</h4>
+      <div class="table-responsive">
+        <table class="table table-bordered table-sm table-striped rounded shadow-sm" id="groupsTable">
+          <thead class="table-light">
+            <tr>
+              <th>Name</th>
+              <th>Schedule</th>
+              <th>Location</th>
+              <th>Members</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (typeof groups !== 'undefined' && groups.length > 0) { %>
+              <% groups.forEach(group => { %>
+                <tr>
+                  <td><%= group.name %></td>
+                  <td><%= group.day_of_week %>s, <%= group.start_time %> - <%= group.end_time %></td>
+                  <td><%= group.location %></td>
+                  <td><%= group.group_member_count || 0 %></td>
+                  <td>
+                    <a href="/admin/groups/<%= group.id %>/members" class="btn btn-sm btn-outline-primary">Manage Members</a>
+                  </td>
+                </tr>
+              <% }) %>
+            <% } else { %>
+              <tr><td colspan="5" class="text-center text-muted">No groups found.</td></tr>
             <% } %>
           </tbody>
         </table>

@@ -8,6 +8,7 @@
     <div class="collapse navbar-collapse" id="navbarNav">
       <ul class="navbar-nav ms-auto">
         <li class="nav-item"><a class="nav-link" href="/admin/dashboard">Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link<%= (typeof activePage !== 'undefined' && activePage === 'organizations') ? ' active' : '' %>" href="/admin/organizations">Organizations</a></li>
         <li class="nav-item"><a class="nav-link" href="/">Main Site</a></li>
         <li class="nav-item">
           <a class="nav-link" href="/messages/inbox">
