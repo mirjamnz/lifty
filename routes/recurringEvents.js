@@ -176,6 +176,22 @@ router.get('/:id/group', async (req, res) => {
       ORDER BY ea.event_date, ea.assignment_type
     `, [eventId]);
 
+    // --- Addable Children Logic ---
+    // Get user's children
+    const [children] = await db.query(`
+      SELECT c.* FROM Children c
+      JOIN ParentChild pc ON pc.child_id = c.id
+      WHERE pc.parent_id = ?
+    `, [userId]);
+    // Get user's children already in the group
+    const [groupChildren] = await db.query(
+      'SELECT child_id FROM EventGroupMembers WHERE event_id = ? AND user_id = ? AND child_id IS NOT NULL AND is_active = TRUE',
+      [eventId, userId]
+    );
+    const groupChildIds = groupChildren.map(gc => gc.child_id);
+    const addableChildren = children.filter(c => !groupChildIds.includes(c.id));
+    // --- End Addable Children Logic ---
+
     res.render('event-group', {
       session: req.session,
       event,
@@ -185,7 +201,8 @@ router.get('/:id/group', async (req, res) => {
       messages,
       assignments,
       success: req.query.success,
-      error: req.query.error
+      error: req.query.error,
+      addableChildren
     });
   } catch (err) {
     console.error('GET /recurring-events/:id/group error:', err);
@@ -668,6 +685,61 @@ router.get('/:id/assignments', async (req, res) => {
   } catch (err) {
     console.error('GET /recurring-events/:id/assignments error:', err);
     res.status(500).send('Failed to load event assignments.');
+  }
+});
+
+// GET /recurring-events/:id/add-children - Show add children form for group members
+router.get('/:id/add-children', async (req, res) => {
+  const userId = req.session.userId;
+  const eventId = req.params.id;
+  if (!userId) return res.status(401).send('Not logged in');
+
+  // Get user's children
+  const [children] = await db.query(`
+    SELECT c.* FROM Children c
+    JOIN ParentChild pc ON pc.child_id = c.id
+    WHERE pc.parent_id = ?
+  `, [userId]);
+
+  // Get children already in the group
+  const [groupChildren] = await db.query(
+    'SELECT child_id FROM EventGroupMembers WHERE event_id = ? AND user_id = ? AND child_id IS NOT NULL AND is_active = TRUE',
+    [eventId, userId]
+  );
+  const groupChildIds = groupChildren.map(gc => gc.child_id);
+
+  // Filter to only children not already in the group
+  const addableChildren = children.filter(c => !groupChildIds.includes(c.id));
+
+  res.render('partials/add-children-modal', { eventId, addableChildren });
+});
+
+// POST /recurring-events/:id/add-children - Add selected children to group
+router.post('/:id/add-children', async (req, res) => {
+  const userId = req.session.userId;
+  const eventId = req.params.id;
+  let { child_ids } = req.body;
+  if (!userId || !child_ids) return res.status(400).send('Missing required fields.');
+  if (!Array.isArray(child_ids)) child_ids = [child_ids];
+
+  try {
+    for (const childId of child_ids) {
+      // Check if already in group
+      const [[existing]] = await db.query(
+        'SELECT id FROM EventGroupMembers WHERE event_id = ? AND user_id = ? AND child_id = ? AND is_active = TRUE',
+        [eventId, userId, childId]
+      );
+      if (!existing) {
+        await db.query(
+          'INSERT INTO EventGroupMembers (event_id, user_id, child_id, role) VALUES (?, ?, ?, ?)',
+          [eventId, userId, childId, 'child']
+        );
+      }
+    }
+    res.redirect(`/recurring-events/${eventId}/group?success=Children added to group`);
+  } catch (err) {
+    console.error('POST /recurring-events/:id/add-children error:', err);
+    res.status(500).send('Failed to add children to group.');
   }
 });
 

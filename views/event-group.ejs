@@ -166,11 +166,16 @@
 
       <!-- Assignment Management -->
       <div class="card mb-4">
-        <div class="card-header bg-success text-white">
+        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
           <h5 class="mb-0">
             <i class="fas fa-tasks me-2"></i>
             Assignment Management
           </h5>
+          <% if (typeof addableChildren !== 'undefined' && addableChildren.length > 0) { %>
+            <button class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#addChildrenModal">
+              <i class="fas fa-child me-1"></i>Add Your Children to Group
+            </button>
+          <% } %>
         </div>
         <div class="card-body">
           <!-- Create Assignment Form -->
@@ -327,6 +332,45 @@
           </form>
         </div>
       </div>
+
+      <% if (typeof addableChildren !== 'undefined') { %>
+        <div class="alert alert-secondary">
+          <strong>Debug: addableChildren</strong>
+          <pre style="white-space: pre-wrap; word-break: break-all; font-size: 0.9em;">
+            <%= JSON.stringify(addableChildren, null, 2) %>
+          </pre>
+        </div>
+      <% } %>
+
+      <% if (typeof addableChildren !== 'undefined' && addableChildren.length > 0) { %>
+        <!-- Add Children Modal -->
+        <div class="modal fade" id="addChildrenModal" tabindex="-1">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <form method="POST" action="/recurring-events/<%= event.id %>/add-children">
+                <div class="modal-header">
+                  <h5 class="modal-title">Add Your Children to Group</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                  <% addableChildren.forEach(child => { %>
+                    <div class="form-check mb-2">
+                      <input class="form-check-input" type="checkbox" name="child_ids" value="<%= child.id %>" id="child_<%= child.id %>">
+                      <label class="form-check-label" for="child_<%= child.id %>">
+                        <i class="fas fa-child me-1"></i><%= child.name %> (<%= child.school %>)
+                      </label>
+                    </div>
+                  <% }) %>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                  <button type="submit" class="btn btn-success">Add Selected</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      <% } %>
     </div>
   </div>
 </div>
