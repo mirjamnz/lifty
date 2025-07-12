@@ -126,12 +126,49 @@
                   </button>
                 </div>
               </div>
-              <input type="hidden" name="home_lat" id="home_lat" value="<%= user && user.home_lat ? user.home_lat : '' %>">
-              <input type="hidden" name="home_lng" id="home_lng" value="<%= user && user.home_lng ? user.home_lng : '' %>">
+              <input type="hidden" name="home_lat" id="home_lat" value="<%= user && user.home_lat != null ? user.home_lat : null %>">
+              <input type="hidden" name="home_lng" id="home_lng" value="<%= user && user.home_lng != null ? user.home_lng : null %>">
             </form>
           </div>
         </div>
       </div>
+
+      <!-- Community Map Section -->
+      <% if (neighbors && neighbors.length > 0) { %>
+        <div class="card mb-4">
+          <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0">
+              <i class="fas fa-map me-2"></i>
+              Community Map (<%= neighbors.length %> neighbors)
+            </h5>
+          </div>
+          <div class="card-body">
+            <div id="map" style="height: 300px; width: 100%; border-radius: 8px; border: 1px solid #ddd; background-color: #f8f9fa;"></div>
+            <div class="mt-3">
+              <small class="text-muted">
+                <i class="fas fa-info-circle me-1"></i>
+                Showing other registered users in your area
+              </small>
+              <div id="map-debug" class="mt-2 small text-muted"></div>
+            </div>
+          </div>
+        </div>
+      <% } else { %>
+        <div class="card mb-4">
+          <div class="card-header bg-light text-muted">
+            <h5 class="mb-0">
+              <i class="fas fa-map me-2"></i>
+              Community Map
+            </h5>
+          </div>
+          <div class="card-body text-center">
+            <p class="text-muted mb-0">
+              <i class="fas fa-info-circle me-1"></i>
+              No other users with addresses found yet
+            </p>
+          </div>
+        </div>
+      <% } %>
 
       <!-- Add Child Section -->
       <div class="card mb-4">
@@ -250,45 +287,8 @@
     </div>
 
     <div class="col-md-4">
-      <!-- Community Map Section -->
-      <% if (neighbors && neighbors.length > 0) { %>
-        <div class="card mt-3">
-          <div class="card-header bg-warning text-dark">
-            <h5 class="mb-0">
-              <i class="fas fa-map me-2"></i>
-              Community Map (<%= neighbors.length %> neighbors)
-            </h5>
-          </div>
-          <div class="card-body">
-            <div id="map" style="height: 300px; width: 100%; border-radius: 8px; border: 1px solid #ddd; background-color: #f8f9fa;"></div>
-            <div class="mt-3">
-              <small class="text-muted">
-                <i class="fas fa-info-circle me-1"></i>
-                Showing other registered users in your area
-              </small>
-              <div id="map-debug" class="mt-2 small text-muted"></div>
-            </div>
-          </div>
-        </div>
-      <% } else { %>
-        <div class="card mt-3">
-          <div class="card-header bg-light text-muted">
-            <h5 class="mb-0">
-              <i class="fas fa-map me-2"></i>
-              Community Map
-            </h5>
-          </div>
-          <div class="card-body text-center">
-            <p class="text-muted mb-0">
-              <i class="fas fa-info-circle me-1"></i>
-              No other users with addresses found yet
-            </p>
-          </div>
-        </div>
-      <% } %>
-
       <!-- Quick Actions -->
-      <div class="card mt-3">
+      <div class="card">
         <div class="card-header bg-info text-white">
           <h5 class="mb-0">
             <i class="fas fa-bolt me-2"></i>
@@ -296,15 +296,16 @@
           </h5>
         </div>
         <div class="card-body">
-          <div class="d-grid gap-2">
-            <a href="/rides" class="btn btn-outline-primary">
-              <i class="fas fa-car me-2"></i>View Rides
+          <p class="mb-3 text-muted">Access your most-used features quickly:</p>
+          <div class="d-grid gap-3">
+            <a href="/rides" class="btn btn-outline-primary btn-lg d-flex align-items-center justify-content-center gap-2">
+              <i class="fas fa-car"></i> View Rides
             </a>
-            <a href="/recurring-events" class="btn btn-outline-success">
-              <i class="fas fa-calendar me-2"></i>Recurring Events
+            <a href="/recurring-events" class="btn btn-outline-success btn-lg d-flex align-items-center justify-content-center gap-2">
+              <i class="fas fa-calendar"></i> Recurring Events
             </a>
-            <a href="/messages/all" class="btn btn-outline-info">
-              <i class="fas fa-envelope me-2"></i>Messages
+            <a href="/messages/all" class="btn btn-outline-info btn-lg d-flex align-items-center justify-content-center gap-2">
+              <i class="fas fa-envelope"></i> Messages
             </a>
           </div>
         </div>
@@ -384,8 +385,8 @@ function initLiftyMaps() {
   // Community map
   var mapElement = document.getElementById('map');
   if (mapElement && typeof google !== 'undefined' && google.maps) {
-    var userLat = <%= user && user.home_lat ? user.home_lat : 'null' %>;
-    var userLng = <%= user && user.home_lng ? user.home_lng : 'null' %>;
+    var userLat = <%= (user && user.home_lat != null) ? parseFloat(user.home_lat) : 'null' %>;
+    var userLng = <%= (user && user.home_lng != null) ? parseFloat(user.home_lng) : 'null' %>;
     var neighbors = <%- JSON.stringify(neighbors || []) %>;
     var map = new google.maps.Map(mapElement, {
       zoom: 12,
