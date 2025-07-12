@@ -51,12 +51,108 @@ router.get('/dashboard', async (req, res) => {
       ORDER BY egi.invited_at DESC
     `, [userId]);
 
+    // Get calendar events for the user and their children
+    const childIds = children.map(c => c.id);
+    let calendarEvents = [];
+    
+    // Get ride offers where user is the driver (RideOffers)
+    const [rideOffers] = await db.query(`
+      SELECT ro.id, ro.pickup_time, ro.school as dropoff_location, 'Home' as pickup_location, 'offer' as type
+      FROM RideOffers ro 
+      WHERE ro.user_id = ? AND ro.pickup_time >= NOW()
+    `, [userId]);
+
+    console.log('Ride offers found:', rideOffers.length);
+    
+    // Get ride requests where user is assigned as driver (RideRequests)
+    const [assignedRides] = await db.query(`
+      SELECT rr.id, rr.pickup_time, rr.pickup_location, rr.dropoff_location, c.name as child_name, 'request' as type
+      FROM RideRequests rr 
+      JOIN Children c ON rr.child_id = c.id 
+      WHERE rr.assigned_user_id = ? AND rr.pickup_time >= NOW()
+    `, [userId]);
+
+    console.log('Assigned rides found:', assignedRides.length);
+    
+    // Get ride requests for user's children (if they have children)
+    let childrenRides = [];
+    if (childIds.length > 0) {
+      [childrenRides] = await db.query(`
+        SELECT rr.id, rr.pickup_time, rr.pickup_location, rr.dropoff_location, c.name as child_name, 'child_request' as type
+        FROM RideRequests rr 
+        JOIN Children c ON rr.child_id = c.id 
+        WHERE rr.child_id IN (?) AND rr.pickup_time >= NOW()
+      `, [childIds]);
+    }
+
+    console.log('Children rides found:', childrenRides.length);
+    
+    // Get recurring event assignments for user's children (if they have children)
+    let recurringAssignments = [];
+    if (childIds.length > 0) {
+      [recurringAssignments] = await db.query(`
+        SELECT ea.id, ea.event_date, re.name as event_name, re.day_of_week, re.start_time, re.end_time, re.location, c.name as child_name, 'recurring' as type
+        FROM EventAssignments ea
+        JOIN RecurringEvents re ON ea.event_id = re.id
+        JOIN Children c ON ea.child_id = c.id
+        WHERE ea.child_id IN (?) AND ea.event_date >= CURDATE() AND ea.status != 'cancelled' AND ea.is_cancelled = FALSE
+        ORDER BY ea.event_date ASC
+      `, [childIds]);
+    }
+
+    console.log('Recurring assignments found:', recurringAssignments.length);
+
+    // Format events for FullCalendar
+    calendarEvents = [
+      ...rideOffers.map(offer => ({
+        id: `offer_${offer.id}`,
+        title: `Drive: To ${offer.dropoff_location}`,
+        start: offer.pickup_time,
+        description: `${offer.pickup_location} → ${offer.dropoff_location}`,
+        backgroundColor: '#dc3545',
+        borderColor: '#c82333',
+        type: offer.type
+      })),
+      ...assignedRides.map(ride => ({
+        id: `ride_${ride.id}`,
+        title: `Drive: ${ride.child_name}`,
+        start: ride.pickup_time,
+        description: `${ride.pickup_location} → ${ride.dropoff_location || 'Unknown'}`,
+        backgroundColor: '#dc3545',
+        borderColor: '#c82333',
+        type: ride.type
+      })),
+      ...childrenRides.map(ride => ({
+        id: `child_ride_${ride.id}`,
+        title: `Ride: ${ride.child_name}`,
+        start: ride.pickup_time,
+        description: `${ride.pickup_location} → ${ride.dropoff_location || 'Unknown'}`,
+        backgroundColor: '#28a745',
+        borderColor: '#1e7e34',
+        type: ride.type
+      })),
+      ...recurringAssignments.map(event => ({
+        id: `event_${event.id}`,
+        title: `${event.event_name} (${event.child_name})`,
+        start: `${event.event_date}T${event.start_time}`,
+        end: event.end_time ? `${event.event_date}T${event.end_time}` : undefined,
+        description: `${event.location}`,
+        backgroundColor: '#ffc107',
+        borderColor: '#e0a800',
+        type: event.type
+      }))
+    ];
+
+    console.log('Total calendar events:', calendarEvents.length);
+    console.log('Calendar events:', calendarEvents);
+
     res.render('dashboard', {
       session: req.session,
       user,
       children,
       neighbors,
       groupInvitations,
+      calendarEvents,
       success: req.session.success,
       error: req.session.error
     });
@@ -300,6 +396,213 @@ router.post('/children/:id/invite-parent', async (req, res) => {
     console.error('Invite parent error:', err);
     req.session.error = "Something went wrong while inviting the parent.";
     res.redirect('/dashboard');
+  }
+});
+
+// GET /api/calendar-events
+// Returns all rides and recurring events for the logged-in user and their children in FullCalendar JSON format
+router.get('/api/calendar-events', async (req, res) => {
+  const userId = req.session.userId;
+  if (!userId) return res.status(401).json({ error: 'Not logged in' });
+
+  try {
+    // 1. Get user's children IDs
+    const [children] = await db.query(
+      'SELECT c.id, c.name FROM Children c JOIN ParentChild pc ON pc.child_id = c.id WHERE pc.parent_id = ?',
+      [userId]
+    );
+    const childIds = children.map(c => c.id);
+
+    // 2. Get rides where user is a driver or passenger (for themselves or their children)
+    // Example: RideOffers (as driver)
+    const [rideOffers] = await db.query(
+      'SELECT id, date, start_time, end_time, from_location, to_location FROM RideOffers WHERE driver_id = ? AND date >= CURDATE()',
+      [userId]
+    );
+    // Example: RideBookings (as passenger for children)
+    let rideBookings = [];
+    if (childIds.length > 0) {
+      [rideBookings] = await db.query(
+        'SELECT rb.id, rb.date, rb.start_time, rb.end_time, rb.from_location, rb.to_location, c.name as child_name FROM RideBookings rb JOIN Children c ON rb.child_id = c.id WHERE rb.child_id IN (?) AND rb.date >= CURDATE()',
+        [childIds]
+      );
+    }
+
+    // 3. Get recurring events (for user and children)
+    // For simplicity, show next 30 days of assignments
+    let recurringAssignments = [];
+    if (childIds.length > 0) {
+      [recurringAssignments] = await db.query(
+        `SELECT ea.id, ea.event_date, re.name as event_name, re.day_of_week, re.start_time, re.end_time, re.location, c.name as child_name
+         FROM EventAssignments ea
+         JOIN RecurringEvents re ON ea.event_id = re.id
+         JOIN Children c ON ea.child_id = c.id
+         WHERE ea.child_id IN (?) AND ea.event_date >= CURDATE() AND ea.event_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)`,
+        [childIds]
+      );
+    }
+
+    // 4. Format all events for FullCalendar
+    const events = [];
+    // Ride offers (as driver)
+    for (const offer of rideOffers) {
+      events.push({
+        title: `Drive: ${offer.from_location} → ${offer.to_location}`,
+        start: `${offer.date}T${offer.start_time}`,
+        end: offer.end_time ? `${offer.date}T${offer.end_time}` : undefined,
+        description: 'You are the driver for this ride.'
+      });
+    }
+    // Ride bookings (as passenger for children)
+    for (const booking of rideBookings) {
+      events.push({
+        title: `Ride for ${booking.child_name}: ${booking.from_location} → ${booking.to_location}`,
+        start: `${booking.date}T${booking.start_time}`,
+        end: booking.end_time ? `${booking.date}T${booking.end_time}` : undefined,
+        description: `Your child ${booking.child_name} is booked for this ride.`
+      });
+    }
+    // Recurring assignments (for children)
+    for (const assignment of recurringAssignments) {
+      events.push({
+        title: `Event: ${assignment.event_name} (${assignment.child_name})`,
+        start: `${assignment.event_date}T${assignment.start_time}`,
+        end: assignment.end_time ? `${assignment.event_date}T${assignment.end_time}` : undefined,
+        description: `${assignment.child_name} has ${assignment.event_name} at ${assignment.location}`
+      });
+    }
+
+    // 5. Get ride requests where user is the assigned driver
+    const [assignedRideRequests] = await db.query(
+      'SELECT rr.id, rr.pickup_time, rr.pickup_location, rr.dropoff_location, c.name as child_name FROM RideRequests rr JOIN Children c ON rr.child_id = c.id WHERE rr.assigned_user_id = ? AND rr.pickup_time >= NOW()',
+      [userId]
+    );
+    // Add assigned ride requests to events
+    for (const request of assignedRideRequests) {
+      events.push({
+        title: `Drive for ${request.child_name}: ${request.pickup_location} → ${request.dropoff_location}`,
+        start: request.pickup_time,
+        description: `You are the assigned driver for ${request.child_name} from ${request.pickup_location} to ${request.dropoff_location}.`
+      });
+    }
+
+    res.json(events);
+  } catch (err) {
+    console.error('Calendar events error:', err);
+    res.status(500).json({ error: 'Failed to load calendar events' });
+  }
+});
+
+// Standalone calendar test page for troubleshooting FullCalendar
+router.get('/calendar-test', (req, res) => {
+  res.render('calendar-test');
+});
+
+// GET /calendar - Detailed calendar page
+router.get('/calendar', async (req, res) => {
+  const userId = req.session.userId;
+  if (!userId) return res.redirect('/login');
+
+  try {
+    // Get user's children using ParentChild join
+    const [children] = await db.query(`
+      SELECT c.* FROM Children c
+      JOIN ParentChild pc ON pc.child_id = c.id
+      WHERE pc.parent_id = ?
+    `, [userId]);
+
+    // Get calendar events (same logic as dashboard)
+    const childIds = children.map(c => c.id);
+    let calendarEvents = [];
+    
+    // Get ride offers where user is the driver (RideOffers)
+    const [rideOffers] = await db.query(`
+      SELECT ro.id, ro.pickup_time, ro.school as dropoff_location, 'Home' as pickup_location, 'offer' as type
+      FROM RideOffers ro 
+      WHERE ro.user_id = ? AND ro.pickup_time >= NOW()
+    `, [userId]);
+    
+    // Get ride requests where user is assigned as driver (RideRequests)
+    const [assignedRides] = await db.query(`
+      SELECT rr.id, rr.pickup_time, rr.pickup_location, rr.dropoff_location, c.name as child_name, 'request' as type
+      FROM RideRequests rr 
+      JOIN Children c ON rr.child_id = c.id 
+      WHERE rr.assigned_user_id = ? AND rr.pickup_time >= NOW()
+    `, [userId]);
+
+    // Get ride requests for user's children (if they have children)
+    let childrenRides = [];
+    if (childIds.length > 0) {
+      [childrenRides] = await db.query(`
+        SELECT rr.id, rr.pickup_time, rr.pickup_location, rr.dropoff_location, c.name as child_name, 'child_request' as type
+        FROM RideRequests rr 
+        JOIN Children c ON rr.child_id = c.id 
+        WHERE rr.child_id IN (?) AND rr.pickup_time >= NOW()
+      `, [childIds]);
+    }
+
+    // Get recurring event assignments for user's children (if they have children)
+    let recurringAssignments = [];
+    if (childIds.length > 0) {
+      [recurringAssignments] = await db.query(`
+        SELECT ea.id, ea.event_date, re.name as event_name, re.day_of_week, re.start_time, re.end_time, re.location, c.name as child_name, 'recurring' as type
+        FROM EventAssignments ea
+        JOIN RecurringEvents re ON ea.event_id = re.id
+        JOIN Children c ON ea.child_id = c.id
+        WHERE ea.child_id IN (?) AND ea.event_date >= CURDATE() AND ea.status != 'cancelled' AND ea.is_cancelled = FALSE
+        ORDER BY ea.event_date ASC
+      `, [childIds]);
+    }
+
+    // Format events for FullCalendar
+    calendarEvents = [
+      ...rideOffers.map(offer => ({
+        id: `offer_${offer.id}`,
+        title: `Drive: To ${offer.dropoff_location}`,
+        start: new Date(offer.pickup_time).toISOString().slice(0, 19).replace('T', ' '),
+        description: `${offer.pickup_location} → ${offer.dropoff_location}`,
+        backgroundColor: '#dc3545',
+        borderColor: '#c82333',
+        type: offer.type
+      })),
+      ...assignedRides.map(ride => ({
+        id: `ride_${ride.id}`,
+        title: `Drive: ${ride.child_name}`,
+        start: new Date(ride.pickup_time).toISOString().slice(0, 19).replace('T', ' '),
+        description: `${ride.pickup_location} → ${ride.dropoff_location || 'Unknown'}`,
+        backgroundColor: '#dc3545',
+        borderColor: '#c82333',
+        type: ride.type
+      })),
+      ...childrenRides.map(ride => ({
+        id: `child_ride_${ride.id}`,
+        title: `Ride: ${ride.child_name}`,
+        start: new Date(ride.pickup_time).toISOString().slice(0, 19).replace('T', ' '),
+        description: `${ride.pickup_location} → ${ride.dropoff_location || 'Unknown'}`,
+        backgroundColor: '#28a745',
+        borderColor: '#1e7e34',
+        type: ride.type
+      })),
+      ...recurringAssignments.map(event => ({
+        id: `event_${event.id}`,
+        title: `${event.event_name} (${event.child_name})`,
+        start: `${event.event_date}T${event.start_time}`,
+        end: event.end_time ? `${event.event_date}T${event.end_time}` : undefined,
+        description: `${event.location}`,
+        backgroundColor: '#ffc107',
+        borderColor: '#e0a800',
+        type: event.type
+      }))
+    ];
+
+    res.render('calendar-detail', {
+      session: req.session,
+      children,
+      calendarEvents
+    });
+  } catch (err) {
+    console.error('Calendar page error:', err);
+    res.status(500).send('Failed to load calendar page.');
   }
 });
 

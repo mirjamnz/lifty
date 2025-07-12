@@ -2,6 +2,148 @@
 <%- include('partials/header1') %>
 <%- include('partials/navbar1') %>
 
+<!-- FullCalendar v5.11.3 CSS (guaranteed CDN) -->
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet" />
+
+<style>
+/* Custom Calendar Styling */
+.fc {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Event type colors */
+.event-drive {
+  background-color: #dc3545 !important;
+  border-color: #c82333 !important;
+  color: white !important;
+}
+
+.event-ride {
+  background-color: #28a745 !important;
+  border-color: #1e7e34 !important;
+  color: white !important;
+}
+
+.event-recurring {
+  background-color: #ffc107 !important;
+  border-color: #e0a800 !important;
+  color: #212529 !important;
+}
+
+/* Weekend styling */
+.fc-day-sun, .fc-day-sat {
+  background-color: #f8f9fa !important;
+}
+
+.fc-day-sun .fc-daygrid-day-number,
+.fc-day-sat .fc-daygrid-day-number {
+  font-weight: bold;
+  color: #6c757d;
+}
+
+/* Today highlighting */
+.fc-day-today {
+  background-color: #e3f2fd !important;
+}
+
+/* Event hover effects */
+.fc-event:hover {
+  opacity: 0.8;
+  transform: scale(1.02);
+  transition: all 0.2s ease;
+}
+
+/* Calendar header styling */
+.fc-header-toolbar {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 15px;
+  border-radius: 8px 8px 0 0;
+  margin-bottom: 0;
+}
+
+.fc-header-toolbar h2 {
+  color: white !important;
+  font-weight: 600;
+}
+
+.fc-button {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  color: white !important;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.fc-button:hover {
+  background-color: rgba(255, 255, 255, 0.3) !important;
+  transform: translateY(-1px);
+}
+
+.fc-button-active {
+  background-color: rgba(255, 255, 255, 0.4) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Calendar body styling */
+.fc-daygrid-body {
+  border-radius: 0 0 8px 8px;
+  overflow: hidden;
+}
+
+/* Event styling */
+.fc-event {
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-weight: 500;
+  padding: 2px 4px;
+  margin: 1px 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Tooltip styling */
+.tooltip-inner {
+  background-color: #343a40;
+  color: white;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 0.9em;
+  line-height: 1.4;
+}
+
+.tooltip-arrow::before {
+  border-top-color: #343a40;
+}
+
+/* Legend */
+.calendar-legend {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin: 15px 0;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9em;
+  color: #6c757d;
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.legend-drive { background-color: #dc3545; }
+.legend-ride { background-color: #28a745; }
+.legend-recurring { background-color: #ffc107; }
+</style>
+
 <div class="container py-5">
   <div class="row">
     <div class="col-md-8">
@@ -20,6 +162,46 @@
           <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
       <% } %>
+
+      <!-- Step 2: Calendar Overview Section -->
+      <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-calendar-alt me-2"></i>
+            Calendar Overview
+          </h5>
+        </div>
+        <div class="card-body">
+          <!-- FullCalendar container -->
+          <div id="calendar"></div>
+          
+          <!-- Calendar Legend -->
+          <div class="calendar-legend">
+            <div class="legend-item">
+              <div class="legend-color legend-drive"></div>
+              <span>You're Driving</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color legend-ride"></div>
+              <span>Child's Ride</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color legend-recurring"></div>
+              <span>Recurring Event</span>
+            </div>
+          </div>
+          
+          <!-- Quick Actions -->
+          <div class="text-center mt-3">
+            <a href="/calendar" class="btn btn-outline-primary btn-sm" target="_blank">
+              <i class="fas fa-calendar-alt me-1"></i>View Detailed Calendar
+            </a>
+            <a href="/rides" class="btn btn-outline-success btn-sm ms-2">
+              <i class="fas fa-car me-1"></i>Manage Rides
+            </a>
+          </div>
+        </div>
+      </div>
 
       <!-- Group Invitations Section -->
       <% if (groupInvitations && groupInvitations.length > 0) { %>
@@ -314,7 +496,265 @@
   </div>
 </div>
 
+<!-- FullCalendar v5.11.3 JS (guaranteed CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+
 <script>
+// FullCalendar Initialization with Debugging
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('DOM Content Loaded - Starting FullCalendar initialization');
+  
+  // Debug: Check if FullCalendar is available
+  if (typeof FullCalendar === 'undefined') {
+    console.error('FullCalendar is not defined! Check if the CDN loaded properly.');
+    return;
+  }
+  console.log('FullCalendar library loaded successfully:', FullCalendar);
+  
+  // Debug: Check if calendar container exists
+  const calendarEl = document.getElementById('calendar');
+  if (!calendarEl) {
+    console.error('Calendar container element not found!');
+    return;
+  }
+  console.log('Calendar container found:', calendarEl);
+  
+  // Debug: Check calendar events data
+  const calendarEvents = <%- JSON.stringify(calendarEvents || []) %>;
+  console.log('Calendar events data:', calendarEvents);
+  console.log('Number of events:', calendarEvents.length);
+  console.log('Events structure:', JSON.stringify(calendarEvents, null, 2));
+  
+  // Check if events have valid dates
+  calendarEvents.forEach((event, index) => {
+    console.log(`Event ${index}:`, {
+      id: event.id,
+      title: event.title,
+      start: event.start,
+      startType: typeof event.start,
+      startValid: event.start ? new Date(event.start).toString() : 'INVALID',
+      startParsed: event.start ? new Date(event.start) : null
+    });
+  });
+  
+  try {
+    // Initialize FullCalendar with enhanced styling and functionality
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: 'dayGridMonth',
+      headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: 'dayGridMonth,timeGridWeek,listWeek'
+      },
+      height: 450, // Slightly taller for better visibility
+      timeZone: 'local', // Use local timezone
+      initialDate: new Date(), // Start with current date
+      events: <%- JSON.stringify(calendarEvents || []) %>, // Use server-provided events
+      
+      // Enhanced event styling
+      eventDisplay: 'block',
+      eventTimeFormat: {
+        hour: '2-digit',
+        minute: '2-digit',
+        meridiem: 'short'
+      },
+      
+      // Custom event rendering
+      eventDidMount: function(info) {
+        console.log('Event mounted:', info.event);
+        
+        // Add tooltip with more details using vanilla JavaScript
+        const event = info.event;
+        const tooltipContent = `
+          <div class="text-start">
+            <strong>${event.title}</strong><br>
+            <small>${event.extendedProps.description || 'No description'}</small><br>
+            <small>${event.start.toLocaleTimeString('en-US', { 
+              hour: '2-digit', 
+              minute: '2-digit',
+              hour12: true 
+            })}</small>
+          </div>
+        `;
+        
+        // Use vanilla JavaScript for tooltip-like behavior
+        info.el.title = event.title + ' - ' + (event.extendedProps.description || 'No description');
+        
+        // Add click handler for more details
+        info.el.addEventListener('click', function(e) {
+          e.preventDefault();
+          
+          // Create a custom modal-like experience
+          const event = info.event;
+          
+          // Create modal HTML
+          const modalHTML = `
+            <div class="modal fade" id="eventModal" tabindex="-1" aria-labelledby="eventModalLabel" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <h5 class="modal-title" id="eventModalLabel">
+                      <i class="fas fa-calendar-event me-2"></i>${event.title}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                  </div>
+                  <div class="modal-body">
+                    <div class="row">
+                      <div class="col-12">
+                        <p class="text-muted mb-3">
+                          <i class="fas fa-info-circle me-2"></i>
+                          ${event.extendedProps.description || 'No description'}
+                        </p>
+                        <div class="alert alert-info">
+                          <i class="fas fa-clock me-2"></i>
+                          <strong>Time:</strong> ${event.start.toLocaleString('en-US', { 
+                            weekday: 'long',
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric',
+                            hour: '2-digit', 
+                            minute: '2-digit',
+                            hour12: true 
+                          })}
+                          ${event.end ? `<br><i class="fas fa-stop-circle me-2"></i><strong>End:</strong> ${event.end.toLocaleString('en-US', { 
+                            hour: '2-digit', 
+                            minute: '2-digit',
+                            hour12: true 
+                          })}` : ''}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                      <i class="fas fa-times me-1"></i>Close
+                    </button>
+                    <a href="/calendar" class="btn btn-primary">
+                      <i class="fas fa-calendar-alt me-1"></i>View Full Calendar
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+          
+          // Remove existing modal if any
+          const existingModal = document.getElementById('eventModal');
+          if (existingModal) {
+            existingModal.remove();
+          }
+          
+          // Add modal to body
+          document.body.insertAdjacentHTML('beforeend', modalHTML);
+          
+          // Show modal
+          const modal = new bootstrap.Modal(document.getElementById('eventModal'));
+          modal.show();
+          
+          // Clean up modal after it's hidden
+          document.getElementById('eventModal').addEventListener('hidden.bs.modal', function() {
+            this.remove();
+          });
+        });
+      },
+      
+      // Day cell rendering for highlighting
+      dayCellDidMount: function(arg) {
+        const date = arg.date;
+        const dayOfWeek = date.getDay();
+        
+        // Add weekend styling
+        if (dayOfWeek === 0 || dayOfWeek === 6) {
+          arg.el.style.backgroundColor = '#f8f9fa';
+          arg.el.style.fontWeight = 'bold';
+        }
+        
+        // Add today highlighting
+        const today = new Date();
+        if (date.toDateString() === today.toDateString()) {
+          arg.el.style.border = '2px solid #007bff';
+          arg.el.style.borderRadius = '8px';
+        }
+      },
+      
+      // Loading state
+      loading: function(isLoading) {
+        console.log('Calendar loading state:', isLoading);
+      },
+      
+      // View-specific settings
+      views: {
+        dayGridMonth: {
+          dayMaxEvents: 3, // Show max 3 events per day, rest as "+more"
+          moreLinkClick: 'popover'
+        },
+        timeGridWeek: {
+          slotMinTime: '06:00:00',
+          slotMaxTime: '22:00:00'
+        }
+      },
+      
+      // Custom event colors based on type
+      eventClassNames: function(arg) {
+        const event = arg.event;
+        const classes = [];
+        
+        // Add type-specific classes
+        if (event.extendedProps.type === 'request') {
+          classes.push('event-drive');
+        } else if (event.extendedProps.type === 'child_request') {
+          classes.push('event-ride');
+        } else if (event.extendedProps.type === 'recurring') {
+          classes.push('event-recurring');
+        }
+        
+        return classes;
+      }
+    });
+    
+    console.log('FullCalendar instance created:', calendar);
+    
+    // Render the calendar
+    calendar.render();
+    console.log('FullCalendar rendered successfully');
+    
+    // Debug: Check calendar view and navigate to event date if needed
+    const eventDate = new Date('2025-07-14T05:00:00.000Z');
+    console.log('Event date:', eventDate);
+    console.log('Current calendar date:', calendar.getDate());
+    
+    // Navigate to the month containing the event
+    calendar.gotoDate(eventDate);
+    console.log('Navigated to event month:', calendar.getDate());
+    
+    // Debug: Check if calendar is visible
+    setTimeout(() => {
+      const calendarContainer = calendarEl.querySelector('.fc');
+      if (calendarContainer) {
+        console.log('Calendar DOM structure created:', calendarContainer);
+        console.log('Calendar dimensions:', {
+          width: calendarContainer.offsetWidth,
+          height: calendarContainer.offsetHeight,
+          visible: calendarContainer.offsetWidth > 0 && calendarContainer.offsetHeight > 0
+        });
+        
+        // Check for events in the DOM
+        const eventElements = calendarContainer.querySelectorAll('.fc-event');
+        console.log('Event elements found in DOM:', eventElements.length);
+        eventElements.forEach((el, index) => {
+          console.log(`Event element ${index}:`, el.textContent, el);
+        });
+      } else {
+        console.error('Calendar DOM structure not found after render');
+      }
+    }, 100);
+    
+  } catch (error) {
+    console.error('Error initializing FullCalendar:', error);
+    console.error('Error stack:', error.stack);
+  }
+});
+
 // School/club autocomplete (not Google Maps)
 document.addEventListener('DOMContentLoaded', function() {
   const autocompleteInputs = document.querySelectorAll('.autocomplete');
