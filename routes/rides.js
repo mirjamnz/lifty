@@ -200,9 +200,12 @@ router.get('/', async (req, res) => {
       myBookings,
       filter,
       expired,
-      success: req.query.success,
+      success: req.query.success || req.session.success,
       recurringAssignments
     });
+
+    // Clear session success message after passing it to template
+    delete req.session.success;
   } catch (err) {
     console.error('GET /rides error:', err);
     res.status(500).send('Failed to load rides page.');

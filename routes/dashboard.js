@@ -12,7 +12,7 @@ router.get('/dashboard', async (req, res) => {
   try {
     // Get current user data (for home address display)
     const [[user]] = await db.query(
-      'SELECT id, name, email, home_address, home_lat, home_lng FROM Users WHERE id = ?',
+      'SELECT id, name, email, home_address, home_lat, home_lng, is_address_private FROM Users WHERE id = ?',
       [userId]
     );
 
@@ -33,12 +33,19 @@ router.get('/dashboard', async (req, res) => {
       child.parents = parents;
     }
 
-    // Get other users with locations (for map display)
+    // Get other users with locations (for map display) - only show public addresses
     const [neighbors] = await db.query(`
       SELECT id, name, home_address, home_lat, home_lng 
       FROM Users 
-      WHERE id != ? AND home_lat IS NOT NULL AND home_lng IS NOT NULL AND home_address IS NOT NULL
+      WHERE id != ? AND home_lat IS NOT NULL AND home_lng IS NOT NULL AND home_address IS NOT NULL AND is_address_private = FALSE
       ORDER BY name
+    `, [userId]);
+
+    // Get count of private users for display
+    const [[privateCount]] = await db.query(`
+      SELECT COUNT(*) as count
+      FROM Users 
+      WHERE id != ? AND home_lat IS NOT NULL AND home_lng IS NOT NULL AND home_address IS NOT NULL AND is_address_private = TRUE
     `, [userId]);
 
     // Get group invitations for this user
@@ -151,6 +158,7 @@ router.get('/dashboard', async (req, res) => {
       user,
       children,
       neighbors,
+      privateCount,
       groupInvitations,
       calendarEvents,
       success: req.session.success,
@@ -169,9 +177,9 @@ router.get('/dashboard', async (req, res) => {
 // POST /update-address
 router.post('/update-address', async (req, res) => {
   const userId = req.session.userId;
-  const { home_address, home_lat, home_lng } = req.body;
+  const { home_address, home_lat, home_lng, is_address_private } = req.body;
 
-  console.log('Update address request:', { home_address, home_lat, home_lng });
+  console.log('Update address request:', { home_address, home_lat, home_lng, is_address_private });
 
   if (!home_address) {
     req.session.error = "Home address is required.";
@@ -188,9 +196,12 @@ router.post('/update-address', async (req, res) => {
   }
 
   try {
+    // Fix: Properly handle checkbox value - if it's 'on' then true, otherwise false
+    const isPrivate = is_address_private === 'on' ? 1 : 0;
+    
     await db.query(
-      'UPDATE Users SET home_address = ?, home_lat = ?, home_lng = ? WHERE id = ?',
-      [home_address, parseFloat(lat), parseFloat(lng), userId]
+      'UPDATE Users SET home_address = ?, home_lat = ?, home_lng = ?, is_address_private = ? WHERE id = ?',
+      [home_address, parseFloat(lat), parseFloat(lng), isPrivate, userId]
     );
 
     req.session.success = "✅ Home address updated successfully!";

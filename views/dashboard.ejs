@@ -119,23 +119,23 @@
 .calendar-legend {
   display: flex;
   justify-content: center;
-  gap: 20px;
-  margin: 15px 0;
+  gap: 15px;
+  margin: 10px 0;
   flex-wrap: wrap;
 }
 
 .legend-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.9em;
+  gap: 6px;
+  font-size: 0.8em;
   color: #6c757d;
 }
 
 .legend-color {
-  width: 16px;
-  height: 16px;
-  border-radius: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
   border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
@@ -162,46 +162,6 @@
           <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
       <% } %>
-
-      <!-- Step 2: Calendar Overview Section -->
-      <div class="card mb-4">
-        <div class="card-header bg-primary text-white">
-          <h5 class="mb-0">
-            <i class="fas fa-calendar-alt me-2"></i>
-            Calendar Overview
-          </h5>
-        </div>
-        <div class="card-body">
-          <!-- FullCalendar container -->
-          <div id="calendar"></div>
-          
-          <!-- Calendar Legend -->
-          <div class="calendar-legend">
-            <div class="legend-item">
-              <div class="legend-color legend-drive"></div>
-              <span>You're Driving</span>
-            </div>
-            <div class="legend-item">
-              <div class="legend-color legend-ride"></div>
-              <span>Child's Ride</span>
-            </div>
-            <div class="legend-item">
-              <div class="legend-color legend-recurring"></div>
-              <span>Recurring Event</span>
-            </div>
-          </div>
-          
-          <!-- Quick Actions -->
-          <div class="text-center mt-3">
-            <a href="/calendar" class="btn btn-outline-primary btn-sm" target="_blank">
-              <i class="fas fa-calendar-alt me-1"></i>View Detailed Calendar
-            </a>
-            <a href="/rides" class="btn btn-outline-success btn-sm ms-2">
-              <i class="fas fa-car me-1"></i>Manage Rides
-            </a>
-          </div>
-        </div>
-      </div>
 
       <!-- Group Invitations Section -->
       <% if (groupInvitations && groupInvitations.length > 0) { %>
@@ -271,11 +231,24 @@
           </h5>
         </div>
         <div class="card-body">
+          <% 
+            const isPrivate = (user.is_address_private == 1 || user.is_address_private === true || user.is_address_private === '1' || user.is_address_private === 'true');
+          %>
           <% if (user && user.home_address) { %>
             <div class="row">
               <div class="col-md-8">
                 <p class="mb-2">
                   <strong>Current Address:</strong> <%= user.home_address %>
+                  <!-- Debug: is_address_private value: <%= user.is_address_private %> (type: <%= typeof user.is_address_private %>) -->
+                  <% if (isPrivate) { %>
+                    <span class="badge bg-warning text-dark ms-2">
+                      <i class="fas fa-eye-slash me-1"></i>Private
+                    </span>
+                  <% } else { %>
+                    <span class="badge bg-success ms-2">
+                      <i class="fas fa-eye me-1"></i>Public
+                    </span>
+                  <% } %>
                 </p>
                 <small class="text-muted">
                   <i class="fas fa-map-marker-alt me-1"></i>
@@ -310,6 +283,25 @@
               </div>
               <input type="hidden" name="home_lat" id="home_lat" value="<%= user && user.home_lat != null ? user.home_lat : null %>">
               <input type="hidden" name="home_lng" id="home_lng" value="<%= user && user.home_lng != null ? user.home_lng : null %>">
+              
+              <!-- Privacy Toggle -->
+              <div class="row mt-3">
+                <div class="col-12">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="is_address_private" name="is_address_private" 
+                           <%= isPrivate ? 'checked' : '' %>>
+                    <label class="form-check-label" for="is_address_private">
+                      <i class="fas fa-eye-slash me-1"></i>
+                      <strong>Hide my address from other users</strong>
+                      <br>
+                      <small class="text-muted">
+                        When enabled, your address won't appear on the community map or in ride coordination. 
+                        You can still participate in rides, but your location will be private.
+                      </small>
+                    </label>
+                  </div>
+                </div>
+              </div>
             </form>
           </div>
         </div>
@@ -321,7 +313,10 @@
           <div class="card-header bg-warning text-dark">
             <h5 class="mb-0">
               <i class="fas fa-map me-2"></i>
-              Community Map (<%= neighbors.length %> neighbors)
+              Community Map (<%= neighbors.length %> neighbors
+              <% if (typeof privateCount !== 'undefined' && privateCount.count > 0) { %>
+                , <%= privateCount.count %> private
+              <% } %>)
             </h5>
           </div>
           <div class="card-body">
@@ -329,7 +324,11 @@
             <div class="mt-3">
               <small class="text-muted">
                 <i class="fas fa-info-circle me-1"></i>
-                Showing other registered users in your area
+                Showing other registered users in your area with public addresses
+                <% if (typeof privateCount !== 'undefined' && privateCount.count > 0) { %>
+                  <br><i class="fas fa-eye-slash me-1"></i>
+                  <%= privateCount.count %> user<%= privateCount.count > 1 ? 's have' : ' has' %> chosen to keep their address private
+                <% } %>
               </small>
               <div id="map-debug" class="mt-2 small text-muted"></div>
             </div>
@@ -346,57 +345,18 @@
           <div class="card-body text-center">
             <p class="text-muted mb-0">
               <i class="fas fa-info-circle me-1"></i>
-              No other users with addresses found yet
+              <% if (typeof privateCount !== 'undefined' && privateCount.count > 0) { %>
+                <%= privateCount.count %> user<%= privateCount.count > 1 ? 's have' : ' has' %> addresses in your area but have chosen to keep them private
+              <% } else { %>
+                No other users with public addresses found yet
+              <% } %>
             </p>
           </div>
         </div>
       <% } %>
 
-      <!-- Add Child Section -->
-      <div class="card mb-4">
-        <div class="card-header bg-success text-white">
-          <h5 class="mb-0">
-            <i class="fas fa-plus me-2"></i>
-            Add Child
-          </h5>
-        </div>
-        <div class="card-body">
-          <form action="/add-child" method="POST">
-            <div class="row g-2">
-              <div class="col-md-6">
-                <input type="text" name="name" class="form-control" placeholder="Child's Name" required autocomplete="name">
-              </div>
-              <div class="col-md-6">
-                <input name="school" type="text" class="form-control autocomplete" data-type="school" placeholder="School Name" required autocomplete="off">
-              </div>
-            </div>
-            <div class="row g-2 mt-2">
-              <div class="col-md-6">
-                <input type="text" name="club" class="form-control autocomplete" data-type="club" placeholder="Club (Optional)" autocomplete="off">
-              </div>
-              <div class="col-md-6">
-                <input type="text" name="child_username" class="form-control" placeholder="Child Username (for login)" required autocomplete="username">
-              </div>
-            </div>
-            <div class="row g-2 mt-2">
-              <div class="col-md-6">
-                <input type="password" name="child_password" class="form-control" placeholder="Child Password (for login)" required autocomplete="new-password">
-              </div>
-              <div class="col-md-6 d-flex align-items-center">
-                <button type="submit" class="btn btn-success w-100">Add Child</button>
-              </div>
-            </div>
-            <div class="row mt-2">
-              <div class="col">
-                <small class="text-muted">Can't find your school? <a href="/organizations/add" target="_blank">Add a new school</a></small>
-              </div>
-            </div>
-          </form>
-        </div>
-      </div>
-
       <!-- Your Children Section -->
-      <div class="card">
+      <div class="card mb-4">
         <div class="card-header bg-primary text-white">
           <h5 class="mb-0">
             <i class="fas fa-child me-2"></i>
@@ -466,6 +426,49 @@
           <% } %>
         </div>
       </div>
+
+      <!-- Add Child Section -->
+      <div class="card">
+        <div class="card-header bg-success text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-plus me-2"></i>
+            Add Child
+          </h5>
+        </div>
+        <div class="card-body">
+          <form action="/add-child" method="POST">
+            <div class="row g-2">
+              <div class="col-md-6">
+                <input type="text" name="name" class="form-control" placeholder="Child's Name" required autocomplete="name">
+              </div>
+              <div class="col-md-6">
+                <input name="school" type="text" class="form-control autocomplete" data-type="school" placeholder="School Name" required autocomplete="off">
+              </div>
+            </div>
+            <div class="row g-2 mt-2">
+              <div class="col-md-6">
+                <input type="text" name="club" class="form-control autocomplete" data-type="club" placeholder="Club (Optional)" autocomplete="off">
+              </div>
+              <div class="col-md-6">
+                <input type="text" name="child_username" class="form-control" placeholder="Child Username (for login)" required autocomplete="username">
+              </div>
+            </div>
+            <div class="row g-2 mt-2">
+              <div class="col-md-6">
+                <input type="password" name="child_password" class="form-control" placeholder="Child Password (for login)" required autocomplete="new-password">
+              </div>
+              <div class="col-md-6 d-flex align-items-center">
+                <button type="submit" class="btn btn-success w-100">Add Child</button>
+              </div>
+            </div>
+            <div class="row mt-2">
+              <div class="col">
+                <small class="text-muted">Can't find your school? <a href="/organizations/add" target="_blank">Add a new school</a></small>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
 
     <div class="col-md-4">
@@ -488,6 +491,46 @@
             </a>
             <a href="/messages/all" class="btn btn-outline-info btn-lg d-flex align-items-center justify-content-center gap-2">
               <i class="fas fa-envelope"></i> Messages
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Calendar Overview Section -->
+      <div class="card mt-4">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-calendar-alt me-2"></i>
+            Calendar Overview
+          </h5>
+        </div>
+        <div class="card-body">
+          <!-- FullCalendar container -->
+          <div id="calendar"></div>
+          
+          <!-- Calendar Legend -->
+          <div class="calendar-legend">
+            <div class="legend-item">
+              <div class="legend-color legend-drive"></div>
+              <span>You're Driving</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color legend-ride"></div>
+              <span>Child's Ride</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color legend-recurring"></div>
+              <span>Recurring Event</span>
+            </div>
+          </div>
+          
+          <!-- Quick Actions -->
+          <div class="text-center mt-3">
+            <a href="/calendar" class="btn btn-outline-primary btn-sm">
+              <i class="fas fa-calendar-alt me-1"></i>View Detailed Calendar
+            </a>
+            <a href="/rides" class="btn btn-outline-success btn-sm ms-2">
+              <i class="fas fa-car me-1"></i>Manage Rides
             </a>
           </div>
         </div>
@@ -546,7 +589,7 @@ document.addEventListener('DOMContentLoaded', function() {
         center: 'title',
         right: 'dayGridMonth,timeGridWeek,listWeek'
       },
-      height: 450, // Slightly taller for better visibility
+      height: 350, // Smaller height for right column
       timeZone: 'local', // Use local timezone
       initialDate: new Date(), // Start with current date
       events: <%- JSON.stringify(calendarEvents || []) %>, // Use server-provided events
@@ -832,7 +875,9 @@ function initLiftyMaps() {
       zoom: 12,
       center: userLat && userLng ? { lat: parseFloat(userLat), lng: parseFloat(userLng) } : { lat: -36.8485, lng: 174.7633 }
     });
-    if (userLat && userLng) {
+    
+    // Only show user's marker if their address is not private
+    if (userLat && userLng && !<%= user && user.is_address_private == 1 ? 'true' : 'false' %>) {
       new google.maps.Marker({
         position: { lat: parseFloat(userLat), lng: parseFloat(userLng) },
         map: map,
@@ -840,6 +885,8 @@ function initLiftyMaps() {
         icon: { url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png' }
       });
     }
+    
+    // Show neighbors (all have public addresses since we filtered in the query)
     neighbors.forEach(function(neighbor) {
       if (neighbor.home_lat && neighbor.home_lng) {
         var marker = new google.maps.Marker({

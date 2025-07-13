@@ -84,13 +84,72 @@ router.post('/assign-request/:id', async (req, res) => {
   if (!userId) return res.redirect('/login');
 
   try {
+    // First, get the ride request details to find the parent
+    const [[rideRequest]] = await db.query(`
+      SELECT rr.*, c.name as child_name, u.name as parent_name, u.id as parent_id
+      FROM RideRequests rr
+      JOIN Children c ON rr.child_id = c.id
+      JOIN Users u ON rr.user_id = u.id
+      WHERE rr.id = ?
+    `, [requestId]);
+
+    console.log('🔍 Ride request details:', rideRequest);
+
+    if (!rideRequest) {
+      return res.status(404).send('Ride request not found.');
+    }
+
+    // Get the helper's name
+    const [[helperUser]] = await db.query('SELECT name FROM Users WHERE id = ?', [userId]);
+    console.log('🔍 Helper user details:', helperUser);
+
+    // Assign the ride request
     await db.query(
       `UPDATE RideRequests SET assigned_user_id = ? WHERE id = ?`,
       [userId, requestId]
     );
+    console.log(`✅ Ride request ${requestId} assigned to user ${userId}`);
+
+    // Send automatic notification message to the parent
+    const notificationMessage = `🎉 Great news! Your ride request for ${rideRequest.child_name} has been fulfilled by ${helperUser.name}. 
+
+📅 Date: ${new Date(rideRequest.pickup_time).toLocaleDateString()}
+⏰ Time: ${new Date(rideRequest.pickup_time).toLocaleTimeString()}
+📍 From: ${rideRequest.pickup_location}
+🎯 To: ${rideRequest.dropoff_location}
+
+You can view the details and communicate with ${helperUser.name} in the group chat for this ride.`;
+
+    console.log('📝 Notification message:', notificationMessage);
+    console.log('📤 Sending group message with params:', {
+      sender_id: userId,
+      recipient_id: null, // NULL for group messages
+      content: notificationMessage,
+      related_type: 'request',
+      related_id: requestId
+    });
+
+    // Send as group message (recipient_id = NULL) instead of direct message
+    const [messageResult] = await db.query(
+      'INSERT INTO Messages (sender_id, recipient_id, content, related_type, related_id) VALUES (?, NULL, ?, ?, ?)',
+      [userId, notificationMessage, 'request', requestId]
+    );
+
+    console.log('✅ Group message inserted successfully:', messageResult);
+
+    console.log(`✅ Ride request ${requestId} assigned to user ${userId}. Notification sent to parent ${rideRequest.parent_id}.`);
+
+    // Set success message in session
+    req.session.success = 'ride_assigned';
     res.redirect('/rides');
   } catch (err) {
     console.error('❌ Assign Ride Error:', err);
+    console.error('❌ Error details:', {
+      message: err.message,
+      code: err.code,
+      sqlMessage: err.sqlMessage,
+      sqlState: err.sqlState
+    });
     res.status(500).send('Could not assign yourself to this ride.');
   }
 });
