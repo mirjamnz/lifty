@@ -317,23 +317,33 @@ router.post('/children/add', async (req, res) => {
       validParents.push(id);
     }
     await db.query('START TRANSACTION');
-    const childEntries = [];
-    for (const parentId of validParents) {
-      const [childResult] = await db.query(
-        'INSERT INTO Children (user_id, name, school, club, created_at) VALUES (?, ?, ?, ?, NOW())',
-        [parentId, name.trim(), school.trim(), club ? club.trim() : null]
-      );
-      childEntries.push(childResult.insertId);
-    }
-    const childId = childEntries[0];
+    
+    // Create child record for the first parent (primary parent)
+    const primaryParentId = validParents[0];
+    const [childResult] = await db.query(
+      'INSERT INTO Children (user_id, name, school, club, created_at) VALUES (?, ?, ?, ?, NOW())',
+      [primaryParentId, name.trim(), school.trim(), club ? club.trim() : null]
+    );
+    const childId = childResult.insertId;
+    
+    // Create child user account
     const hashedPassword = await bcrypt.hash(child_password, 10);
     const [userResult] = await db.query(
       'INSERT INTO Users (name, username, email, password_hash, role, parent_id, child_profile_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())',
-      [name.trim(), child_username.trim(), `${child_username.trim()}@child.local`, hashedPassword, 'child', validParents[0], childId]
+      [name.trim(), child_username.trim(), `${child_username.trim()}@child.local`, hashedPassword, 'child', primaryParentId, childId]
     );
     if (userResult.affectedRows === 0) {
       throw new Error('Failed to insert into Users table');
     }
+    
+    // Create ParentChild entries for all parents
+    for (const parentId of validParents) {
+      await db.query(
+        'INSERT INTO ParentChild (parent_id, child_id, created_at) VALUES (?, ?, NOW())',
+        [parentId, childId]
+      );
+    }
+    
     await db.query('COMMIT');
     req.session.success = `✅ Child '${name}' added successfully with login for parent(s) ${validParents.join(', ')}.`;
     res.redirect('/admin/dashboard');
@@ -365,13 +375,35 @@ router.get('/children/:id/edit', async (req, res) => {
 router.post('/children/:id/edit', async (req, res) => {
   const { name, school, club, user_id } = req.body;
   try {
+    await db.query('START TRANSACTION');
+    
+    // Get the current child info
+    const [[currentChild]] = await db.query('SELECT * FROM Children WHERE id = ?', [req.params.id]);
+    if (!currentChild) {
+      await db.query('ROLLBACK');
+      req.session.error = 'Child not found';
+      return res.redirect('/admin/dashboard');
+    }
+    
+    // Update the child record
     await db.query(
       'UPDATE Children SET name = ?, school = ?, club = ?, user_id = ? WHERE id = ?',
       [name.trim(), school.trim(), club ? club.trim() : null, user_id, req.params.id]
     );
+    
+    // Update ParentChild entries if the parent changed
+    if (currentChild.user_id != user_id) {
+      // Remove old ParentChild entry
+      await db.query('DELETE FROM ParentChild WHERE child_id = ? AND parent_id = ?', [req.params.id, currentChild.user_id]);
+      // Add new ParentChild entry
+      await db.query('INSERT INTO ParentChild (parent_id, child_id, created_at) VALUES (?, ?, NOW())', [user_id, req.params.id]);
+    }
+    
+    await db.query('COMMIT');
     req.session.success = `✅ Child '${name}' updated successfully.`;
     res.redirect('/admin/dashboard');
   } catch (err) {
+    await db.query('ROLLBACK');
     console.error('Update child error:', err);
     req.session.error = `Failed to update child: ${err.message || 'Unknown error'}`;
     res.redirect('/admin/dashboard');
@@ -394,6 +426,10 @@ router.post('/children/:id/delete', async (req, res) => {
       await db.query('DELETE FROM Users WHERE id = ?', [userId]);
       console.log(`Deleted user with child_profile_id ${childId}: User ID ${userId}`);
     }
+
+    // Delete ParentChild entries for this child
+    await db.query('DELETE FROM ParentChild WHERE child_id = ?', [childId]);
+    console.log(`Deleted ParentChild entries for child ID ${childId}`);
 
     // Then delete the child
     const [[child]] = await db.query('SELECT * FROM Children WHERE id = ?', [childId]);
@@ -418,30 +454,122 @@ router.post('/children/:id/delete', async (req, res) => {
 router.post('/children/:childId/add-parent', async (req, res) => {
   const childId = req.params.childId;
   const { parent_email_or_username } = req.body;
+  
   if (!parent_email_or_username) {
     req.session.error = 'Parent email or username is required.';
     return res.redirect('/admin/dashboard');
   }
+  
   try {
-    // Find parent by email or username
-    const [[parent]] = await db.query(
-      'SELECT id FROM Users WHERE email = ? OR username = ?',
-      [parent_email_or_username, parent_email_or_username]
-    );
-    if (!parent) {
-      req.session.error = 'Parent not found.';
+    await db.query('START TRANSACTION');
+    
+    // First, verify the child exists
+    const [[child]] = await db.query('SELECT * FROM Children WHERE id = ?', [childId]);
+    if (!child) {
+      await db.query('ROLLBACK');
+      req.session.error = 'Child not found.';
       return res.redirect('/admin/dashboard');
     }
-    // Link parent to child in ParentChild
-    await db.query(
-      'INSERT IGNORE INTO ParentChild (parent_id, child_id) VALUES (?, ?)',
+    
+    // Find parent by email or username
+    const [[parent]] = await db.query(
+      'SELECT id, name, email, role FROM Users WHERE (email = ? OR username = ?) AND role = "parent"',
+      [parent_email_or_username, parent_email_or_username]
+    );
+    
+    if (!parent) {
+      await db.query('ROLLBACK');
+      req.session.error = `Parent not found with email/username: ${parent_email_or_username}. Please ensure the parent exists and has the 'parent' role.`;
+      return res.redirect('/admin/dashboard');
+    }
+    
+    // Check if this parent is already linked to this child
+    const [[existingLink]] = await db.query(
+      'SELECT * FROM ParentChild WHERE parent_id = ? AND child_id = ?',
       [parent.id, childId]
     );
-    req.session.success = 'Parent linked to child successfully!';
+    
+    if (existingLink) {
+      await db.query('ROLLBACK');
+      req.session.error = `Parent ${parent.name} is already linked to child ${child.name}.`;
+      return res.redirect('/admin/dashboard');
+    }
+    
+    // Link parent to child in ParentChild
+    await db.query(
+      'INSERT INTO ParentChild (parent_id, child_id, created_at) VALUES (?, ?, NOW())',
+      [parent.id, childId]
+    );
+    
+    await db.query('COMMIT');
+    req.session.success = `✅ Parent ${parent.name} (${parent.email}) successfully linked to child ${child.name}!`;
     res.redirect('/admin/dashboard');
+    
   } catch (err) {
+    await db.query('ROLLBACK');
     console.error('Admin add parent to child error:', err);
-    req.session.error = 'Failed to link parent to child.';
+    req.session.error = `Failed to link parent to child: ${err.message}`;
+    res.redirect('/admin/dashboard');
+  }
+});
+
+// Admin: Remove parent from child (unlink in ParentChild)
+router.post('/children/:childId/remove-parent', async (req, res) => {
+  const childId = req.params.childId;
+  const { parent_id } = req.body;
+  
+  if (!parent_id) {
+    req.session.error = 'Parent ID is required.';
+    return res.redirect('/admin/dashboard');
+  }
+  
+  try {
+    await db.query('START TRANSACTION');
+    
+    // First, verify the child exists
+    const [[child]] = await db.query('SELECT * FROM Children WHERE id = ?', [childId]);
+    if (!child) {
+      await db.query('ROLLBACK');
+      req.session.error = 'Child not found.';
+      return res.redirect('/admin/dashboard');
+    }
+    
+    // Verify the parent exists and is linked to this child
+    const [[parentLink]] = await db.query(
+      `SELECT pc.*, u.name as parent_name, u.email as parent_email 
+       FROM ParentChild pc 
+       JOIN Users u ON pc.parent_id = u.id 
+       WHERE pc.parent_id = ? AND pc.child_id = ?`,
+      [parent_id, childId]
+    );
+    
+    if (!parentLink) {
+      await db.query('ROLLBACK');
+      req.session.error = 'Parent is not linked to this child.';
+      return res.redirect('/admin/dashboard');
+    }
+    
+    // Check if this is the primary parent (the one in the Children.user_id field)
+    if (child.user_id == parent_id) {
+      await db.query('ROLLBACK');
+      req.session.error = `Cannot remove ${parentLink.parent_name} as they are the primary parent of ${child.name}. Please reassign the primary parent first.`;
+      return res.redirect('/admin/dashboard');
+    }
+    
+    // Remove the parent-child link
+    await db.query(
+      'DELETE FROM ParentChild WHERE parent_id = ? AND child_id = ?',
+      [parent_id, childId]
+    );
+    
+    await db.query('COMMIT');
+    req.session.success = `✅ Parent ${parentLink.parent_name} (${parentLink.parent_email}) successfully removed from child ${child.name}!`;
+    res.redirect('/admin/dashboard');
+    
+  } catch (err) {
+    await db.query('ROLLBACK');
+    console.error('Admin remove parent from child error:', err);
+    req.session.error = `Failed to remove parent from child: ${err.message}`;
     res.redirect('/admin/dashboard');
   }
 });
