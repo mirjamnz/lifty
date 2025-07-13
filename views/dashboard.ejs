@@ -65,6 +65,7 @@
 .fc-header-toolbar h2 {
   color: white !important;
   font-weight: 600;
+  font-size: 1rem; /* Even smaller font size */
 }
 
 .fc-button {
@@ -583,7 +584,7 @@ document.addEventListener('DOMContentLoaded', function() {
   try {
     // Initialize FullCalendar with enhanced styling and functionality
     const calendar = new FullCalendar.Calendar(calendarEl, {
-      initialView: 'dayGridMonth',
+      initialView: calendarEvents.length > 0 ? 'listWeek' : 'dayGridMonth', // Use list view if events exist
       headerToolbar: {
         left: 'prev,next today',
         center: 'title',

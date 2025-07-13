@@ -5,6 +5,21 @@
 <div class="container py-5">
   <h2 class="mb-4 fw-bold text-primary">🛠 Admin Dashboard</h2>
 
+  <% if (session.success) { %>
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+      <%= session.success %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    <% session.success = null; %>
+  <% } %>
+  <% if (session.error) { %>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+      <%= session.error %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    <% session.error = null; %>
+  <% } %>
+
   <% if (typeof stats !== 'undefined') { %>
     <div class="row mb-4 g-3">
       <div class="col-md-2">
@@ -67,8 +82,8 @@
         <div class="d-flex flex-wrap gap-2 w-100 justify-content-md-end justify-content-center mt-3 mt-md-0">
           <a href="/admin/organizations" class="btn btn-outline-success">🏫 Manage Organizations</a>
           <a href="/admin/groups" class="btn btn-outline-primary">👥 Manage Groups/Events</a>
-          <a href="/admin/users/add" class="btn btn-outline-success">➕ Add Parent</a>
-          <a href="/admin/children/add" class="btn btn-outline-success">➕ Add Child</a>
+           <!--  <a href="/admin/users/add" class="btn btn-outline-success">➕ Add Parent</a> -->
+          <!--  <a href="/admin/children/add" class="btn btn-outline-success">➕ Add Child</a> -->
         </div>
       </div>
     </div>
@@ -86,6 +101,7 @@
               <th>Name <a href="#" class="sort text-dark" data-sort="name">🔽</a></th>
               <th>Email <a href="#" class="sort text-dark" data-sort="email">🔽</a></th>
               <th>Blocked? <a href="#" class="sort text-dark" data-sort="is_blocked">🔽</a></th>
+              <th>Address Privacy</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -98,6 +114,18 @@
                   </td>
                   <td class="<%= user.is_blocked ? 'blocked-user' : '' %>"><%= user.email %></td>
                   <td class="<%= user.is_blocked ? 'blocked-user' : '' %>"><%= user.is_blocked ? "Yes" : "No" %></td>
+                  <td>
+                    <form method="POST" action="/admin/users/<%= user.id %>/privacy" class="d-inline privacy-form" data-user-id="<%= user.id %>">
+                      <input type="hidden" name="user_id" value="<%= user.id %>">
+                      <div class="form-check form-switch">
+                        <input class="form-check-input privacy-checkbox" type="checkbox" name="is_address_private" id="privacy_<%= user.id %>" data-user-id="<%= user.id %>" <%= (user.is_address_private == 1 || user.is_address_private === true || user.is_address_private === '1' || user.is_address_private === 'true') ? 'checked' : '' %>>
+                        <label class="form-check-label" for="privacy_<%= user.id %>">
+                          <i class="fas fa-eye-slash me-1"></i> Private
+                        </label>
+                      </div>
+                      <button type="submit" class="btn btn-sm btn-outline-secondary ms-2" onclick="console.log('🔍 Submit button clicked for user', '<%= user.id %>')">Update</button>
+                    </form>
+                  </td>
                   <td>
                     <button class="btn btn-sm btn-warning manage-block" data-user-id="<%= user.id %>" data-blocked="<%= user.is_blocked %>" title="<%= user.is_blocked ? 'Unblock' : 'Block' %>">
                       <%= user.is_blocked ? '🔓' : '🔒' %>
@@ -116,73 +144,73 @@
       </div>
     </div>
 
-    <!-- Children -->
+    <!-- Family / Whānau -->
     <div class="col-lg-6">
-      <h4 class="text-success">👶 Children</h4>
+      <h4 class="text-success">👨‍👩‍👧‍👦 Family / Whānau</h4>
       <a href="/admin/children/add" class="btn btn-success mb-3">➕ Add New Child</a>
       <div class="table-responsive">
         <table class="table table-bordered table-sm table-striped rounded shadow-sm" id="childrenTable">
           <thead class="table-light">
             <tr>
-              <th>Parent Name <a href="#" class="sort text-dark" data-sort="parent_name">🔽</a></th>
-              <th>Children Details</th>
-              <th>Actions</th>
+              <th>Parents</th>
+              <th>Children</th>
             </tr>
           </thead>
           <tbody>
-            <% if (users && children && users.length > 0) { %>
-              <% users.filter(user => user.role === 'parent').forEach(parent => { %>
-                <% const parentChildren = children.filter(child => child.user_id === parent.id); %>
-                <% if (parentChildren.length > 0) { %>
-                  <tr>
-                    <td class="<%= parentChildren.some(child => child.is_blocked) ? 'blocked-user' : '' %>">
-                      <%= parent.name %> <%- parentChildren.some(child => child.is_blocked) ? '<i class="fas fa-lock text-danger ms-1"></i>' : '' %>
-                    </td>
-                    <td>
-                      <div class="card shadow-sm mb-3">
-                        <div class="card-header bg-light" id="heading<%= parent.id %>">
-                          <h5 class="mb-0">
-                            <button class="btn btn-link text-dark text-decoration-none w-100 text-start collapsed" data-bs-toggle="collapse" data-bs-target="#collapse<%= parent.id %>" aria-expanded="false" aria-controls="collapse<%= parent.id %>">
-                              <%= parentChildren.length %> Child<%= parentChildren.length > 1 ? 'ren' : '' %> <i class="fas fa-chevron-down ms-2"></i>
-                            </button>
-                          </h5>
+            <% if (whanauGroups && whanauGroups.length > 0) { %>
+              <% whanauGroups.forEach(group => { %>
+                <tr class="<%= group.parents.some(p => p.is_blocked) || group.children.some(c => c.is_blocked) ? 'table-danger' : '' %>">
+                  <td>
+                    <% group.parents.forEach(parent => { %>
+                      <div class="<%= parent.is_blocked ? 'blocked-user' : '' %> mb-2">
+                        <div class="fw-bold fs-5 mb-1">
+                          <i class="fas fa-user me-1"></i> 
+                          <%= parent.name %> 
+                          <% if (parent.is_blocked) { %>
+                            <i class="fas fa-lock text-danger ms-1" title="Blocked"></i>
+                          <% } %>
                         </div>
-                        <div id="collapse<%= parent.id %>" class="collapse" aria-labelledby="heading<%= parent.id %>" data-bs-parent="#childrenTable">
-                          <div class="card-body p-3">
-                            <% parentChildren.forEach(child => { %>
-                              <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-white rounded" style="width: 100%;">
-                                <span class="<%= child.is_blocked ? 'blocked-user' : '' %>">
-                                  <%= child.name %> - School: <%= child.school || 'N/A' %> <% if (child.club) { %>- Club: <%= child.club %> <% } %>
-                                  <%- child.is_blocked ? '<i class="fas fa-lock text-danger ms-1"></i>' : '' %>
-                                </span>
-                              </div>
-                            <% }); %>
-                          </div>
+                        <div class="text-muted small mb-1">(<%= parent.email %>)</div>
+                        <div class="btn-group btn-group-sm" role="group">
+                          <button class="btn btn-sm <%= parent.is_blocked ? 'btn-success' : 'btn-warning' %> manage-block" 
+                                  data-user-id="<%= parent.id %>" 
+                                  data-blocked="<%= parent.is_blocked %>" 
+                                  title="<%= parent.is_blocked ? 'Unblock' : 'Block' %>">
+                            <%= parent.is_blocked ? '🔓 Unblock' : '🔒 Block' %>
+                          </button>
                         </div>
                       </div>
-                    </td>
-                    <td>
-                      <div class="d-flex flex-column align-items-start">
-                        <button class="btn btn-sm btn-warning manage-block mb-2" data-user-id="<%= parent.id %>" data-blocked="<%= parent.is_blocked %>" title="<%= parent.is_blocked ? 'Unblock' : 'Block' %>">
-                          <%= parent.is_blocked ? '🔓' : '🔒' %>
-                        </button>
-                        <% parentChildren.forEach(child => { %>
-                          <div class="d-flex mb-2" style="gap: 5px;">
-                            <form action="/admin/children/<%= child.id %>/edit" method="GET" style="display:inline;">
-                              <button type="submit" class="btn btn-sm btn-outline-success" title="Edit <%= child.name %>">✏️ <%= child.name %></button>
-                            </form>
-                            <form action="/admin/children/<%= child.id %>/delete" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete <%= child.name %>?');">
-                              <button type="submit" class="btn btn-sm btn-danger" title="Delete <%= child.name %>">🗑️ <%= child.name %></button>
-                            </form>
-                          </div>
-                        <% }); %>
+                    <% }) %>
+                  </td>
+                  <td>
+                    <% group.children.forEach(child => { %>
+                      <div class="mb-2 <%= child.is_blocked ? 'blocked-user' : '' %>">
+                        <span class="fw-bold fs-5">
+                          <i class="fas fa-child me-1"></i> 
+                          <%= child.name %>
+                          <% if (child.is_blocked) { %>
+                            <i class="fas fa-lock text-danger ms-1" title="Blocked"></i>
+                          <% } %>
+                        </span>
+                        <span class="text-muted small ms-2">School: <%= child.school || 'N/A' %> <% if (child.club) { %>- Club: <%= child.club %> <% } %></span>
+                        <!-- Admin: Edit Child -->
+                        <a href="/admin/children/<%= child.id %>/edit" class="btn btn-outline-warning btn-sm ms-1" title="Edit Child">✏️</a>
+                        <!-- Admin: Delete Child -->
+                        <form method="POST" action="/admin/children/<%= child.id %>/delete" class="d-inline ms-1" onsubmit="return confirm('Are you sure you want to delete <%= child.name %>? This will also delete their user account.');">
+                          <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete Child">🗑️</button>
+                        </form>
+                        <!-- Admin: Add Parent to Child -->
+                        <form method="POST" action="/admin/children/<%= child.id %>/add-parent" class="d-inline ms-2" style="display:inline-block;">
+                          <input type="text" name="parent_email_or_username" class="form-control form-control-sm d-inline-block" style="width: 160px; display:inline-block;" placeholder="Add parent (email/username)" required>
+                          <button type="submit" class="btn btn-outline-primary btn-sm ms-1">Add Parent</button>
+                        </form>
                       </div>
-                    </td>
-                  </tr>
-                <% } %>
-              <% }); %>
+                    <% }) %>
+                  </td>
+                </tr>
+              <% }) %>
             <% } else { %>
-              <tr><td colspan="3" class="text-center text-muted">No children or users found.</td></tr>
+              <tr><td colspan="2" class="text-center text-muted">No whānau groups found.</td></tr>
             <% } %>
           </tbody>
         </table>
@@ -280,13 +308,10 @@
     });
 
     // Initialize DataTables for Children
-    $('#childrenTable').DataTable({
+    var childrenTable = $('#childrenTable').DataTable({
       "order": [[0, "asc"]], // Sort by Parent Name by default
       "pageLength": 10,
-      "lengthMenu": [5, 10, 25, 50],
-      "columnDefs": [
-        { "orderable": false, "targets": 2 } // Disable sorting on Actions column
-      ]
+      "lengthMenu": [5, 10, 25, 50]
     });
 
     // Sorting functionality
@@ -320,6 +345,58 @@
       setTimeout(() => {
         animation.hide();
       }, 1000);
+    });
+
+    // Handle privacy form submission
+    /*
+    $(document).on('submit', '.privacy-form', function(e) {
+      console.log('🔍 Privacy form submit event triggered');
+      
+      try {
+        const form = $(this);
+        const userId = form.data('user-id');
+        const checkbox = form.find('.privacy-checkbox');
+        const isPrivate = checkbox.is(':checked');
+        
+        console.log('🔍 Privacy form submitted:', {
+          userId: userId,
+          isPrivate: isPrivate,
+          formAction: form.attr('action'),
+          formData: form.serialize(),
+          formElement: form[0],
+          checkboxElement: checkbox[0]
+        });
+        
+        // Show loading state on the submit button
+        const submitButton = form.find('button[type="submit"]');
+        submitButton.html('<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Updating...').prop('disabled', true);
+        
+        console.log('🔍 Form submission proceeding...');
+      } catch (error) {
+        console.error('🔍 Error in privacy form submission:', error);
+      }
+    });
+    */
+    
+    // Debug: Log when document is ready
+    console.log('🔍 Document ready, privacy forms found:', $('.privacy-form').length);
+    
+    // Debug: Check if forms are properly bound
+    $('.privacy-form').each(function(index) {
+      console.log('🔍 Privacy form', index, ':', {
+        action: $(this).attr('action'),
+        userId: $(this).data('user-id'),
+        checkbox: $(this).find('.privacy-checkbox').length
+      });
+    });
+    
+    // Debug: Test form submission manually
+    $('.privacy-form button[type="submit"]').on('click', function(e) {
+      console.log('🔍 Submit button clicked:', {
+        button: this,
+        form: $(this).closest('form')[0],
+        formAction: $(this).closest('form').attr('action')
+      });
     });
   });
 </script>

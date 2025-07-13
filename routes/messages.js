@@ -179,17 +179,21 @@ router.get('/group/ride/:rideRequestId', async (req, res) => {
   const [[child]] = await db.query('SELECT * FROM Children WHERE id = ?', [ride.child_id]);
   const [[childUser]] = await db.query('SELECT * FROM Users WHERE child_profile_id = ?', [child.id]);
   
-  // Get all parents of this child (support multiple parents)
-  // Find the parent user for this child (Children.user_id points to parent)
-  const [[parentUserLookup]] = await db.query('SELECT * FROM Users WHERE id = ?', [child.user_id]);
-  const parentUsers = parentUserLookup ? [parentUserLookup] : [];
+  // Get all parents of this child (support multiple parents via ParentChild)
+  const [parentLinks] = await db.query('SELECT parent_id FROM ParentChild WHERE child_id = ?', [child.id]);
+  const parentIds = parentLinks.map(p => p.parent_id);
+  const parentUsers = [];
+  if (parentIds.length > 0) {
+    const [parents] = await db.query('SELECT * FROM Users WHERE id IN (?)', [parentIds]);
+    parentUsers.push(...parents);
+  }
   
   const [[driverUser]] = ride.assigned_user_id ? await db.query('SELECT * FROM Users WHERE id = ?', [ride.assigned_user_id]) : [null];
 
-  // Allow child, any parent, or assigned driver
+  // Allow child, any parent (via ParentChild), or assigned driver
   const allowedUserIds = [
     childUser?.id, 
-    ...parentUsers.map(p => p.id), 
+    ...parentIds, 
     driverUser?.id
   ].filter(Boolean);
   
@@ -261,6 +265,102 @@ router.post('/group/ride/:rideRequestId/send', async (req, res) => {
     [senderId, message, 'request', rideRequestId]
   );
   res.redirect(`/messages/group/ride/${rideRequestId}`);
+});
+
+// GROUP CHAT FOR RIDE OFFER
+// GET /messages/group/offer/:offerId
+router.get('/group/offer/:offerId', async (req, res) => {
+  const userId = req.session.userId;
+  const offerId = req.params.offerId;
+  if (!userId || !offerId) return res.status(401).send('Not logged in');
+
+  // Get the ride offer
+  const [[offer]] = await db.query('SELECT * FROM RideOffers WHERE id = ?', [offerId]);
+  if (!offer) return res.status(404).send('Ride offer not found');
+
+  // Get the driver
+  const [[driverUser]] = await db.query('SELECT * FROM Users WHERE id = ?', [offer.user_id]);
+
+  // Get all bookings for this offer
+  const [bookings] = await db.query('SELECT * FROM RideBookings WHERE offer_id = ? AND status = "confirmed"', [offerId]);
+  const bookedChildIds = bookings.map(b => b.child_id);
+  const bookedParentIds = bookings.map(b => b.user_id);
+
+  // Get all parents of booked children (via ParentChild)
+  let parentIds = new Set();
+  if (bookedChildIds.length > 0) {
+    const [parents] = await db.query('SELECT parent_id FROM ParentChild WHERE child_id IN (?)', [bookedChildIds]);
+    parents.forEach(p => parentIds.add(p.parent_id));
+  }
+  // Add the driver
+  parentIds.add(offer.user_id);
+  // Add the booking parents (in case not in ParentChild)
+  bookedParentIds.forEach(pid => parentIds.add(pid));
+
+  // Only allow access for driver or any parent
+  if (!parentIds.has(userId)) return res.status(403).send('Access denied');
+
+  // Get all group messages for this offer
+  const [messages] = await db.query(
+    `SELECT m.*, u.name AS sender_name
+     FROM Messages m
+     JOIN Users u ON m.sender_id = u.id
+     WHERE m.related_type = 'offer' AND m.related_id = ?
+     ORDER BY m.sent_at ASC`,
+    [offerId]
+  );
+
+  // Mark all group messages as read for this user
+  await db.query(
+    'UPDATE Messages SET read_at = NOW() WHERE related_type = "offer" AND related_id = ? AND sender_id != ? AND read_at IS NULL',
+    [offerId, userId]
+  );
+
+  res.render('messages-group', {
+    session: req.session,
+    offer,
+    driverUser,
+    messages,
+    isOfferGroup: true
+  });
+});
+
+// POST /messages/group/offer/:offerId/send - Send message to group chat for offer
+router.post('/group/offer/:offerId/send', async (req, res) => {
+  const senderId = req.session.userId;
+  const offerId = req.params.offerId;
+  const { message } = req.body;
+  if (!senderId || !offerId || !message) return res.status(400).send('Missing required fields.');
+
+  // Get the ride offer
+  const [[offer]] = await db.query('SELECT * FROM RideOffers WHERE id = ?', [offerId]);
+  if (!offer) return res.status(404).send('Ride offer not found');
+
+  // Get all bookings for this offer
+  const [bookings] = await db.query('SELECT * FROM RideBookings WHERE offer_id = ? AND status = "confirmed"', [offerId]);
+  const bookedChildIds = bookings.map(b => b.child_id);
+  const bookedParentIds = bookings.map(b => b.user_id);
+
+  // Get all parents of booked children (via ParentChild)
+  let parentIds = new Set();
+  if (bookedChildIds.length > 0) {
+    const [parents] = await db.query('SELECT parent_id FROM ParentChild WHERE child_id IN (?)', [bookedChildIds]);
+    parents.forEach(p => parentIds.add(p.parent_id));
+  }
+  // Add the driver
+  parentIds.add(offer.user_id);
+  // Add the booking parents
+  bookedParentIds.forEach(pid => parentIds.add(pid));
+
+  // Only allow access for driver or any parent
+  if (!parentIds.has(senderId)) return res.status(403).send('Access denied');
+
+  // Send message to all group members (store as related_type='offer', related_id=offerId)
+  await db.query(
+    'INSERT INTO Messages (sender_id, recipient_id, content, related_type, related_id) VALUES (?, NULL, ?, ?, ?)',
+    [senderId, message, 'offer', offerId]
+  );
+  res.redirect(`/messages/group/offer/${offerId}`);
 });
 
 // GET /messages/all - Get all messages (direct + group) for the logged-in user

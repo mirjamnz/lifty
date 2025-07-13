@@ -13,6 +13,34 @@ router.get('/dashboard', async (req, res) => {
     const [organizations] = await db.query('SELECT * FROM Organizations ORDER BY name ASC');
     const [users] = await db.query('SELECT * FROM Users ORDER BY id DESC');
     const [children] = await db.query('SELECT * FROM Children');
+    // Fetch all ParentChild links
+    const [parentChildLinks] = await db.query('SELECT * FROM ParentChild');
+    // Build whānau groups: group by unique set of parents for each set of children
+    // Map: child_id -> [parent_id]
+    const childToParents = {};
+    parentChildLinks.forEach(link => {
+      if (!childToParents[link.child_id]) childToParents[link.child_id] = [];
+      childToParents[link.child_id].push(link.parent_id);
+    });
+    // Map: parent_id -> [child_id]
+    const parentToChildren = {};
+    parentChildLinks.forEach(link => {
+      if (!parentToChildren[link.parent_id]) parentToChildren[link.parent_id] = [];
+      parentToChildren[link.parent_id].push(link.child_id);
+    });
+    // Group children by their set of parents (sorted for uniqueness)
+    const whanauMap = {};
+    Object.entries(childToParents).forEach(([childId, parentIds]) => {
+      const key = parentIds.sort((a,b)=>a-b).join('-');
+      if (!whanauMap[key]) whanauMap[key] = { parentIds: parentIds.slice(), childIds: [] };
+      whanauMap[key].childIds.push(Number(childId));
+    });
+    // Build whanauGroups: [{parents: [user], children: [child]}]
+    const whanauGroups = Object.values(whanauMap).map(group => {
+      const parents = users.filter(u => group.parentIds.includes(u.id));
+      const kids = children.filter(c => group.childIds.includes(c.id));
+      return { parents, children: kids };
+    });
     // Fetch all groups/events
     const [groups] = await db.query(`
       SELECT re.*, u.name AS created_by_name,
@@ -63,7 +91,8 @@ router.get('/dashboard', async (req, res) => {
       groups,
       stats,
       session: req.session,
-      activePage: 'dashboard'
+      activePage: 'dashboard',
+      whanauGroups // <-- pass to view
     });
   } catch (err) {
     console.error('Admin dashboard error:', err);
@@ -83,6 +112,30 @@ router.get('/users/:id/manage-block', async (req, res) => {
   } catch (err) {
     console.error('Load manage block error:', err);
     res.status(500).send('Could not load block management');
+  }
+});
+
+// Update address privacy (admin) - MUST come before /users/:id/:action
+router.post('/users/:id/privacy', async (req, res) => {
+  const userId = req.params.id;
+  const isPrivate = req.body.is_address_private === 'on' ? 1 : 0;
+  
+  console.log('🔍 Privacy toggle request:', {
+    userId,
+    isPrivate,
+    body: req.body,
+    is_address_private: req.body.is_address_private
+  });
+  
+  try {
+    await db.query('UPDATE Users SET is_address_private = ? WHERE id = ?', [isPrivate, userId]);
+    console.log('✅ Privacy updated successfully for user', userId, 'to', isPrivate);
+    req.session.success = '✅ Address privacy updated.';
+    res.redirect('/admin/dashboard');
+  } catch (err) {
+    console.error('❌ Admin privacy update error:', err);
+    req.session.error = 'Failed to update address privacy.';
+    res.redirect('/admin/dashboard');
   }
 });
 
@@ -361,6 +414,38 @@ router.post('/children/:id/delete', async (req, res) => {
   }
 });
 
+// Admin: Add parent to child (link in ParentChild)
+router.post('/children/:childId/add-parent', async (req, res) => {
+  const childId = req.params.childId;
+  const { parent_email_or_username } = req.body;
+  if (!parent_email_or_username) {
+    req.session.error = 'Parent email or username is required.';
+    return res.redirect('/admin/dashboard');
+  }
+  try {
+    // Find parent by email or username
+    const [[parent]] = await db.query(
+      'SELECT id FROM Users WHERE email = ? OR username = ?',
+      [parent_email_or_username, parent_email_or_username]
+    );
+    if (!parent) {
+      req.session.error = 'Parent not found.';
+      return res.redirect('/admin/dashboard');
+    }
+    // Link parent to child in ParentChild
+    await db.query(
+      'INSERT IGNORE INTO ParentChild (parent_id, child_id) VALUES (?, ?)',
+      [parent.id, childId]
+    );
+    req.session.success = 'Parent linked to child successfully!';
+    res.redirect('/admin/dashboard');
+  } catch (err) {
+    console.error('Admin add parent to child error:', err);
+    req.session.error = 'Failed to link parent to child.';
+    res.redirect('/admin/dashboard');
+  }
+});
+
 // List all groups/events
 router.get('/groups', async (req, res) => {
   try {
@@ -488,7 +573,16 @@ router.post('/groups/:id/invites/:inviteId/decline', async (req, res) => {
 router.get('/organizations', async (req, res) => {
   try {
     const [organizations] = await db.query('SELECT * FROM Organizations ORDER BY name ASC');
-    res.render('admin/organizations', { organizations, session: req.session, activePage: 'organizations' });
+    // Get popularity data: count children linked to each organization (by school)
+    const [orgPopularity] = await db.query(`
+      SELECT o.name, COUNT(c.id) as count
+      FROM Organizations o
+      LEFT JOIN Children c ON c.school = o.name
+      GROUP BY o.id
+      ORDER BY count DESC, o.name ASC
+      LIMIT 10
+    `);
+    res.render('admin/organizations', { organizations, orgPopularityData: orgPopularity, session: req.session, activePage: 'organizations' });
   } catch (err) {
     console.error('Admin organizations error:', err);
     res.status(500).send('Failed to load organizations');

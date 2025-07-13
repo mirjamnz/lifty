@@ -3,6 +3,11 @@
 
 <div class="container py-5">
   <h2 class="mb-4 fw-bold text-success">🏫 Organizations</h2>
+  <!-- Popularity Chart -->
+  <div class="mb-4">
+    <h5 class="fw-bold">Most Popular Places (by number of children linked)</h5>
+    <canvas id="orgPopularityChart" height="120"></canvas>
+  </div>
   <a href="/admin/organizations/add" class="btn btn-success mb-3">➕ Add New Organization</a>
   <div class="table-responsive">
     <table class="table table-bordered table-sm table-striped rounded shadow-sm" id="organizationsTable">
@@ -39,4 +44,38 @@
   </div>
 </div>
 
-<%- include('../partials/footer1') %> 
+<%- include('../partials/footer1') %>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const data = <%- JSON.stringify(orgPopularityData || []) %>;
+    if (data.length > 0) {
+      const ctx = document.getElementById('orgPopularityChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: data.map(d => d.name),
+          datasets: [{
+            label: 'Number of Children',
+            data: data.map(d => d.count),
+            backgroundColor: 'rgba(54, 162, 235, 0.7)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: false },
+            title: { display: false }
+          },
+          scales: {
+            y: { beginAtZero: true, ticks: { precision:0 } }
+          }
+        }
+      });
+    }
+  });
+</script> 

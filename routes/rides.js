@@ -11,7 +11,12 @@ router.get('/', async (req, res) => {
   if (!userId) return res.redirect('/login');
 
   try {
-    const [children] = await db.query('SELECT * FROM Children WHERE user_id = ?', [userId]);
+    // Use ParentChild join to get all children linked to this parent
+    const [children] = await db.query(`
+      SELECT c.* FROM Children c
+      JOIN ParentChild pc ON pc.child_id = c.id
+      WHERE pc.parent_id = ?
+    `, [userId]);
 
     // Ride Offers with booking information
     let offerQuery = `
@@ -265,6 +270,22 @@ router.post('/book-ride/:offerId', async (req, res) => {
         [offerId, userId, childId, 1, notes || null]
       );
     }
+
+    // --- Notification: Send group message to driver, booking parent, and child ---
+    // Fetch driver, booking parent, and child info
+    const [[driver]] = await db.query('SELECT id, name FROM Users WHERE id = ?', [offer.user_id]);
+    const [[bookingParent]] = await db.query('SELECT id, name FROM Users WHERE id = ?', [userId]);
+    const [childrenInfo] = await db.query('SELECT id, name FROM Children WHERE id IN (?)', [childIds]);
+    const childNames = Array.isArray(childrenInfo) ? childrenInfo.map(c => c.name).join(', ') : childrenInfo.name;
+
+    // Compose message
+    const message = `🚗 New ride booking!\n${childNames} has been signed up for your ride offer to ${offer.school} on ${new Date(offer.pickup_time).toLocaleString()}.\n\nParents: ${driver.name} (driver), ${bookingParent.name} (parent).`;
+
+    // Insert as group message
+    await db.query(
+      'INSERT INTO Messages (sender_id, recipient_id, content, related_type, related_id) VALUES (?, NULL, ?, ?, ?)',
+      [userId, message, 'offer', offerId]
+    );
 
     res.redirect('/rides?success=booking_created');
   } catch (err) {
