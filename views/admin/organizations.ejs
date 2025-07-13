@@ -1,15 +1,78 @@
 <%- include('../partials/header1') %>
 <%- include(session && session.is_admin ? '../partials/navbar2' : '../partials/navbar1') %>
 
+<style>
+.search-highlight {
+  background-color: #fff3cd;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.filter-active {
+  background-color: #e7f3ff;
+  border-color: #0d6efd;
+}
+
+.results-count {
+  font-size: 0.9rem;
+  color: #6c757d;
+  margin-bottom: 1rem;
+}
+</style>
+
 <div class="container py-5">
-  <h2 class="mb-4 fw-bold text-success">🏫 Organizations</h2>
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="text-success mb-0">🏫 Organizations</h2>
+    <a href="/admin/dashboard" class="btn btn-outline-secondary">
+      <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+    </a>
+  </div>
   <!-- Popularity Chart -->
   <div class="mb-4">
     <h5 class="fw-bold">Most Popular Places (by number of children linked)</h5>
     <canvas id="orgPopularityChart" height="120"></canvas>
   </div>
   <a href="/admin/organizations/add" class="btn btn-success mb-3">➕ Add New Organization</a>
+
+  <!-- Search and Filter Section -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label for="searchInput" class="form-label">Search Organizations</label>
+          <input type="text" class="form-control" id="searchInput" placeholder="Search by name, type, or address...">
+        </div>
+        <div class="col-md-3">
+          <label for="typeFilter" class="form-label">Filter by Type</label>
+          <select class="form-select" id="typeFilter">
+            <option value="">All Types</option>
+            <option value="School">School</option>
+            <option value="Club">Club</option>
+            <option value="Sports">Sports</option>
+            <option value="Music">Music</option>
+            <option value="Art">Art</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label for="sortBy" class="form-label">Sort By</label>
+          <select class="form-select" id="sortBy">
+            <option value="name">Name (A-Z)</option>
+            <option value="name-desc">Name (Z-A)</option>
+            <option value="type">Type (A-Z)</option>
+            <option value="type-desc">Type (Z-A)</option>
+            <option value="created">Newest First</option>
+            <option value="created-desc">Oldest First</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="results-count" id="resultsCount"></div>
+  
   <div class="table-responsive">
+    
     <table class="table table-bordered table-sm table-striped rounded shadow-sm" id="organizationsTable">
       <thead class="table-light">
         <tr>
@@ -48,8 +111,10 @@
 
 <!-- Chart.js CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
   document.addEventListener('DOMContentLoaded', function() {
+    // Chart functionality
     const data = <%- JSON.stringify(orgPopularityData || []) %>;
     if (data.length > 0) {
       const ctx = document.getElementById('orgPopularityChart').getContext('2d');
@@ -77,5 +142,116 @@
         }
       });
     }
+
+    // Search and Filter functionality
+    const searchInput = document.getElementById('searchInput');
+    const typeFilter = document.getElementById('typeFilter');
+    const sortBy = document.getElementById('sortBy');
+    const table = document.getElementById('organizationsTable');
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+
+    function filterAndSortTable() {
+      const searchTerm = searchInput.value.toLowerCase();
+      const selectedType = typeFilter.value;
+      const sortOption = sortBy.value;
+
+      // Filter rows
+      rows.forEach(row => {
+        const name = row.cells[0].textContent.toLowerCase();
+        const type = row.cells[1].textContent;
+        const address = row.cells[2].textContent.toLowerCase();
+        
+        const matchesSearch = name.includes(searchTerm) || 
+                             type.toLowerCase().includes(searchTerm) || 
+                             address.includes(searchTerm);
+        const matchesType = !selectedType || type === selectedType;
+        
+        row.style.display = matchesSearch && matchesType ? '' : 'none';
+        
+        // Highlight search terms if search is active
+        if (searchTerm && matchesSearch && matchesType) {
+          highlightSearchTerms(row, searchTerm);
+        } else {
+          removeHighlights(row);
+        }
+      });
+
+      // Sort rows
+      const visibleRows = rows.filter(row => row.style.display !== 'none');
+      
+      visibleRows.sort((a, b) => {
+        const aName = a.cells[0].textContent;
+        const bName = b.cells[0].textContent;
+        const aType = a.cells[1].textContent;
+        const bType = b.cells[1].textContent;
+        
+        switch(sortOption) {
+          case 'name':
+            return aName.localeCompare(bName);
+          case 'name-desc':
+            return bName.localeCompare(aName);
+          case 'type':
+            return aType.localeCompare(bType) || aName.localeCompare(bName);
+          case 'type-desc':
+            return bType.localeCompare(aType) || aName.localeCompare(bName);
+          default:
+            return 0;
+        }
+      });
+
+      // Reorder rows in the table
+      visibleRows.forEach(row => tbody.appendChild(row));
+      
+      // Update results count
+      const resultsCount = document.getElementById('resultsCount');
+      const totalCount = rows.length;
+      const visibleCount = visibleRows.length;
+      
+      if (searchTerm || selectedType) {
+        resultsCount.textContent = `Showing ${visibleCount} of ${totalCount} organizations`;
+        resultsCount.style.display = 'block';
+      } else {
+        resultsCount.style.display = 'none';
+      }
+      
+      // Update "no results" message
+      const noResultsRow = tbody.querySelector('tr td[colspan]');
+      if (noResultsRow) {
+        if (visibleRows.length === 0) {
+          noResultsRow.style.display = '';
+          noResultsRow.textContent = 'No organizations found matching your criteria.';
+        } else {
+          noResultsRow.style.display = 'none';
+        }
+      }
+    }
+
+    function highlightSearchTerms(row, searchTerm) {
+      const cells = [row.cells[0], row.cells[1], row.cells[2]]; // Name, Type, Address
+      cells.forEach(cell => {
+        const text = cell.textContent;
+        const regex = new RegExp(`(${searchTerm})`, 'gi');
+        cell.innerHTML = text.replace(regex, '<span class="search-highlight">$1</span>');
+      });
+    }
+
+    function removeHighlights(row) {
+      const cells = [row.cells[0], row.cells[1], row.cells[2]];
+      cells.forEach(cell => {
+        const highlights = cell.querySelectorAll('.search-highlight');
+        highlights.forEach(highlight => {
+          highlight.outerHTML = highlight.textContent;
+        });
+      });
+    }
+
+    // Event listeners
+    searchInput.addEventListener('input', filterAndSortTable);
+    typeFilter.addEventListener('change', filterAndSortTable);
+    sortBy.addEventListener('change', filterAndSortTable);
+
+    // Initialize with default sorting
+    filterAndSortTable();
   });
 </script> 

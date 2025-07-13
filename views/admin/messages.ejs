@@ -1,0 +1,295 @@
+<%- include('../partials/header1') %>
+<%- include(session && session.is_admin ? '../partials/navbar2' : '../partials/navbar1') %>
+
+<style>
+.stat-card {
+  transition: transform 0.2s;
+}
+.stat-card:hover {
+  transform: translateY(-2px);
+}
+.activity-feed {
+  max-height: 400px;
+  overflow-y: auto;
+}
+.message-preview {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+</style>
+
+<div class="container py-5">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="text-primary mb-0">📊 Messages & Communications Overview</h2>
+    <a href="/admin/dashboard" class="btn btn-outline-secondary">
+      <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+    </a>
+  </div>
+
+  <!-- Statistics Cards -->
+  <div class="row mb-4 g-3">
+    <div class="col-md-3">
+      <div class="card shadow-sm border-primary stat-card">
+        <div class="card-body text-center">
+          <h6 class="text-primary">Total Messages</h6>
+          <div class="fw-bold fs-4"><%= messageStats.total_messages || 0 %></div>
+          <small class="text-muted"><%= messageStats.unread_messages || 0 %> unread</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm border-success stat-card">
+        <div class="card-body text-center">
+          <h6 class="text-success">Group Messages</h6>
+          <div class="fw-bold fs-4"><%= groupMessageStats.total_group_messages || 0 %></div>
+          <small class="text-muted"><%= groupMessageStats.active_group_chats || 0 %> active chats</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm border-info stat-card">
+        <div class="card-body text-center">
+          <h6 class="text-info">Active Users</h6>
+          <div class="fw-bold fs-4"><%= messageStats.unique_senders || 0 %></div>
+          <small class="text-muted"><%= messageStats.unique_recipients || 0 %> recipients</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm border-warning stat-card">
+        <div class="card-body text-center">
+          <h6 class="text-warning">Notifications</h6>
+          <div class="fw-bold fs-4"><%= notificationStats.total_notifications || 0 %></div>
+          <small class="text-muted"><%= notificationStats.unread_notifications || 0 %> unread</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <!-- Recent Messages -->
+    <div class="col-lg-6">
+      <div class="card shadow-sm">
+        <div class="card-header bg-light">
+          <h5 class="mb-0">📨 Recent Direct Messages</h5>
+        </div>
+        <div class="card-body p-0">
+          <div class="activity-feed">
+            <% if (recentMessages && recentMessages.length > 0) { %>
+              <% recentMessages.forEach(message => { %>
+                <div class="border-bottom p-3">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                      <div class="fw-bold">
+                        <%= message.sender_name %> → <%= message.recipient_name %>
+                      </div>
+                      <div class="message-preview text-muted">
+                        <%= message.message %>
+                      </div>
+                      <small class="text-muted">
+                        <%= new Date(message.sent_at).toLocaleString() %>
+                        <% if (!message.read_at) { %>
+                          <span class="badge bg-warning ms-2">Unread</span>
+                        <% } %>
+                      </small>
+                    </div>
+                  </div>
+                </div>
+              <% }) %>
+            <% } else { %>
+              <div class="p-3 text-center text-muted">
+                <i class="fas fa-inbox fa-2x mb-2"></i>
+                <div>No recent messages</div>
+              </div>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Group Messages -->
+    <div class="col-lg-6">
+      <div class="card shadow-sm">
+        <div class="card-header bg-light">
+          <h5 class="mb-0">👥 Recent Group Messages</h5>
+        </div>
+        <div class="card-body p-0">
+          <div class="activity-feed">
+            <% if (recentGroupMessages && recentGroupMessages.length > 0) { %>
+              <% recentGroupMessages.forEach(message => { %>
+                <div class="border-bottom p-3">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                      <div class="fw-bold">
+                        <%= message.sender_name %> in <%= message.group_name %>
+                      </div>
+                      <div class="message-preview text-muted">
+                        <%= message.message %>
+                      </div>
+                      <small class="text-muted">
+                        <%= new Date(message.sent_at).toLocaleString() %>
+                      </small>
+                    </div>
+                  </div>
+                </div>
+              <% }) %>
+            <% } else { %>
+              <div class="p-3 text-center text-muted">
+                <i class="fas fa-users fa-2x mb-2"></i>
+                <div>No recent group messages</div>
+              </div>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Most Active Users -->
+    <div class="col-lg-6">
+      <div class="card shadow-sm">
+        <div class="card-header bg-light">
+          <h5 class="mb-0">🏆 Most Active Users</h5>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>User</th>
+                  <th>Role</th>
+                  <th>Sent</th>
+                  <th>Received</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (mostActiveUsers && mostActiveUsers.length > 0) { %>
+                  <% mostActiveUsers.forEach(user => { %>
+                    <tr>
+                      <td>
+                        <div class="fw-bold"><%= user.name %></div>
+                        <small class="text-muted"><%= user.email %></small>
+                      </td>
+                      <td>
+                        <span class="badge bg-<%= user.role === 'parent' ? 'success' : 'info' %>">
+                          <%= user.role %>
+                        </span>
+                      </td>
+                      <td><%= user.messages_sent %></td>
+                      <td><%= user.messages_received %></td>
+                    </tr>
+                  <% }) %>
+                <% } else { %>
+                  <tr>
+                    <td colspan="4" class="text-center text-muted">No user activity data</td>
+                  </tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Notifications -->
+    <div class="col-lg-6">
+      <div class="card shadow-sm">
+        <div class="card-header bg-light">
+          <h5 class="mb-0">🔔 Recent Notifications</h5>
+        </div>
+        <div class="card-body p-0">
+          <div class="activity-feed">
+            <% if (recentNotifications && recentNotifications.length > 0) { %>
+              <% recentNotifications.forEach(notification => { %>
+                <div class="border-bottom p-3">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                      <div class="fw-bold"><%= notification.user_name %></div>
+                      <div class="text-muted"><%= notification.message %></div>
+                      <small class="text-muted">
+                        <%= new Date(notification.created_at).toLocaleString() %>
+                        <% if (!notification.is_read) { %>
+                          <span class="badge bg-danger ms-2">Unread</span>
+                        <% } %>
+                      </small>
+                    </div>
+                  </div>
+                </div>
+              <% }) %>
+            <% } else { %>
+              <div class="p-3 text-center text-muted">
+                <i class="fas fa-bell fa-2x mb-2"></i>
+                <div>No recent notifications</div>
+              </div>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Communication Trends Chart -->
+  <% if (dailyStats && dailyStats.length > 0) { %>
+    <div class="row mt-4">
+      <div class="col-12">
+        <div class="card shadow-sm">
+          <div class="card-header bg-light">
+            <h5 class="mb-0">📈 Message Activity (Last 7 Days)</h5>
+          </div>
+          <div class="card-body">
+            <canvas id="messageTrendsChart" height="100"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% } %>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Message trends chart
+  const dailyStats = <%- JSON.stringify(dailyStats || []) %>;
+  if (dailyStats.length > 0) {
+    const ctx = document.getElementById('messageTrendsChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: dailyStats.map(d => new Date(d.date).toLocaleDateString()),
+        datasets: [{
+          label: 'Messages Sent',
+          data: dailyStats.map(d => d.message_count),
+          borderColor: 'rgba(54, 162, 235, 1)',
+          backgroundColor: 'rgba(54, 162, 235, 0.1)',
+          tension: 0.4
+        }, {
+          label: 'Active Users',
+          data: dailyStats.map(d => d.unique_senders),
+          borderColor: 'rgba(255, 99, 132, 1)',
+          backgroundColor: 'rgba(255, 99, 132, 0.1)',
+          tension: 0.4
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            position: 'top',
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { precision: 0 }
+          }
+        }
+      }
+    });
+  }
+});
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+
+<%- include('../partials/footer1') %> 

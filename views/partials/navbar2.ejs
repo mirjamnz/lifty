@@ -11,11 +11,8 @@
         <li class="nav-item"><a class="nav-link<%= (typeof activePage !== 'undefined' && activePage === 'organizations') ? ' active' : '' %>" href="/admin/organizations">Organizations</a></li>
         <li class="nav-item"><a class="nav-link" href="/">Main Site</a></li>
         <li class="nav-item">
-          <a class="nav-link" href="/messages/inbox">
-            <i class="fas fa-envelope"></i> Messages
-            <% if (typeof unreadCount !== 'undefined' && unreadCount > 0) { %>
-              <span class="badge rounded-pill bg-danger ms-1"><%= unreadCount %></span>
-            <% } %>
+          <a class="nav-link" href="/admin/messages">
+            <i class="fas fa-chart-line"></i> Messages Overview
           </a>
         </li>
         <li class="nav-item"><a class="nav-link" href="/logout">Logout</a></li>

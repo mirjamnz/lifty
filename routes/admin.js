@@ -578,7 +578,8 @@ router.post('/children/:childId/remove-parent', async (req, res) => {
 router.get('/groups', async (req, res) => {
   try {
     const [groups] = await db.query(`
-      SELECT re.*, u.name AS created_by_name
+      SELECT re.*, u.name AS created_by_name,
+        (SELECT COUNT(*) FROM EventGroupMembers WHERE event_id = re.id AND is_active = TRUE) AS group_member_count
       FROM RecurringEvents re
       JOIN Users u ON re.created_by = u.id
       ORDER BY re.day_of_week, re.start_time
@@ -587,6 +588,75 @@ router.get('/groups', async (req, res) => {
   } catch (err) {
     console.error('Admin groups error:', err);
     res.status(500).send('Failed to load groups');
+  }
+});
+
+// Add new group/event
+router.post('/groups/add', async (req, res) => {
+  const { name, description, day_of_week, start_time, end_time, location, activity_type, max_participants, is_group_event, auto_assign } = req.body;
+  
+  if (!name || !day_of_week || !start_time || !end_time || !location) {
+    req.session.error = 'Name, day of week, start time, end time, and location are required.';
+    return res.redirect('/admin/groups');
+  }
+  
+  try {
+    await db.query(`
+      INSERT INTO RecurringEvents (name, description, day_of_week, start_time, end_time, location, activity_type, max_participants, is_group_event, auto_assign, created_by, created_at) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+    `, [
+      name.trim(), 
+      description ? description.trim() : null,
+      day_of_week,
+      start_time,
+      end_time,
+      location.trim(),
+      activity_type || null,
+      max_participants || null,
+      is_group_event === 'on' ? 1 : 0,
+      auto_assign === 'on' ? 1 : 0,
+      req.session.userId
+    ]);
+    
+    req.session.success = `✅ Group '${name}' created successfully!`;
+    res.redirect('/admin/groups');
+  } catch (err) {
+    console.error('Add group error:', err);
+    req.session.error = `Failed to create group: ${err.message}`;
+    res.redirect('/admin/groups');
+  }
+});
+
+// Delete group/event
+router.post('/groups/:id/delete', async (req, res) => {
+  const groupId = req.params.id;
+  
+  try {
+    await db.query('START TRANSACTION');
+    
+    // Get group name for success message
+    const [[group]] = await db.query('SELECT name FROM RecurringEvents WHERE id = ?', [groupId]);
+    if (!group) {
+      await db.query('ROLLBACK');
+      req.session.error = 'Group not found.';
+      return res.redirect('/admin/groups');
+    }
+    
+    // Delete related records first
+    await db.query('DELETE FROM EventGroupInvitations WHERE event_id = ?', [groupId]);
+    await db.query('DELETE FROM EventGroupMembers WHERE event_id = ?', [groupId]);
+    
+    // Delete the group
+    await db.query('DELETE FROM RecurringEvents WHERE id = ?', [groupId]);
+    
+    await db.query('COMMIT');
+    req.session.success = `✅ Group '${group.name}' deleted successfully!`;
+    res.redirect('/admin/groups');
+  } catch (err) {
+    await db.query('ROLLBACK');
+    console.error('Delete group error:', err);
+    req.session.error = `Failed to delete group: ${err.message}`;
+    res.redirect('/admin/groups');
   }
 });
 
@@ -725,6 +795,135 @@ router.post('/organizations/:id/delete', async (req, res) => {
   } catch (err) {
     console.error('Delete org error:', err);
     res.status(500).send('Could not delete organization: ' + err.message);
+  }
+});
+
+// Admin Messages Overview
+router.get('/messages', async (req, res) => {
+  try {
+    // Get message statistics
+    let messageStats = { total_messages: 0, unread_messages: 0, unique_senders: 0, unique_recipients: 0 };
+    let recentMessages = [];
+    let mostActiveUsers = [];
+    let dailyStats = [];
+    
+    try {
+      const [[stats]] = await db.query(`
+        SELECT 
+          COUNT(*) AS total_messages,
+          SUM(read_at IS NULL) AS unread_messages,
+          COUNT(DISTINCT sender_id) AS unique_senders,
+          COUNT(DISTINCT recipient_id) AS unique_recipients
+        FROM Messages
+      `);
+      messageStats = stats;
+    } catch (err) {
+      console.log('Error getting message stats:', err.message);
+    }
+
+    try {
+      const [messages] = await db.query(`
+        SELECT m.*, 
+          s.name AS sender_name, 
+          r.name AS recipient_name,
+          m.sent_at
+        FROM Messages m
+        JOIN Users s ON m.sender_id = s.id
+        JOIN Users r ON m.recipient_id = r.id
+        ORDER BY m.sent_at DESC
+        LIMIT 10
+      `);
+      recentMessages = messages;
+    } catch (err) {
+      console.log('Error getting recent messages:', err.message);
+    }
+
+    try {
+      const [users] = await db.query(`
+        SELECT u.name, u.email, u.role,
+          COUNT(m.id) AS messages_sent,
+          COUNT(mr.id) AS messages_received
+        FROM Users u
+        LEFT JOIN Messages m ON u.id = m.sender_id
+        LEFT JOIN Messages mr ON u.id = mr.recipient_id
+        WHERE u.role IN ('parent', 'child')
+        GROUP BY u.id
+        ORDER BY messages_sent DESC
+        LIMIT 10
+      `);
+      mostActiveUsers = users;
+    } catch (err) {
+      console.log('Error getting most active users:', err.message);
+    }
+
+    // Get group message statistics
+    let groupMessageStats = { total_group_messages: 0, active_group_chats: 0, group_participants: 0 };
+    let recentGroupMessages = [];
+    
+    try {
+      const [[groupStats]] = await db.query(`
+        SELECT 
+          COUNT(*) AS total_group_messages,
+          COUNT(DISTINCT event_id) AS active_group_chats,
+          COUNT(DISTINCT sender_id) AS group_participants
+        FROM EventGroupMessages
+      `);
+      groupMessageStats = groupStats;
+      
+      const [groupMessages] = await db.query(`
+        SELECT egm.*, 
+          u.name AS sender_name,
+          re.name AS group_name
+        FROM EventGroupMessages egm
+        JOIN Users u ON egm.sender_id = u.id
+        JOIN RecurringEvents re ON egm.event_id = re.id
+        ORDER BY egm.sent_at DESC
+        LIMIT 10
+      `);
+      recentGroupMessages = groupMessages;
+    } catch (err) {
+      console.log('EventGroupMessages table not found, using empty data');
+    }
+
+    // Note: Notification table doesn't exist in the database
+    // Using empty objects/arrays for now
+    const notificationStats = {
+      total_notifications: 0,
+      unread_notifications: 0,
+      users_with_notifications: 0
+    };
+    const recentNotifications = [];
+
+    try {
+      const [stats] = await db.query(`
+        SELECT 
+          DATE(sent_at) AS date,
+          COUNT(*) AS message_count,
+          COUNT(DISTINCT sender_id) AS unique_senders
+        FROM Messages
+        WHERE sent_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+        GROUP BY DATE(sent_at)
+        ORDER BY date DESC
+      `);
+      dailyStats = stats;
+    } catch (err) {
+      console.log('Error getting daily stats:', err.message);
+    }
+
+    res.render('admin/messages', {
+      messageStats,
+      recentMessages,
+      mostActiveUsers,
+      groupMessageStats,
+      recentGroupMessages,
+      notificationStats,
+      recentNotifications,
+      dailyStats,
+      session: req.session
+    });
+  } catch (err) {
+    console.error('Admin messages error:', err);
+    res.status(500).send('Failed to load messages overview');
   }
 });
 

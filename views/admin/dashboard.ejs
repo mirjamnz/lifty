@@ -82,6 +82,7 @@
         <div class="d-flex flex-wrap gap-2 w-100 justify-content-md-end justify-content-center mt-3 mt-md-0">
           <a href="/admin/organizations" class="btn btn-outline-success">🏫 Manage Organizations</a>
           <a href="/admin/groups" class="btn btn-outline-primary">👥 Manage Groups/Events</a>
+          <a href="/admin/messages" class="btn btn-outline-info">📊 Messages Overview</a>
            <!--  <a href="/admin/users/add" class="btn btn-outline-success">➕ Add Parent</a> -->
           <!--  <a href="/admin/children/add" class="btn btn-outline-success">➕ Add Child</a> -->
         </div>
@@ -225,45 +226,7 @@
     </div>
   </div>
 
-  <!-- Groups / Events -->
-  <div class="row mt-4">
-    <div class="col-12">
-      <h4 class="text-primary">👥 Groups / Events</h4>
-      <div class="table-responsive">
-        <table class="table table-bordered table-sm table-striped rounded shadow-sm" id="groupsTable">
-          <thead class="table-light">
-            <tr>
-              <th>Name</th>
-              <th>Schedule</th>
-              <th>Location</th>
-              <th>Members</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% if (typeof groups !== 'undefined' && groups.length > 0) { %>
-              <% groups.forEach(group => { %>
-                <tr>
-                  <td><%= group.name %></td>
-                  <td><%= group.day_of_week %>s, <%= group.start_time %> - <%= group.end_time %></td>
-                  <td><%= group.location %></td>
-                  <td><%= group.group_member_count || 0 %></td>
-                  <td>
-                    <a href="/admin/groups/<%= group.id %>/members" class="btn btn-sm btn-outline-primary">Manage Members</a>
-                  </td>
-                </tr>
-              <% }) %>
-            <% } else { %>
-              <tr><td colspan="5" class="text-center text-muted">No groups found.</td></tr>
-            <% } %>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Modal for Block/Unblock Management -->
+  <!-- Modal for Block/Unblock Management -->
 <div class="modal fade" id="blockModal" tabindex="-1" aria-labelledby="blockModalLabel" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
