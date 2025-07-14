@@ -769,6 +769,29 @@ router.post('/:id/add-children', async (req, res) => {
           'INSERT INTO EventGroupMembers (event_id, user_id, child_id, role) VALUES (?, ?, ?, ?)',
           [eventId, userId, childId, 'child']
         );
+        // --- AUTO-ASSIGN FOR FUTURE INSTANCES ---
+        // Get all future event instances for this event
+        const [futureInstances] = await db.query(
+          'SELECT id, event_date FROM EventInstances WHERE event_id = ? AND event_date >= CURDATE()',
+          [eventId]
+        );
+        for (const instance of futureInstances) {
+          for (const assignment_type of ['dropoff', 'pickup']) {
+            // Check if assignment already exists and is not cancelled
+            const [[existingAssignment]] = await db.query(
+              'SELECT id FROM EventAssignments WHERE event_id = ? AND event_date = ? AND child_id = ? AND assignment_type = ? AND is_cancelled = FALSE',
+              [eventId, instance.event_date, childId, assignment_type]
+            );
+            if (!existingAssignment) {
+              await db.query(
+                `INSERT INTO EventAssignments (event_id, event_date, user_id, child_id, assignment_type, group_assignment)
+                 VALUES (?, ?, ?, ?, ?, TRUE)`,
+                [eventId, instance.event_date, userId, childId, assignment_type]
+              );
+            }
+          }
+        }
+        // --- END AUTO-ASSIGN ---
       }
     }
     res.redirect(`/recurring-events/${eventId}/group?success=Children added to group`);

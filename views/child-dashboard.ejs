@@ -122,6 +122,65 @@
       <% }); %>
     </div>
   <% } %>
+
+  <!-- Your Recurring Event Rides Section -->
+  <h2 class="mb-3 mt-5 text-info">🗓️ Your Recurring Event Rides</h2>
+  <% if (!recurringAssignments || recurringAssignments.length === 0) { %>
+    <div class="alert alert-info text-center" role="alert">
+      No recurring event rides found. Check back later!
+    </div>
+  <% } else { %>
+    <div class="row g-4">
+      <% recurringAssignments.forEach(function(assignment) { %>
+        <div class="col-12 col-md-6 col-lg-4">
+          <div class="card h-100 shadow-sm" style="background-color: #e3f2fd; border-radius: 1rem;">
+            <div class="card-header bg-info text-white text-center">
+              <span class="badge bg-light text-info">
+                <i class="fas fa-<%= assignment.assignment_type === 'dropoff' ? 'sign-in-alt' : 'sign-out-alt' %> me-1"></i>
+                <%= assignment.assignment_type.charAt(0).toUpperCase() + assignment.assignment_type.slice(1) %>
+              </span>
+            </div>
+            <div class="card-body p-3">
+              <h5 class="card-title fw-bold text-info"><%= assignment.event_name %></h5>
+              <ul class="list-group list-group-flush">
+                <li class="list-group-item bg-transparent">
+                  <i class="fas fa-calendar-alt me-2 text-info"></i>
+                  <strong>Date:</strong> <%= new Date(assignment.event_date).toLocaleDateString() %>
+                </li>
+                <li class="list-group-item bg-transparent">
+                  <i class="fas fa-clock me-2 text-info"></i>
+                  <strong>Time:</strong> <%= assignment.start_time %> - <%= assignment.end_time %>
+                </li>
+                <li class="list-group-item bg-transparent">
+                  <i class="fas fa-user me-2 text-success"></i>
+                  <strong>Driver:</strong> <%= assignment.assigned_parent_name %>
+                </li>
+                <li class="list-group-item bg-transparent">
+                  <i class="fas fa-map-marker-alt me-2 text-warning"></i>
+                  <strong>Location:</strong> <%= assignment.location %>
+                </li>
+                <li class="list-group-item bg-transparent">
+                  <i class="fas fa-calendar-week me-2 text-primary"></i>
+                  <strong>Schedule:</strong> <%= assignment.day_of_week %>s
+                </li>
+              </ul>
+              <% if (assignment.notes) { %>
+                <div class="alert alert-secondary py-1 px-2 small mb-0 mt-2"><%= assignment.notes %></div>
+              <% } %>
+            </div>
+            <div class="card-footer bg-transparent text-center">
+              <span class="badge bg-<%= assignment.status === 'confirmed' ? 'success' : assignment.status === 'pending' ? 'warning text-dark' : assignment.status === 'completed' ? 'info' : 'secondary' %>">
+                <%= assignment.status.charAt(0).toUpperCase() + assignment.status.slice(1) %>
+              </span>
+              <a href="/recurring-event-groups/<%= assignment.event_id %>" class="btn btn-sm btn-outline-info ms-2">
+                <i class="fas fa-users me-1"></i>Group
+              </a>
+            </div>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+  <% } %>
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>

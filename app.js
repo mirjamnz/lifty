@@ -101,6 +101,99 @@ app.use('/messages', messagesRouter);
 app.use('/recurring-events', recurringEventsRouter);
 app.use('/recurring-event-groups', recurringEventGroupsRouter);
 
+const db = require('./db');
+
+// Simple requireAuth middleware for root-level routes
+function requireAuth(req, res, next) {
+  if (!req.session.userId) {
+    return res.status(401).send('Please log in to access this feature.');
+  }
+  next();
+}
+
+// POST /event-instances/:instanceId/assign-self-driver - Assign self as driver for an event instance (root-level)
+app.post('/event-instances/:instanceId/assign-self-driver', requireAuth, async (req, res) => {
+  const instanceId = req.params.instanceId;
+  const userId = req.session.userId;
+
+  try {
+    // Get the event instance and event ID
+    const [[instance]] = await db.query(`
+      SELECT ei.*, re.id as event_id
+      FROM EventInstances ei
+      JOIN RecurringEvents re ON ei.event_id = re.id
+      WHERE ei.id = ?
+    `, [instanceId]);
+
+    if (!instance) {
+      req.session.error = 'Event instance not found.';
+      return res.redirect('/rides');
+    }
+    const eventId = instance.event_id;
+
+    // Check if user is a parent group member for this event
+    const [membership] = await db.query(`
+      SELECT * FROM EventGroupMembers 
+      WHERE event_id = ? AND user_id = ? AND role = 'parent' AND is_active = TRUE
+    `, [eventId, userId]);
+    if (membership.length === 0) {
+      req.session.error = 'You must be a parent group member to assign yourself as driver.';
+      return res.redirect('/rides');
+    }
+
+    // Assign self as driver (allow take over)
+    await db.query(`
+      UPDATE EventInstances 
+      SET driver_id = ?, driver_assigned_at = NOW(), driver_assigned_by = ?
+      WHERE id = ?
+    `, [userId, userId, instanceId]);
+
+    // Set can_drive = TRUE for this user in EventGroupMembers
+    await db.query(`
+      UPDATE EventGroupMembers SET can_drive = TRUE WHERE event_id = ? AND user_id = ?
+    `, [eventId, userId]);
+
+    // --- AUTO-ASSIGN DRIVER FOR ALL GROUP CHILDREN ---
+    // Get all active children in the group for this event
+    const [groupChildren] = await db.query(
+      'SELECT child_id FROM EventGroupMembers WHERE event_id = ? AND child_id IS NOT NULL AND is_active = TRUE',
+      [eventId]
+    );
+    for (const child of groupChildren) {
+      for (const assignment_type of ['dropoff', 'pickup']) {
+        // Check if assignment already exists and is not cancelled
+        const [[existingAssignment]] = await db.query(
+          'SELECT id FROM EventAssignments WHERE event_id = ? AND event_date = ? AND child_id = ? AND assignment_type = ? AND is_cancelled = FALSE',
+          [eventId, instance.event_date, child.child_id, assignment_type]
+        );
+        if (!existingAssignment) {
+          await db.query(
+            `INSERT INTO EventAssignments (event_id, event_date, user_id, child_id, assignment_type, group_assignment)
+             VALUES (?, ?, ?, ?, ?, TRUE)`,
+            [eventId, instance.event_date, userId, child.child_id, assignment_type]
+          );
+        }
+      }
+    }
+    // --- END AUTO-ASSIGN ---
+
+    // Get user name for message
+    const [[user]] = await db.query('SELECT name FROM Users WHERE id = ?', [userId]);
+    // Send group message about driver assignment
+    await db.query(`
+      INSERT INTO EventGroupMessages (event_id, sender_id, message, message_type)
+      VALUES (?, ?, ?, 'assignment')
+    `, [eventId, userId, `${user.name} has assigned themselves as driver for ${instance.event_date}`]);
+
+    req.session.success = 'You are now the driver for this event instance.';
+    return res.redirect('/rides');
+  } catch (err) {
+    console.error('Assign self as driver error:', err);
+    req.session.error = 'Error assigning yourself as driver.';
+    return res.redirect('/rides');
+  }
+});
+
 // Home page
 app.get('/', (req, res) => {
   if (req.session.userId) {

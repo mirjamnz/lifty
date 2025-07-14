@@ -203,7 +203,15 @@
                       <br><span class="badge bg-info text-white">Group Event</span>
                     <% } %>
                   </td>
-                  <td><%= a.child_name %></td>
+                  <td>
+                    <% if (a.is_consolidated && a.child_count > 1) { %>
+                      <strong><%= a.child_name %></strong>
+                      <br><small class="text-muted"><%= a.child_count %> children</small>
+                      <br><span class="badge bg-info text-white">Group Drive</span>
+                    <% } else { %>
+                      <%= a.child_name %>
+                    <% } %>
+                  </td>
                   <td>
                     <span class="badge bg-<%= a.assignment_type === 'dropoff' ? 'primary' : 'success' %>">
                       <i class="fas fa-<%= a.assignment_type === 'dropoff' ? 'sign-in-alt' : 'sign-out-alt' %> me-1"></i>
@@ -220,7 +228,7 @@
                   </td>
                   <td><%= a.notes || '—' %></td>
                   <td>
-                    <% if (a.group_assignment) { %>
+                    <% if (a.group_assignment || a.is_consolidated || a.user_id === session.userId) { %>
                       <a href="/recurring-event-groups/<%= a.event_id %>" class="btn btn-sm btn-outline-info">
                         <i class="fas fa-users me-1"></i>Group
                       </a>
@@ -231,6 +239,113 @@
                         <i class="fas fa-times me-1"></i>Cancel
                       </button>
                     <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <!-- Admin Group Assignments Section -->
+  <% if (adminGroupAssignments && adminGroupAssignments.length > 0) { %>
+    <div class="card mb-4 border-warning">
+      <div class="card-header bg-warning text-dark">
+        <h5 class="mb-0"><i class="fas fa-user-shield me-2"></i>👑 Group Admin View: All Assignments for Your Groups</h5>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover table-bordered align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Event</th>
+                <th>Child</th>
+                <th>Type</th>
+                <th>Date</th>
+                <th>Assigned Parent/Driver</th>
+                <th>Location</th>
+                <th>Status</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% adminGroupAssignments.forEach(a => { %>
+                <tr class="<%= a.group_assignment ? 'table-warning' : '' %>">
+                  <td><strong><%= a.event_name %></strong></td>
+                  <td><%= a.child_name %></td>
+                  <td>
+                    <span class="badge bg-<%= a.assignment_type === 'dropoff' ? 'primary' : 'success' %>">
+                      <i class="fas fa-<%= a.assignment_type === 'dropoff' ? 'sign-in-alt' : 'sign-out-alt' %> me-1"></i>
+                      <%= a.assignment_type.charAt(0).toUpperCase() + a.assignment_type.slice(1) %>
+                    </span>
+                  </td>
+                  <td><%= new Date(a.event_date).toLocaleDateString() %></td>
+                  <td><%= a.assigned_parent_name %></td>
+                  <td><%= a.location %></td>
+                  <td>
+                    <span class="badge bg-<%= a.status === 'confirmed' ? 'success' : a.status === 'pending' ? 'warning text-dark' : a.status === 'completed' ? 'info' : 'secondary' %>">
+                      <%= a.status.charAt(0).toUpperCase() + a.status.slice(1) %>
+                    </span>
+                  </td>
+                  <td><%= a.notes || '—' %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <!-- Not Yet Assigned / Action Needed Section -->
+  <% if (unassignedGroupInstances && unassignedGroupInstances.length > 0) { %>
+    <div class="card mb-4 border-warning">
+      <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Not Yet Assigned / Action Needed</h5>
+        <form method="get" action="/rides" class="d-flex align-items-center gap-2 mb-0">
+          <label for="range" class="form-label mb-0 me-2">Show:</label>
+          <select name="range" id="range" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="7" <%= range == '7' ? 'selected' : '' %>>Next 7 days</option>
+            <option value="30" <%= range == '30' ? 'selected' : '' %>>This Month (30 days)</option>
+            <option value="60" <%= range == '60' ? 'selected' : '' %>>Next 60 days</option>
+          </select>
+        </form>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover table-bordered align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Event</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Location</th>
+                <th>Current Driver</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% unassignedGroupInstances.forEach(instance => { %>
+                <tr>
+                  <td><strong><%= instance.event_name %></strong></td>
+                  <td><%= new Date(instance.event_date).toLocaleDateString() %></td>
+                  <td><%= instance.start_time %> - <%= instance.end_time %></td>
+                  <td><%= instance.location %></td>
+                  <td>
+                    <% if (instance.driver_name) { %>
+                      <span class="text-danger"><%= instance.driver_name %></span>
+                    <% } else { %>
+                      <span class="text-warning">Not assigned</span>
+                    <% } %>
+                  </td>
+                  <td>
+                    <form method="POST" action="/event-instances/<%= instance.id %>/assign-self-driver" style="display:inline;">
+                      <button type="submit" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-car me-1"></i>Assign Myself as Driver
+                      </button>
+                    </form>
                   </td>
                 </tr>
               <% }) %>

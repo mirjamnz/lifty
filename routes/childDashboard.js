@@ -44,12 +44,23 @@ router.get('/child-dashboard', async (req, res) => {
       offer.formatted_time = new Date(offer.pickup_time).toLocaleString('en-NZ', { dateStyle: 'medium', timeStyle: 'short' });
     });
 
-    // 5. Render child dashboard with session
+    // 5. Load child's recurring event assignments
+    const [recurringAssignments] = await db.query(`
+      SELECT ea.*, re.name AS event_name, re.location, re.day_of_week, re.start_time, re.end_time, u.name AS assigned_parent_name
+      FROM EventAssignments ea
+      JOIN RecurringEvents re ON ea.event_id = re.id
+      JOIN Users u ON ea.user_id = u.id
+      WHERE ea.child_id = ? AND ea.event_date >= CURDATE() AND ea.status != 'cancelled' AND ea.is_cancelled = FALSE
+      ORDER BY ea.event_date ASC, re.name, ea.assignment_type
+    `, [user.child_profile_id]);
+
+    // 6. Render child dashboard with session
     const [users] = await db.query('SELECT id, name FROM Users');
     res.render('child-dashboard', {
       child: childProfile,
       requests,
       offers,
+      recurringAssignments,
       users, // For driver lookup
       session: req.session,
       GMAPS_API_KEY: process.env.GMAPS_API_KEY || 'YOUR_API_KEY' // Kept for future use

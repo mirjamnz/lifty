@@ -1,7 +1,7 @@
 # 🚗 Lifty - Feature List
 
 ## Overview
-Lifty is a comprehensive school transportation platform that connects parents, children, and drivers for safe and efficient ride sharing. The platform supports ride requests, offers, group messaging, and real-time coordination.
+Lifty is a comprehensive school transportation platform that connects parents, children, and drivers for safe and efficient ride sharing. The platform supports ride requests, offers, group messaging, real-time coordination, and recurring events management with integrated calendar functionality.
 
 ---
 
@@ -29,6 +29,8 @@ Lifty is a comprehensive school transportation platform that connects parents, c
 - **Child management**: Add, edit, delete children profiles
 - **Organization management**: Add schools, clubs, events
 - **Real-time updates**: Live status of ride requests and offers
+- **Integrated calendar**: Full calendar view with all events and rides
+- **Community map**: View other users with public addresses
 
 ### Child Dashboard
 - **Ride status overview**: View assigned and pending rides
@@ -68,6 +70,61 @@ Lifty is a comprehensive school transportation platform that connects parents, c
 
 ---
 
+## 📅 Calendar & Event Management
+
+### Integrated Calendar System
+- **FullCalendar integration**: Professional calendar interface
+- **Multiple views**: Month, week, and list views
+- **Color-coded events**: Different colors for different event types
+- **Interactive events**: Click events for detailed information
+- **Real-time updates**: Calendar refreshes with new data
+
+### Event Types Displayed
+- **🚗 Driving assignments**: Red - When you're driving others
+- **🚌 Child rides**: Green - When your child has a ride
+- **📅 Recurring events**: Yellow - Regular event assignments
+- **🔵 Group events**: Blue - Events you're a group member of
+- **⚫ Subscribed events**: Gray - Events your children are subscribed to
+
+### Calendar Features
+- **Event tooltips**: Hover for quick information
+- **Detailed modals**: Click for comprehensive event details
+- **Legend system**: Clear color coding explanation
+- **Responsive design**: Works on all device sizes
+- **Date navigation**: Easy month/week navigation
+
+---
+
+## 🎯 Recurring Events System
+
+### Event Creation & Management
+- **Recurring event setup**: Create weekly/monthly events
+- **Day/time specification**: Set recurring schedule
+- **Location management**: Event venue details
+- **Privacy controls**: Public or private events
+- **Active/inactive status**: Enable/disable events
+
+### Group Management
+- **Group invitations**: Invite users to join event groups
+- **Member management**: Add/remove group participants
+- **Invitation system**: Email-based invitations with status tracking
+- **Group messaging**: Direct communication with group members
+- **Member roles**: Different permission levels
+
+### Event Subscriptions
+- **Child subscriptions**: Subscribe children to events
+- **Automatic assignments**: Generate recurring assignments
+- **Subscription management**: Add/remove children from events
+- **Calendar integration**: Subscribed events appear in calendar
+
+### Assignment System
+- **Parent assignments**: Assign parents to event responsibilities
+- **Date-specific assignments**: Create assignments for specific dates
+- **Status tracking**: Track assignment completion
+- **Cancellation support**: Handle assignment cancellations
+
+---
+
 ## 💬 Messaging System
 
 ### Direct Messaging
@@ -78,6 +135,7 @@ Lifty is a comprehensive school transportation platform that connects parents, c
 
 ### Group Chat System
 - **Ride-specific chats**: Group conversations for assigned rides
+- **Event group chats**: Communication for recurring events
 - **Multi-participant**: Child, parent(s), and driver can all participate
 - **Real-time updates**: Live message display
 - **Access control**: Only relevant users can access group chats
@@ -104,6 +162,8 @@ Lifty is a comprehensive school transportation platform that connects parents, c
 - **Assignment system**: Assign parents to event responsibilities
 - **Participant management**: Track who's involved
 - **Communication**: Direct messaging to event participants
+- **Calendar integration**: Events appear in user calendars
+- **Group invitations**: Invite users to join event groups
 
 ---
 
@@ -114,11 +174,13 @@ Lifty is a comprehensive school transportation platform that connects parents, c
 - **Geocoding**: Automatic coordinate lookup
 - **Map integration**: Visual address selection
 - **Location validation**: Ensure valid addresses
+- **Privacy controls**: Option to hide address from other users
 
 ### Location Services
 - **Autocomplete**: Smart location suggestions
 - **Distance calculation**: Route planning assistance
 - **Pickup/dropoff**: Precise location specification
+- **Community map**: View other users with public addresses
 
 ---
 
@@ -129,11 +191,13 @@ Lifty is a comprehensive school transportation platform that connects parents, c
 - **Toast notifications**: Bottom-right popup for new messages
 - **Status updates**: Real-time ride status changes
 - **Booking confirmations**: Instant feedback on ride bookings
+- **Event invitations**: Notifications for group event invitations
 
 ### Message Types
 - **Direct messages**: Individual user communications
-- **Group messages**: Ride-specific group chats
+- **Group messages**: Ride-specific and event group chats
 - **System notifications**: Platform updates and alerts
+- **Invitation notifications**: Group event invitations
 
 ---
 
@@ -156,6 +220,7 @@ Lifty is a comprehensive school transportation platform that connects parents, c
 - **Card views**: Alternative display option
 - **Filtering**: Hide expired, show only seeking drivers
 - **Sorting**: Order by time, status, location
+- **Calendar views**: Visual event and ride scheduling
 
 ---
 
@@ -172,6 +237,7 @@ Lifty is a comprehensive school transportation platform that connects parents, c
 - **Group chat security**: Only relevant users can access
 - **Admin controls**: User management and blocking
 - **Child protection**: Restricted access for children
+- **Address privacy**: Option to hide home addresses
 
 ---
 
@@ -182,6 +248,7 @@ Lifty is a comprehensive school transportation platform that connects parents, c
 - **Relationship management**: Complex user-child-parent relationships
 - **Message threading**: Efficient group message storage
 - **Status tracking**: Comprehensive ride lifecycle management
+- **Event management**: Recurring events and assignments
 
 ### Performance
 - **Efficient queries**: Optimized database operations
@@ -204,6 +271,7 @@ Lifty is a comprehensive school transportation platform that connects parents, c
 - **Ride statistics**: Track request/offer patterns
 - **User engagement**: Monitor platform usage
 - **System health**: Performance monitoring
+- **Event participation**: Track recurring event engagement
 
 ### Admin Insights
 - **User management**: Monitor user behavior
@@ -219,11 +287,13 @@ Lifty is a comprehensive school transportation platform that connects parents, c
 - **Real-time notifications**: Push notifications for mobile
 - **Payment integration**: Ride cost sharing
 - **Rating system**: Driver and passenger reviews
-- **Advanced scheduling**: Recurring ride arrangements
+- **Advanced scheduling**: More flexible recurring ride arrangements
 - **Mobile app**: Native iOS/Android applications
 - **GPS tracking**: Real-time ride location
 - **Emergency contacts**: Safety feature integration
 - **Insurance integration**: Ride coverage options
+- **Calendar sync**: Integration with external calendars (Google, Outlook)
+- **Event templates**: Pre-defined event types for common activities
 
 ---
 
@@ -243,4 +313,60 @@ Lifty is a comprehensive school transportation platform that connects parents, c
 ---
 
 *Last updated: January 2025*
-*Version: 1.0* 
+*Version: 1.1* 
+
+### Review of the "My Rides" Query Logic
+
+#### **What the Code Does**
+- The `/rides` page builds the "My Rides" section from three main queries:
+  1. **userAssignments**: Consolidated assignments where the user is the assigned parent/driver (grouped by event/date/type).
+  2. **childAssignments**: Assignments for the user's children where the user is NOT the driver.
+  3. **driverAssignments**: Assignments where the user is the assigned driver (for any child).
+
+- The code then consolidates these into a `recurringAssignments` array, which is rendered in the UI.
+
+#### **Potential Issues**
+- The main query for `userAssignments`:
+  ```sql
+  SELECT ... FROM EventAssignments ea
+  ...
+  WHERE ea.user_id = ? AND ea.event_date >= CURDATE() AND ea.status != 'cancelled' AND ea.is_cancelled = FALSE
+  GROUP BY ...
+  ```
+  - This should include group assignments, as the new logic sets `user_id` to the driver for group assignments.
+  - However, if the driver is not the parent of any child in the group, the `MIN(c.user_id) as child_parent_id` may not match the driver, but this is only used for display.
+
+- The code **should** show group assignments for the driver, as long as:
+  - The `user_id` in `EventAssignments` is set to the driver's user ID (which the new logic does).
+  - The assignment is not canceled and not marked as status "cancelled".
+
+#### **Why Might Shar Not See Her Ride?**
+- If the assignments are being created with the correct `user_id` (Shar's ID), they should show up.
+- **Possible issues:**
+  - The assignments are not being created for the correct date or with the correct user ID.
+  - The assignment status is "cancelled" or `is_cancelled = TRUE`.
+  - There is a mismatch in the event date or assignment type.
+
+---
+
+## **Next Steps**
+
+1. **Verify in the Database:**
+   - Are there `EventAssignments` for the relevant event/date with `user_id` = Shar's ID, `is_cancelled = FALSE`, and `status != 'cancelled'`?
+   - Are the assignment types correct (`dropoff` and `pickup`)?
+
+2. **Add Debug Logging (Optional):**
+   - Add a debug log to print out the assignments fetched for the current user in the `/rides` route.
+
+3. **(If Needed) Adjust the Query:**
+   - If the assignments exist but are not shown, adjust the query to ensure group assignments are included.
+
+---
+
+## **Proposed Immediate Action**
+
+**Add a debug log after fetching `userAssignments` to print the assignments for the current user.**  
+This will help confirm if the assignments are being fetched but not displayed, or not being fetched at all.
+
+Would you like me to add this debug logging, or do you want to check the database for the relevant assignments first?  
+If you want, I can also add a filter to explicitly include `group_assignment = TRUE` in the query for clarity. 

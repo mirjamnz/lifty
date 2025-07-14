@@ -6,7 +6,7 @@ const db = require('../db');
 // GET /rides > Load ride requests by the user
 router.get('/', async (req, res) => {
   const userId = req.session.userId;
-  const { filter = 'all', expired = 'true' } = req.query;
+  const { filter = 'all', expired = 'true', range = '7' } = req.query;
 
   if (!userId) return res.redirect('/login');
 
@@ -152,32 +152,50 @@ router.get('/', async (req, res) => {
       WHERE pc.parent_id = ?
     `, [userId]);
 
-    // For each child, get their next upcoming assignment (dropoff/pickup) for each event
-    let recurringAssignments = [];
-    if (myChildren.length > 0) {
-      const childIds = myChildren.map(c => c.id);
-      // Get all upcoming assignments for these children
-      const [allAssignments] = await db.query(`
-        SELECT ea.*, re.name AS event_name, re.location, re.day_of_week, re.start_time, re.end_time, c.name AS child_name, u.name AS assigned_parent_name, c.user_id as child_parent_id
-        FROM EventAssignments ea
-        JOIN RecurringEvents re ON ea.event_id = re.id
-        JOIN Children c ON ea.child_id = c.id
-        JOIN Users u ON ea.user_id = u.id
-        WHERE ea.child_id IN (?) AND ea.event_date >= CURDATE() AND ea.status != 'cancelled' AND ea.is_cancelled = FALSE
-        ORDER BY ea.event_id, ea.child_id, ea.assignment_type, ea.event_date ASC
-      `, [childIds]);
-      // Group by event_id, child_id, assignment_type, and take only the soonest (first) for each
-      const seen = new Set();
-      for (const a of allAssignments) {
-        const key = `${a.event_id}_${a.child_id}_${a.assignment_type}`;
-        if (!seen.has(key)) {
-          recurringAssignments.push(a);
-          seen.add(key);
-        }
-      }
-    }
-    // Optionally: Get assignments where the user is the assigned parent (driver/helper)
+    // Get assignments where the user is the assigned parent (driver/helper) - CONSOLIDATED
     const [userAssignments] = await db.query(`
+      SELECT 
+        ea.event_id,
+        ea.event_date,
+        ea.assignment_type,
+        ea.status,
+        ea.notes,
+        re.name AS event_name,
+        re.location,
+        re.day_of_week,
+        re.start_time,
+        re.end_time,
+        u.name AS assigned_parent_name,
+        GROUP_CONCAT(c.name ORDER BY c.name SEPARATOR ', ') AS child_names,
+        COUNT(c.id) AS child_count,
+        MIN(ea.id) AS assignment_id,
+        MIN(c.user_id) as child_parent_id
+      FROM EventAssignments ea
+      JOIN RecurringEvents re ON ea.event_id = re.id
+      JOIN Children c ON ea.child_id = c.id
+      JOIN Users u ON ea.user_id = u.id
+      WHERE ea.user_id = ? AND ea.event_date >= CURDATE() AND ea.status != 'cancelled' AND ea.is_cancelled = FALSE
+      GROUP BY ea.event_id, ea.event_date, ea.assignment_type, ea.status, ea.notes, re.name, re.location, re.day_of_week, re.start_time, re.end_time, u.name
+      ORDER BY ea.event_date ASC, re.name, ea.assignment_type
+    `, [userId]);
+
+    // Get individual assignments for children where the user is NOT the driver
+    const [childAssignments] = await db.query(`
+      SELECT ea.*, re.name AS event_name, re.location, re.day_of_week, re.start_time, re.end_time, c.name AS child_name, u.name AS assigned_parent_name, c.user_id as child_parent_id
+      FROM EventAssignments ea
+      JOIN RecurringEvents re ON ea.event_id = re.id
+      JOIN Children c ON ea.child_id = c.id
+      JOIN Users u ON ea.user_id = u.id
+      WHERE ea.child_id IN (
+        SELECT c.id FROM Children c
+        JOIN ParentChild pc ON pc.child_id = c.id
+        WHERE pc.parent_id = ?
+      ) AND ea.event_date >= CURDATE() AND ea.status != 'cancelled' AND ea.is_cancelled = FALSE
+      ORDER BY ea.event_id, ea.child_id, ea.assignment_type, ea.event_date ASC
+    `, [userId]);
+
+    // Get assignments where the current user is the assigned driver (for any child)
+    const [driverAssignments] = await db.query(`
       SELECT ea.*, re.name AS event_name, re.location, re.day_of_week, re.start_time, re.end_time, c.name AS child_name, u.name AS assigned_parent_name, c.user_id as child_parent_id
       FROM EventAssignments ea
       JOIN RecurringEvents re ON ea.event_id = re.id
@@ -186,13 +204,155 @@ router.get('/', async (req, res) => {
       WHERE ea.user_id = ? AND ea.event_date >= CURDATE() AND ea.status != 'cancelled' AND ea.is_cancelled = FALSE
       ORDER BY ea.event_id, ea.child_id, ea.assignment_type, ea.event_date ASC
     `, [userId]);
-    // Group by event_id, child_id, assignment_type, and take only the soonest (first) for each
-    const seenUser = new Set(recurringAssignments.map(a => `${a.event_id}_${a.child_id}_${a.assignment_type}`));
+
+    // Create a set of consolidated assignment keys to filter out individual assignments
+    const consolidatedKeys = new Set();
+    userAssignments.forEach(a => {
+      const key = `${a.event_id}_${a.event_date}_${a.assignment_type}`;
+      consolidatedKeys.add(key);
+    });
+
+    // Build the final recurringAssignments array
+    let recurringAssignments = [];
+
+    // Add consolidated assignments first
     for (const a of userAssignments) {
+      recurringAssignments.push({
+        id: a.assignment_id,
+        event_id: a.event_id,
+        event_date: a.event_date,
+        assignment_type: a.assignment_type,
+        status: a.status,
+        notes: a.notes,
+        event_name: a.event_name,
+        location: a.location,
+        day_of_week: a.day_of_week,
+        start_time: a.start_time,
+        end_time: a.end_time,
+        child_name: a.child_names, // This will show all children names
+        assigned_parent_name: a.assigned_parent_name,
+        child_parent_id: a.child_parent_id,
+        user_id: userId,
+        child_count: a.child_count,
+        is_consolidated: true // Flag to indicate this is a consolidated entry
+      });
+    }
+
+    // Add individual assignments only if they're not covered by a consolidated assignment
+    const seenIndividualKeys = new Set();
+    for (const a of childAssignments) {
       const key = `${a.event_id}_${a.child_id}_${a.assignment_type}`;
-      if (!seenUser.has(key)) {
-        recurringAssignments.push(a);
-        seenUser.add(key);
+      const consolidatedKey = `${a.event_id}_${a.event_date}_${a.assignment_type}`;
+      
+      // Skip if this child's assignment is covered by a consolidated assignment
+      if (consolidatedKeys.has(consolidatedKey)) {
+        continue;
+      }
+      
+      // Skip if we've already seen this individual assignment
+      if (seenIndividualKeys.has(key)) {
+        continue;
+      }
+      
+      seenIndividualKeys.add(key);
+      recurringAssignments.push({
+        id: a.id,
+        event_id: a.event_id,
+        event_date: a.event_date,
+        assignment_type: a.assignment_type,
+        status: a.status,
+        notes: a.notes,
+        event_name: a.event_name,
+        location: a.location,
+        day_of_week: a.day_of_week,
+        start_time: a.start_time,
+        end_time: a.end_time,
+        child_name: a.child_name,
+        assigned_parent_name: a.assigned_parent_name,
+        child_parent_id: a.child_parent_id,
+        user_id: a.user_id,
+        child_count: 1,
+        is_consolidated: false
+      });
+    }
+
+    // Add driver assignments (where user is the driver but not covered by consolidated assignments)
+    const seenDriverKeys = new Set();
+    for (const a of driverAssignments) {
+      const key = `${a.event_id}_${a.child_id}_${a.assignment_type}`;
+      const consolidatedKey = `${a.event_id}_${a.event_date}_${a.assignment_type}`;
+      
+      // Skip if this assignment is covered by a consolidated assignment
+      if (consolidatedKeys.has(consolidatedKey)) {
+        continue;
+      }
+      
+      // Skip if we've already seen this driver assignment
+      if (seenDriverKeys.has(key)) {
+        continue;
+      }
+      
+      seenDriverKeys.add(key);
+      recurringAssignments.push({
+        id: a.id,
+        event_id: a.event_id,
+        event_date: a.event_date,
+        assignment_type: a.assignment_type,
+        status: a.status,
+        notes: a.notes,
+        event_name: a.event_name,
+        location: a.location,
+        day_of_week: a.day_of_week,
+        start_time: a.start_time,
+        end_time: a.end_time,
+        child_name: a.child_name,
+        assigned_parent_name: a.assigned_parent_name,
+        child_parent_id: a.child_parent_id,
+        user_id: a.user_id,
+        child_count: 1,
+        is_consolidated: false
+      });
+    }
+
+    // --- Unassigned Group Event Instances ---
+    // Filter by date range (default: next 7 days)
+    let days = 7;
+    if (range === '30') days = 30;
+    if (range === '60') days = 60;
+    const [unassignedGroupInstances] = await db.query(`
+      SELECT ei.*, re.name AS event_name, re.location, re.day_of_week, re.start_time, re.end_time, u.name AS driver_name
+      FROM EventInstances ei
+      JOIN RecurringEvents re ON ei.event_id = re.id
+      JOIN EventGroupMembers egm ON re.id = egm.event_id
+      LEFT JOIN Users u ON ei.driver_id = u.id
+      WHERE egm.user_id = ? AND egm.role = 'parent' AND egm.is_active = TRUE
+        AND ei.event_date >= CURDATE()
+        AND ei.event_date <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
+        AND (ei.driver_id IS NULL OR ei.driver_id != ?)
+      ORDER BY ei.event_date ASC, re.name
+      LIMIT 20
+    `, [userId, days, userId]);
+
+    // --- Admin Group Assignments ---
+    let adminGroupAssignments = [];
+    // Find group events where user is admin
+    const [adminGroups] = await db.query(`
+      SELECT event_id FROM EventGroupMembers WHERE user_id = ? AND role = 'admin' AND is_active = TRUE
+    `, [userId]);
+    if (adminGroups.length > 0) {
+      const adminEventIds = adminGroups.map(g => g.event_id);
+      // Fetch all assignments for these events (upcoming only)
+      if (adminEventIds.length > 0) {
+        const [allAssignments] = await db.query(`
+          SELECT ea.*, re.name AS event_name, re.location, re.day_of_week, re.start_time, re.end_time, c.name AS child_name, u.name AS assigned_parent_name
+          FROM EventAssignments ea
+          JOIN RecurringEvents re ON ea.event_id = re.id
+          JOIN Children c ON ea.child_id = c.id
+          JOIN Users u ON ea.user_id = u.id
+          WHERE ea.event_id IN (?) AND ea.event_date >= CURDATE() AND ea.status != 'cancelled' AND ea.is_cancelled = FALSE
+          ORDER BY ea.event_date ASC, re.name, ea.assignment_type
+        `, [adminEventIds]);
+        adminGroupAssignments = allAssignments;
       }
     }
 
@@ -206,7 +366,10 @@ router.get('/', async (req, res) => {
       filter,
       expired,
       success: req.query.success || req.session.success,
-      recurringAssignments
+      recurringAssignments,
+      unassignedGroupInstances, // <-- pass to template
+      range, // <-- pass selected range to template
+      adminGroupAssignments // <-- pass to template
     });
 
     // Clear session success message after passing it to template

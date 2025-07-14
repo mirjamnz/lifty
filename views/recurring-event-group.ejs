@@ -167,7 +167,7 @@
                       </div>
                     <% } %>
                     <div class="mt-1">
-                      <% if (member.can_drive) { %>
+                      <% if (member.can_drive || instances.some(instance => instance.driver_id === member.user_id)) { %>
                         <span class="badge bg-success">Can Drive</span>
                       <% } %>
                       <% if (member.role === 'admin') { %>
@@ -256,7 +256,11 @@
             <label for="driver_id" class="form-label">Select Driver</label>
             <select class="form-select" name="driver_id" required>
               <option value="">Choose a driver...</option>
-              <% members.filter(m => m.can_drive && m.role === 'parent').forEach(member => { %>
+              <% 
+                // Show all parent members as potential drivers
+                const availableDrivers = members.filter(m => m.role === 'parent');
+                availableDrivers.forEach(member => { 
+              %>
                 <option value="<%= member.user_id %>"><%= member.user_name %></option>
               <% }) %>
             </select>

@@ -162,6 +162,21 @@ router.post('/:eventId/join', requireAuth, async (req, res) => {
       VALUES (?, ?, 'parent', ?)
     `, [eventId, userId, can_drive === 'on']);
     
+    // Check if user is already assigned as a driver for this event
+    const [existingDriverAssignments] = await db.query(`
+      SELECT COUNT(*) as count FROM EventAssignments 
+      WHERE event_id = ? AND user_id = ? AND status != 'cancelled'
+    `, [eventId, userId]);
+    
+    // If user is already assigned as a driver, update their can_drive flag
+    if (existingDriverAssignments[0].count > 0) {
+      await db.query(`
+        UPDATE EventGroupMembers 
+        SET can_drive = TRUE 
+        WHERE event_id = ? AND user_id = ?
+      `, [eventId, userId]);
+    }
+    
     // Add children if selected
     if (child_ids && Array.isArray(child_ids)) {
       for (const childId of child_ids) {
@@ -197,10 +212,14 @@ router.post('/:eventId/join', requireAuth, async (req, res) => {
 // POST /recurring-event-groups/:eventId/confirm-attendance - Confirm child attendance
 router.post('/:eventId/confirm-attendance', requireAuth, requireGroupAccess, async (req, res) => {
   const eventId = req.params.eventId;
-  const { child_id, will_attend, instance_date } = req.body;
+  let { child_id, will_attend, instance_date } = req.body;
   const userId = req.session.userId;
   
   try {
+    // Convert instance_date to YYYY-MM-DD format
+    const dateObj = new Date(instance_date);
+    const formattedDate = dateObj.toISOString().split('T')[0];
+
     // Verify the child belongs to this user
     const [children] = await db.query(`
       SELECT c.* FROM Children c
@@ -217,7 +236,7 @@ router.post('/:eventId/confirm-attendance', requireAuth, requireGroupAccess, asy
     const [[existingInstance]] = await db.query(`
       SELECT id FROM EventInstances 
       WHERE event_id = ? AND event_date = ?
-    `, [eventId, instance_date]);
+    `, [eventId, formattedDate]);
     
     if (existingInstance) {
       instanceId = existingInstance.id;
@@ -225,7 +244,7 @@ router.post('/:eventId/confirm-attendance', requireAuth, requireGroupAccess, asy
       const [result] = await db.query(`
         INSERT INTO EventInstances (event_id, event_date) 
         VALUES (?, ?)
-      `, [eventId, instance_date]);
+      `, [eventId, formattedDate]);
       instanceId = result.insertId;
     }
     
@@ -254,7 +273,7 @@ router.post('/:eventId/confirm-attendance', requireAuth, requireGroupAccess, asy
     await db.query(`
       INSERT INTO EventGroupMessages (event_id, sender_id, message, message_type)
       VALUES (?, ?, ?, 'general')
-    `, [eventId, userId, `${childName} ${status} on ${instance_date}`]);
+    `, [eventId, userId, `${childName} ${status} on ${formattedDate}`]);
     
     res.redirect(`/recurring-event-groups/${eventId}?success=Attendance confirmed`);
   } catch (err) {
@@ -266,18 +285,22 @@ router.post('/:eventId/confirm-attendance', requireAuth, requireGroupAccess, asy
 // POST /recurring-event-groups/:eventId/assign-driver - Assign driver for an instance
 router.post('/:eventId/assign-driver', requireAuth, requireGroupAccess, async (req, res) => {
   const eventId = req.params.eventId;
-  const { instance_date, driver_id } = req.body;
+  let { instance_date, driver_id } = req.body;
   const userId = req.session.userId;
-  
+
   try {
-    // Verify the driver is a group member who can drive
+    // Convert instance_date to YYYY-MM-DD format
+    const dateObj = new Date(instance_date);
+    const formattedDate = dateObj.toISOString().split('T')[0];
+
+    // Verify the driver is a group member (parent role)
     const [driver] = await db.query(`
       SELECT * FROM EventGroupMembers 
-      WHERE event_id = ? AND user_id = ? AND can_drive = TRUE AND is_active = TRUE
+      WHERE event_id = ? AND user_id = ? AND role = 'parent' AND is_active = TRUE
     `, [eventId, driver_id]);
     
     if (driver.length === 0) {
-      return res.status(400).send('Selected driver is not available or cannot drive.');
+      return res.status(400).send('Selected driver is not a valid group member.');
     }
     
     // Get or create event instance
@@ -285,7 +308,7 @@ router.post('/:eventId/assign-driver', requireAuth, requireGroupAccess, async (r
     const [[existingInstance]] = await db.query(`
       SELECT id FROM EventInstances 
       WHERE event_id = ? AND event_date = ?
-    `, [eventId, instance_date]);
+    `, [eventId, formattedDate]);
     
     if (existingInstance) {
       instanceId = existingInstance.id;
@@ -298,16 +321,23 @@ router.post('/:eventId/assign-driver', requireAuth, requireGroupAccess, async (r
       const [result] = await db.query(`
         INSERT INTO EventInstances (event_id, event_date, driver_id, driver_assigned_at, driver_assigned_by)
         VALUES (?, ?, ?, NOW(), ?)
-      `, [eventId, instance_date, driver_id, userId]);
+      `, [eventId, formattedDate, driver_id, userId]);
       instanceId = result.insertId;
     }
+    
+    // Update the user's can_drive flag to TRUE since they're now assigned as a driver
+    await db.query(`
+      UPDATE EventGroupMembers 
+      SET can_drive = TRUE 
+      WHERE event_id = ? AND user_id = ?
+    `, [eventId, driver_id]);
     
     // Send group message about driver assignment
     const driverName = driver[0].user_name;
     await db.query(`
       INSERT INTO EventGroupMessages (event_id, sender_id, message, message_type)
       VALUES (?, ?, ?, 'assignment')
-    `, [eventId, userId, `${driverName} has been assigned as driver for ${instance_date}`]);
+    `, [eventId, userId, `${driverName} has been assigned as driver for ${formattedDate}`]);
     
     res.redirect(`/recurring-event-groups/${eventId}?success=Driver assigned`);
   } catch (err) {
