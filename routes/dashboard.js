@@ -62,6 +62,9 @@ router.get('/dashboard', async (req, res) => {
     const childIds = children.map(c => c.id);
     let calendarEvents = [];
     
+    // Define today for date calculations
+    const today = new Date();
+    
     // Get ride offers where user is the driver (RideOffers)
     const [rideOffers] = await db.query(`
       SELECT ro.id, ro.pickup_time, ro.school as dropoff_location, 'Home' as pickup_location, 'offer' as type
@@ -107,7 +110,93 @@ router.get('/dashboard', async (req, res) => {
       `, [childIds]);
     }
 
+    // Get recurring events where user is a group member (for the next 4 weeks)
+    let groupRecurringEvents = [];
+    const [groupEvents] = await db.query(`
+      SELECT DISTINCT re.id, re.name as event_name, re.day_of_week, re.start_time, re.end_time, re.location
+      FROM RecurringEvents re
+      JOIN EventGroupMembers egm ON re.id = egm.event_id
+      WHERE egm.user_id = ? AND egm.is_active = TRUE AND re.is_active = TRUE
+      ORDER BY re.day_of_week, re.start_time
+    `, [userId]);
+
+    // Generate next 4 weeks of occurrences for group events
+    for (const event of groupEvents) {
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const eventDayIndex = dayNames.indexOf(event.day_of_week);
+      
+      for (let week = 0; week < 4; week++) {
+        const eventDate = new Date(today);
+        eventDate.setDate(today.getDate() + (week * 7));
+        
+        // Find the next occurrence of this day of the week
+        while (eventDate.getDay() !== eventDayIndex) {
+          eventDate.setDate(eventDate.getDate() + 1);
+        }
+        
+        // Only add if it's in the future
+        if (eventDate >= today) {
+          groupRecurringEvents.push({
+            id: `group_event_${event.id}_${eventDate.toISOString().split('T')[0]}`,
+            event_date: eventDate.toISOString().split('T')[0],
+            event_name: event.event_name,
+            day_of_week: event.day_of_week,
+            start_time: event.start_time,
+            end_time: event.end_time,
+            location: event.location,
+            type: 'group_recurring'
+          });
+        }
+      }
+    }
+
+    // Get recurring events where user's children are subscribed (for the next 4 weeks)
+    let subscribedRecurringEvents = [];
+    if (childIds.length > 0) {
+      const [subscribedEvents] = await db.query(`
+        SELECT DISTINCT re.id, re.name as event_name, re.day_of_week, re.start_time, re.end_time, re.location, c.name as child_name, 'subscribed_recurring' as type
+        FROM RecurringEvents re
+        JOIN EventSubscriptions es ON re.id = es.event_id
+        JOIN Children c ON es.child_id = c.id
+        WHERE es.child_id IN (?) AND re.is_active = TRUE
+        ORDER BY re.day_of_week, re.start_time
+      `, [childIds]);
+
+      // Generate next 4 weeks of occurrences for subscribed events
+      for (const event of subscribedEvents) {
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const eventDayIndex = dayNames.indexOf(event.day_of_week);
+        
+        for (let week = 0; week < 4; week++) {
+          const eventDate = new Date(today);
+          eventDate.setDate(today.getDate() + (week * 7));
+          
+          // Find the next occurrence of this day of the week
+          while (eventDate.getDay() !== eventDayIndex) {
+            eventDate.setDate(eventDate.getDate() + 1);
+          }
+          
+          // Only add if it's in the future
+          if (eventDate >= today) {
+            subscribedRecurringEvents.push({
+              id: `subscribed_event_${event.id}_${eventDate.toISOString().split('T')[0]}`,
+              event_date: eventDate.toISOString().split('T')[0],
+              event_name: event.event_name,
+              day_of_week: event.day_of_week,
+              start_time: event.start_time,
+              end_time: event.end_time,
+              location: event.location,
+              child_name: event.child_name,
+              type: event.type
+            });
+          }
+        }
+      }
+    }
+
     console.log('Recurring assignments found:', recurringAssignments.length);
+    console.log('Group recurring events found:', groupRecurringEvents.length);
+    console.log('Subscribed recurring events found:', subscribedRecurringEvents.length);
 
     // Format events for FullCalendar
     calendarEvents = [
@@ -146,6 +235,26 @@ router.get('/dashboard', async (req, res) => {
         description: `${event.location}`,
         backgroundColor: '#ffc107',
         borderColor: '#e0a800',
+        type: event.type
+      })),
+      ...groupRecurringEvents.map(event => ({
+        id: event.id,
+        title: `${event.event_name}`,
+        start: `${event.event_date}T${event.start_time}`,
+        end: event.end_time ? `${event.event_date}T${event.end_time}` : undefined,
+        description: `${event.location}`,
+        backgroundColor: '#007bff',
+        borderColor: '#0056b3',
+        type: event.type
+      })),
+      ...subscribedRecurringEvents.map(event => ({
+        id: event.id,
+        title: `${event.event_name} (${event.child_name})`,
+        start: `${event.event_date}T${event.start_time}`,
+        end: event.end_time ? `${event.event_date}T${event.end_time}` : undefined,
+        description: `${event.location}`,
+        backgroundColor: '#6c757d',
+        borderColor: '#5a6268',
         type: event.type
       }))
     ];
@@ -453,6 +562,89 @@ router.get('/api/calendar-events', async (req, res) => {
       );
     }
 
+    // Get recurring events where user is a group member (for the next 4 weeks)
+    let groupRecurringEvents = [];
+    const [groupEvents] = await db.query(`
+      SELECT DISTINCT re.id, re.name as event_name, re.day_of_week, re.start_time, re.end_time, re.location
+      FROM RecurringEvents re
+      JOIN EventGroupMembers egm ON re.id = egm.event_id
+      WHERE egm.user_id = ? AND egm.is_active = TRUE AND re.is_active = TRUE
+      ORDER BY re.day_of_week, re.start_time
+    `, [userId]);
+
+    // Generate next 4 weeks of occurrences for group events
+    const today = new Date();
+    for (const event of groupEvents) {
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const eventDayIndex = dayNames.indexOf(event.day_of_week);
+      
+      for (let week = 0; week < 4; week++) {
+        const eventDate = new Date(today);
+        eventDate.setDate(today.getDate() + (week * 7));
+        
+        // Find the next occurrence of this day of the week
+        while (eventDate.getDay() !== eventDayIndex) {
+          eventDate.setDate(eventDate.getDate() + 1);
+        }
+        
+        // Only add if it's in the future
+        if (eventDate >= today) {
+          groupRecurringEvents.push({
+            id: `group_event_${event.id}_${eventDate.toISOString().split('T')[0]}`,
+            event_date: eventDate.toISOString().split('T')[0],
+            event_name: event.event_name,
+            day_of_week: event.day_of_week,
+            start_time: event.start_time,
+            end_time: event.end_time,
+            location: event.location
+          });
+        }
+      }
+    }
+
+    // Get recurring events where user's children are subscribed (for the next 4 weeks)
+    let subscribedRecurringEvents = [];
+    if (childIds.length > 0) {
+      const [subscribedEvents] = await db.query(`
+        SELECT DISTINCT re.id, re.name as event_name, re.day_of_week, re.start_time, re.end_time, re.location, c.name as child_name
+        FROM RecurringEvents re
+        JOIN EventSubscriptions es ON re.id = es.event_id
+        JOIN Children c ON es.child_id = c.id
+        WHERE es.child_id IN (?) AND re.is_active = TRUE
+        ORDER BY re.day_of_week, re.start_time
+      `, [childIds]);
+
+      // Generate next 4 weeks of occurrences for subscribed events
+      for (const event of subscribedEvents) {
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const eventDayIndex = dayNames.indexOf(event.day_of_week);
+        
+        for (let week = 0; week < 4; week++) {
+          const eventDate = new Date(today);
+          eventDate.setDate(today.getDate() + (week * 7));
+          
+          // Find the next occurrence of this day of the week
+          while (eventDate.getDay() !== eventDayIndex) {
+            eventDate.setDate(eventDate.getDate() + 1);
+          }
+          
+          // Only add if it's in the future
+          if (eventDate >= today) {
+            subscribedRecurringEvents.push({
+              id: `subscribed_event_${event.id}_${eventDate.toISOString().split('T')[0]}`,
+              event_date: eventDate.toISOString().split('T')[0],
+              event_name: event.event_name,
+              day_of_week: event.day_of_week,
+              start_time: event.start_time,
+              end_time: event.end_time,
+              location: event.location,
+              child_name: event.child_name
+            });
+          }
+        }
+      }
+    }
+
     // 4. Format all events for FullCalendar
     const events = [];
     // Ride offers (as driver)
@@ -480,6 +672,32 @@ router.get('/api/calendar-events', async (req, res) => {
         start: `${assignment.event_date}T${assignment.start_time}`,
         end: assignment.end_time ? `${assignment.event_date}T${assignment.end_time}` : undefined,
         description: `${assignment.child_name} has ${assignment.event_name} at ${assignment.location}`
+      });
+    }
+
+    // Group recurring events
+    for (const event of groupRecurringEvents) {
+      events.push({
+        title: `${event.event_name}`,
+        start: `${event.event_date}T${event.start_time}`,
+        end: event.end_time ? `${event.event_date}T${event.end_time}` : undefined,
+        description: `${event.location}`,
+        backgroundColor: '#007bff',
+        borderColor: '#0056b3',
+        type: 'group_recurring'
+      });
+    }
+
+    // Subscribed recurring events
+    for (const event of subscribedRecurringEvents) {
+      events.push({
+        title: `${event.event_name} (${event.child_name})`,
+        start: `${event.event_date}T${event.start_time}`,
+        end: event.end_time ? `${event.event_date}T${event.end_time}` : undefined,
+        description: `${event.location}`,
+        backgroundColor: '#6c757d',
+        borderColor: '#5a6268',
+        type: 'subscribed_recurring'
       });
     }
 
@@ -526,6 +744,9 @@ router.get('/calendar', async (req, res) => {
     const childIds = children.map(c => c.id);
     let calendarEvents = [];
     
+    // Define today for date calculations
+    const today = new Date();
+    
     // Get ride offers where user is the driver (RideOffers)
     const [rideOffers] = await db.query(`
       SELECT ro.id, ro.pickup_time, ro.school as dropoff_location, 'Home' as pickup_location, 'offer' as type
@@ -565,6 +786,90 @@ router.get('/calendar', async (req, res) => {
       `, [childIds]);
     }
 
+    // Get recurring events where user is a group member (for the next 4 weeks)
+    let groupRecurringEvents = [];
+    const [groupEvents] = await db.query(`
+      SELECT DISTINCT re.id, re.name as event_name, re.day_of_week, re.start_time, re.end_time, re.location, 'group_recurring' as type
+      FROM RecurringEvents re
+      JOIN EventGroupMembers egm ON re.id = egm.event_id
+      WHERE egm.user_id = ? AND egm.is_active = TRUE AND re.is_active = TRUE
+      ORDER BY re.day_of_week, re.start_time
+    `, [userId]);
+
+    // Generate next 4 weeks of occurrences for group events
+    for (const event of groupEvents) {
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const eventDayIndex = dayNames.indexOf(event.day_of_week);
+      
+      for (let week = 0; week < 4; week++) {
+        const eventDate = new Date(today);
+        eventDate.setDate(today.getDate() + (week * 7));
+        
+        // Find the next occurrence of this day of the week
+        while (eventDate.getDay() !== eventDayIndex) {
+          eventDate.setDate(eventDate.getDate() + 1);
+        }
+        
+        // Only add if it's in the future
+        if (eventDate >= today) {
+          groupRecurringEvents.push({
+            id: `group_event_${event.id}_${eventDate.toISOString().split('T')[0]}`,
+            event_date: eventDate.toISOString().split('T')[0],
+            event_name: event.event_name,
+            day_of_week: event.day_of_week,
+            start_time: event.start_time,
+            end_time: event.end_time,
+            location: event.location,
+            type: event.type
+          });
+        }
+      }
+    }
+
+    // Get recurring events where user's children are subscribed (for the next 4 weeks)
+    let subscribedRecurringEvents = [];
+    if (childIds.length > 0) {
+      const [subscribedEvents] = await db.query(`
+        SELECT DISTINCT re.id, re.name as event_name, re.day_of_week, re.start_time, re.end_time, re.location, c.name as child_name, 'subscribed_recurring' as type
+        FROM RecurringEvents re
+        JOIN EventSubscriptions es ON re.id = es.event_id
+        JOIN Children c ON es.child_id = c.id
+        WHERE es.child_id IN (?) AND re.is_active = TRUE
+        ORDER BY re.day_of_week, re.start_time
+      `, [childIds]);
+
+      // Generate next 4 weeks of occurrences for subscribed events
+      for (const event of subscribedEvents) {
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const eventDayIndex = dayNames.indexOf(event.day_of_week);
+        
+        for (let week = 0; week < 4; week++) {
+          const eventDate = new Date(today);
+          eventDate.setDate(today.getDate() + (week * 7));
+          
+          // Find the next occurrence of this day of the week
+          while (eventDate.getDay() !== eventDayIndex) {
+            eventDate.setDate(eventDate.getDate() + 1);
+          }
+          
+          // Only add if it's in the future
+          if (eventDate >= today) {
+            subscribedRecurringEvents.push({
+              id: `subscribed_event_${event.id}_${eventDate.toISOString().split('T')[0]}`,
+              event_date: eventDate.toISOString().split('T')[0],
+              event_name: event.event_name,
+              day_of_week: event.day_of_week,
+              start_time: event.start_time,
+              end_time: event.end_time,
+              location: event.location,
+              child_name: event.child_name,
+              type: event.type
+            });
+          }
+        }
+      }
+    }
+
     // Format events for FullCalendar
     calendarEvents = [
       ...rideOffers.map(offer => ({
@@ -602,6 +907,26 @@ router.get('/calendar', async (req, res) => {
         description: `${event.location}`,
         backgroundColor: '#ffc107',
         borderColor: '#e0a800',
+        type: event.type
+      })),
+      ...groupRecurringEvents.map(event => ({
+        id: event.id,
+        title: `${event.event_name}`,
+        start: `${event.event_date}T${event.start_time}`,
+        end: event.end_time ? `${event.event_date}T${event.end_time}` : undefined,
+        description: `${event.location}`,
+        backgroundColor: '#007bff',
+        borderColor: '#0056b3',
+        type: event.type
+      })),
+      ...subscribedRecurringEvents.map(event => ({
+        id: event.id,
+        title: `${event.event_name} (${event.child_name})`,
+        start: `${event.event_date}T${event.start_time}`,
+        end: event.end_time ? `${event.event_date}T${event.end_time}` : undefined,
+        description: `${event.location}`,
+        backgroundColor: '#6c757d',
+        borderColor: '#5a6268',
         type: event.type
       }))
     ];

@@ -30,6 +30,18 @@
   color: #212529 !important;
 }
 
+.event-group-recurring {
+  background-color: #007bff !important;
+  border-color: #0056b3 !important;
+  color: white !important;
+}
+
+.event-subscribed-recurring {
+  background-color: #6c757d !important;
+  border-color: #5a6268 !important;
+  color: white !important;
+}
+
 /* Weekend styling */
 .fc-day-sun, .fc-day-sat {
   background-color: #f8f9fa !important;
@@ -143,6 +155,8 @@
 .legend-drive { background-color: #dc3545; }
 .legend-ride { background-color: #28a745; }
 .legend-recurring { background-color: #ffc107; }
+.legend-group-recurring { background-color: #007bff; }
+.legend-subscribed-recurring { background-color: #6c757d; }
 </style>
 
 <div class="container py-5">
@@ -523,6 +537,14 @@
               <div class="legend-color legend-recurring"></div>
               <span>Recurring Event</span>
             </div>
+            <div class="legend-item">
+              <div class="legend-color legend-group-recurring"></div>
+              <span>Group Event</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color legend-subscribed-recurring"></div>
+              <span>Subscribed Event</span>
+            </div>
           </div>
           
           <!-- Quick Actions -->
@@ -750,6 +772,10 @@ document.addEventListener('DOMContentLoaded', function() {
           classes.push('event-ride');
         } else if (event.extendedProps.type === 'recurring') {
           classes.push('event-recurring');
+        } else if (event.extendedProps.type === 'group_recurring') {
+          classes.push('event-group-recurring');
+        } else if (event.extendedProps.type === 'subscribed_recurring') {
+          classes.push('event-subscribed-recurring');
         }
         
         return classes;

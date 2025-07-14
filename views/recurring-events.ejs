@@ -65,7 +65,7 @@
                         </small>
                       </p>
                       <div class="d-flex justify-content-between">
-                        <a href="/recurring-events/<%= membership.event_id %>/group" 
+                        <a href="/recurring-event-groups/<%= membership.event_id %>" 
                            class="btn btn-outline-info btn-sm">
                           <i class="fas fa-users me-1"></i>Group
                         </a>
@@ -213,7 +213,7 @@
                     <div class="card-footer">
                       <div class="d-flex justify-content-between align-items-center">
                         <% if (event.is_group_event) { %>
-                          <a href="/recurring-events/<%= event.id %>/group" 
+                          <a href="/recurring-event-groups/<%= event.id %>" 
                              class="btn btn-outline-info btn-sm">
                             <i class="fas fa-users me-1"></i>Join Group
                           </a>

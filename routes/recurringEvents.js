@@ -8,7 +8,7 @@ router.get('/', async (req, res) => {
   if (!userId) return res.redirect('/login');
 
   try {
-    // Get all active events
+    // Get all active events (excluding private events the user hasn't been invited to)
     const [events] = await db.query(
       `SELECT re.*, u.name AS created_by_name,
               (SELECT COUNT(*) FROM EventSubscriptions WHERE event_id = re.id) AS subscriber_count,
@@ -16,7 +16,20 @@ router.get('/', async (req, res) => {
        FROM RecurringEvents re
        JOIN Users u ON re.created_by = u.id
        WHERE re.is_active = TRUE
-       ORDER BY re.day_of_week, re.start_time`
+         AND (re.is_private = FALSE 
+              OR re.created_by = ? 
+              OR EXISTS (
+                SELECT 1 FROM EventGroupMembers egm 
+                WHERE egm.event_id = re.id AND egm.user_id = ? AND egm.is_active = TRUE
+              )
+              OR EXISTS (
+                SELECT 1 FROM EventGroupInvitations egi 
+                WHERE egi.event_id = re.id AND egi.invitee_email = (
+                  SELECT email FROM Users WHERE id = ?
+                ) AND egi.status = 'pending'
+              ))
+       ORDER BY re.day_of_week, re.start_time`,
+      [userId, userId, userId]
     );
 
     // Get user's children (using ParentChild join)
@@ -73,7 +86,8 @@ router.post('/create', async (req, res) => {
   const userId = req.session.userId;
   const { 
     name, description, day_of_week, start_time, end_time, location, activity_type,
-    is_group_event, max_participants, auto_assign, group_description 
+    is_group_event, is_private, max_participants, auto_assign, group_description,
+    invite_emails
   } = req.body;
 
   if (!userId || !name || !day_of_week || !start_time || !end_time || !location || !activity_type) {
@@ -83,10 +97,10 @@ router.post('/create', async (req, res) => {
   try {
     // Create the event
     const [result] = await db.query(
-      `INSERT INTO RecurringEvents (name, description, day_of_week, start_time, end_time, location, activity_type, created_by, is_group_event, max_participants, auto_assign, group_description)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO RecurringEvents (name, description, day_of_week, start_time, end_time, location, activity_type, created_by, is_group_event, is_private, max_participants, auto_assign, group_description)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [name, description, day_of_week, start_time, end_time, location, activity_type, userId, 
-       is_group_event === 'on', max_participants || null, auto_assign === 'on', group_description]
+       is_group_event === 'on', is_private === 'on', max_participants || null, auto_assign === 'on', group_description]
     );
 
     const eventId = result.insertId;
@@ -97,6 +111,27 @@ router.post('/create', async (req, res) => {
         'INSERT INTO EventGroupMembers (event_id, user_id, role) VALUES (?, ?, ?)',
         [eventId, userId, 'admin']
       );
+      
+      // Send invitations if provided
+      if (invite_emails && Array.isArray(invite_emails)) {
+        for (const email of invite_emails) {
+          if (email && email.trim()) {
+            // Check if user exists
+            const [[user]] = await db.query(
+              'SELECT id, name FROM Users WHERE email = ?',
+              [email.trim()]
+            );
+            
+            if (user) {
+              // Create invitation
+              await db.query(
+                'INSERT INTO EventGroupInvitations (event_id, inviter_id, invitee_email, invitee_name) VALUES (?, ?, ?, ?)',
+                [eventId, userId, email.trim(), user.name]
+              );
+            }
+          }
+        }
+      }
     }
 
     res.redirect('/recurring-events?success=Event created successfully');

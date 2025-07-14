@@ -1,0 +1,99 @@
+<%- include('partials/header1') %>
+<%- include(session && session.is_admin ? 'partials/navbar2' : 'partials/navbar1') %>
+
+<style>
+.join-card {
+  transition: transform 0.2s;
+}
+.join-card:hover {
+  transform: translateY(-2px);
+}
+</style>
+
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="card shadow join-card">
+        <div class="card-header bg-info text-white">
+          <h4 class="mb-0">
+            <i class="fas fa-users me-2"></i>
+            Join Event Group: <%= event.name %>
+          </h4>
+        </div>
+        <div class="card-body">
+          <!-- Event Details -->
+          <div class="row mb-4">
+            <div class="col-md-6">
+              <h6 class="text-muted">Event Details</h6>
+              <p><strong>Description:</strong> <%= event.description || 'No description' %></p>
+              <p><strong>Schedule:</strong> <%= event.day_of_week %>s, <%= event.start_time %> - <%= event.end_time %></p>
+              <p><strong>Location:</strong> <%= event.location %></p>
+            </div>
+            <div class="col-md-6">
+              <h6 class="text-muted">Group Information</h6>
+              <p><strong>Type:</strong> <%= event.activity_type %></p>
+              <p><strong>Created by:</strong> <%= event.created_by_name %></p>
+              <% if (event.group_description) { %>
+                <p><strong>Group Description:</strong> <%= event.group_description %></p>
+              <% } %>
+            </div>
+          </div>
+
+          <!-- Join Form -->
+          <form method="POST" action="/recurring-event-groups/<%= event.id %>/join">
+            <div class="mb-4">
+              <h6 class="text-muted">Driving Capability</h6>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="can_drive" id="can_drive">
+                <label class="form-check-label" for="can_drive">
+                  I can drive and am willing to help with transportation
+                </label>
+                <div class="form-text">
+                  Check this if you're available to drive children to and from events occasionally.
+                </div>
+              </div>
+            </div>
+
+            <% if (children && children.length > 0) { %>
+              <div class="mb-4">
+                <h6 class="text-muted">Children to Include</h6>
+                <p class="text-muted">Select which of your children will participate in this event:</p>
+                <% children.forEach(child => { %>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="child_ids" value="<%= child.id %>" id="child_<%= child.id %>">
+                    <label class="form-check-label" for="child_<%= child.id %>">
+                      <strong><%= child.name %></strong>
+                      <% if (child.school) { %> • <%= child.school %><% } %>
+                      <% if (child.age) { %> • Age <%= child.age %><% } %>
+                    </label>
+                  </div>
+                <% }) %>
+                <div class="form-text">
+                  You can always add or remove children later from the group page.
+                </div>
+              </div>
+            <% } else { %>
+              <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                You don't have any children added to your profile yet. You can still join as a parent member and add children later.
+              </div>
+            <% } %>
+
+            <div class="d-flex justify-content-between">
+              <a href="/recurring-events" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Events
+              </a>
+              <button type="submit" class="btn btn-success">
+                <i class="fas fa-plus me-2"></i>Join Group
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+
+<%- include('partials/footer1') %> 

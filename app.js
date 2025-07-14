@@ -89,6 +89,7 @@ const orgRoutes = require('./routes/organizations');
 const childDashboardRoutes = require('./routes/childDashboard');
 const messagesRouter = require('./routes/messages');
 const recurringEventsRouter = require('./routes/recurringEvents');
+const recurringEventGroupsRouter = require('./routes/recurringEventGroups');
 
 app.use('/', authRoutes);
 app.use('/', dashboardRoutes);
@@ -98,6 +99,7 @@ app.use('/organizations', orgRoutes);
 app.use('/', childDashboardRoutes);
 app.use('/messages', messagesRouter);
 app.use('/recurring-events', recurringEventsRouter);
+app.use('/recurring-event-groups', recurringEventGroupsRouter);
 
 // Home page
 app.get('/', (req, res) => {

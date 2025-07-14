@@ -15,16 +15,27 @@ CREATE TABLE IF NOT EXISTS EventGroupMembers (
   joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   is_active BOOLEAN DEFAULT TRUE,
   
+  -- New fields for attendance tracking
+  default_attendance BOOLEAN DEFAULT TRUE COMMENT 'Whether child attends by default',
+  attendance_confirmed BOOLEAN DEFAULT FALSE COMMENT 'Whether parent has confirmed attendance',
+  attendance_confirmed_at TIMESTAMP NULL COMMENT 'When attendance was confirmed',
+  attendance_confirmed_by INT NULL COMMENT 'Who confirmed the attendance',
+  can_drive BOOLEAN DEFAULT TRUE COMMENT 'Whether this parent can be assigned as driver',
+  preferred_driving_frequency INT DEFAULT 1 COMMENT 'How often they prefer to drive (1=weekly, 2=bi-weekly, etc.)',
+  
   FOREIGN KEY (event_id) REFERENCES RecurringEvents(id) ON DELETE CASCADE,
   FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE,
   FOREIGN KEY (child_id) REFERENCES Children(id) ON DELETE CASCADE,
+  FOREIGN KEY (attendance_confirmed_by) REFERENCES Users(id) ON DELETE SET NULL,
   
   -- Ensure unique parent-child combinations per event
   UNIQUE KEY unique_member (event_id, user_id, child_id),
   INDEX idx_event_id (event_id),
   INDEX idx_user_id (user_id),
   INDEX idx_child_id (child_id),
-  INDEX idx_is_active (is_active)
+  INDEX idx_is_active (is_active),
+  INDEX idx_attendance_confirmed (attendance_confirmed),
+  INDEX idx_can_drive (can_drive)
 );
 
 -- =====================================================
@@ -51,7 +62,59 @@ CREATE TABLE IF NOT EXISTS EventGroupMessages (
 );
 
 -- =====================================================
--- 3. EVENT GROUP INVITATIONS TABLE
+-- 3. EVENT INSTANCES TABLE (NEW)
+-- =====================================================
+-- Tracks individual occurrences of recurring events
+CREATE TABLE IF NOT EXISTS EventInstances (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  event_id INT NOT NULL,
+  event_date DATE NOT NULL,
+  driver_id INT NULL COMMENT 'Assigned driver for this instance',
+  driver_assigned_at TIMESTAMP NULL,
+  driver_assigned_by INT NULL,
+  status ENUM('pending', 'confirmed', 'completed', 'cancelled') DEFAULT 'pending',
+  notes TEXT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  
+  FOREIGN KEY (event_id) REFERENCES RecurringEvents(id) ON DELETE CASCADE,
+  FOREIGN KEY (driver_id) REFERENCES Users(id) ON DELETE SET NULL,
+  FOREIGN KEY (driver_assigned_by) REFERENCES Users(id) ON DELETE SET NULL,
+  
+  UNIQUE KEY unique_event_date (event_id, event_date),
+  INDEX idx_event_date (event_date),
+  INDEX idx_driver_id (driver_id),
+  INDEX idx_status (status)
+);
+
+-- =====================================================
+-- 4. EVENT INSTANCE ATTENDANCE TABLE (NEW)
+-- =====================================================
+-- Tracks attendance for individual event instances
+CREATE TABLE IF NOT EXISTS EventInstanceAttendance (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  instance_id INT NOT NULL,
+  child_id INT NOT NULL,
+  parent_id INT NOT NULL,
+  will_attend BOOLEAN DEFAULT TRUE,
+  confirmed_at TIMESTAMP NULL,
+  confirmed_by INT NULL,
+  notes TEXT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  
+  FOREIGN KEY (instance_id) REFERENCES EventInstances(id) ON DELETE CASCADE,
+  FOREIGN KEY (child_id) REFERENCES Children(id) ON DELETE CASCADE,
+  FOREIGN KEY (parent_id) REFERENCES Users(id) ON DELETE CASCADE,
+  FOREIGN KEY (confirmed_by) REFERENCES Users(id) ON DELETE SET NULL,
+  
+  UNIQUE KEY unique_instance_child (instance_id, child_id),
+  INDEX idx_instance_id (instance_id),
+  INDEX idx_child_id (child_id),
+  INDEX idx_will_attend (will_attend)
+);
+
+-- =====================================================
+-- 5. EVENT GROUP INVITATIONS TABLE
 -- =====================================================
 -- Track invitations to join event groups
 CREATE TABLE IF NOT EXISTS EventGroupInvitations (
@@ -76,57 +139,212 @@ CREATE TABLE IF NOT EXISTS EventGroupInvitations (
 );
 
 -- =====================================================
--- 4. MODIFY EXISTING EventAssignments TABLE
+-- 6. MODIFY EXISTING EventAssignments TABLE
 -- =====================================================
 -- Add fields to support weekly opt-out and better tracking
 
--- Add new columns to EventAssignments (if they don't exist)
-ALTER TABLE EventAssignments 
-ADD COLUMN IF NOT EXISTS is_cancelled BOOLEAN DEFAULT FALSE COMMENT 'Child opted out for this week',
-ADD COLUMN IF NOT EXISTS cancelled_by INT NULL COMMENT 'User who cancelled this assignment',
-ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMP NULL COMMENT 'When this assignment was cancelled',
-ADD COLUMN IF NOT EXISTS cancellation_reason TEXT NULL COMMENT 'Reason for cancellation (e.g., child sick)',
-ADD COLUMN IF NOT EXISTS group_assignment BOOLEAN DEFAULT FALSE COMMENT 'Whether this is part of a group event';
+-- Add new columns to EventAssignments (MariaDB compatible)
+SET @sql = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+   WHERE TABLE_SCHEMA = DATABASE() 
+   AND TABLE_NAME = 'EventAssignments' 
+   AND COLUMN_NAME = 'is_cancelled') = 0,
+  'ALTER TABLE EventAssignments ADD COLUMN is_cancelled BOOLEAN DEFAULT FALSE COMMENT "Child opted out for this week"',
+  'SELECT "Column is_cancelled already exists"'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
--- Add foreign key for cancelled_by
-ALTER TABLE EventAssignments 
-ADD CONSTRAINT fk_assignment_cancelled_by 
-FOREIGN KEY (cancelled_by) REFERENCES Users(id) ON DELETE SET NULL;
+SET @sql = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+   WHERE TABLE_SCHEMA = DATABASE() 
+   AND TABLE_NAME = 'EventAssignments' 
+   AND COLUMN_NAME = 'cancelled_by') = 0,
+  'ALTER TABLE EventAssignments ADD COLUMN cancelled_by INT NULL COMMENT "User who cancelled this assignment"',
+  'SELECT "Column cancelled_by already exists"'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+   WHERE TABLE_SCHEMA = DATABASE() 
+   AND TABLE_NAME = 'EventAssignments' 
+   AND COLUMN_NAME = 'cancelled_at') = 0,
+  'ALTER TABLE EventAssignments ADD COLUMN cancelled_at TIMESTAMP NULL COMMENT "When this assignment was cancelled"',
+  'SELECT "Column cancelled_at already exists"'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+   WHERE TABLE_SCHEMA = DATABASE() 
+   AND TABLE_NAME = 'EventAssignments' 
+   AND COLUMN_NAME = 'cancellation_reason') = 0,
+  'ALTER TABLE EventAssignments ADD COLUMN cancellation_reason TEXT NULL COMMENT "Reason for cancellation (e.g., child sick)"',
+  'SELECT "Column cancellation_reason already exists"'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+   WHERE TABLE_SCHEMA = DATABASE() 
+   AND TABLE_NAME = 'EventAssignments' 
+   AND COLUMN_NAME = 'group_assignment') = 0,
+  'ALTER TABLE EventAssignments ADD COLUMN group_assignment BOOLEAN DEFAULT FALSE COMMENT "Whether this is part of a group event"',
+  'SELECT "Column group_assignment already exists"'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add foreign key for cancelled_by (if it doesn't exist)
+SET @sql = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
+   WHERE TABLE_SCHEMA = DATABASE() 
+   AND TABLE_NAME = 'EventAssignments' 
+   AND CONSTRAINT_NAME = 'fk_assignment_cancelled_by') = 0,
+  'ALTER TABLE EventAssignments ADD CONSTRAINT fk_assignment_cancelled_by FOREIGN KEY (cancelled_by) REFERENCES Users(id) ON DELETE SET NULL',
+  'SELECT "Foreign key fk_assignment_cancelled_by already exists"'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- Add indexes for better performance
-ALTER TABLE EventAssignments 
-ADD INDEX IF NOT EXISTS idx_is_cancelled (is_cancelled),
-ADD INDEX IF NOT EXISTS idx_group_assignment (group_assignment),
-ADD INDEX IF NOT EXISTS idx_event_date_status (event_date, status, is_cancelled);
+SET @sql = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS 
+   WHERE TABLE_SCHEMA = DATABASE() 
+   AND TABLE_NAME = 'EventAssignments' 
+   AND INDEX_NAME = 'idx_is_cancelled') = 0,
+  'ALTER TABLE EventAssignments ADD INDEX idx_is_cancelled (is_cancelled)',
+  'SELECT "Index idx_is_cancelled already exists"'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS 
+   WHERE TABLE_SCHEMA = DATABASE() 
+   AND TABLE_NAME = 'EventAssignments' 
+   AND INDEX_NAME = 'idx_group_assignment') = 0,
+  'ALTER TABLE EventAssignments ADD INDEX idx_group_assignment (group_assignment)',
+  'SELECT "Index idx_group_assignment already exists"'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS 
+   WHERE TABLE_SCHEMA = DATABASE() 
+   AND TABLE_NAME = 'EventAssignments' 
+   AND INDEX_NAME = 'idx_event_date_status') = 0,
+  'ALTER TABLE EventAssignments ADD INDEX idx_event_date_status (event_date, status, is_cancelled)',
+  'SELECT "Index idx_event_date_status already exists"'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- =====================================================
--- 5. MODIFY EXISTING RecurringEvents TABLE
+-- 7. MODIFY EXISTING RecurringEvents TABLE
 -- =====================================================
 -- Add fields to support group management
 
--- Add new columns to RecurringEvents (if they don't exist)
-ALTER TABLE RecurringEvents 
-ADD COLUMN IF NOT EXISTS is_group_event BOOLEAN DEFAULT FALSE COMMENT 'Whether this is a group event with multiple families',
-ADD COLUMN IF NOT EXISTS max_participants INT NULL COMMENT 'Maximum number of participants allowed',
-ADD COLUMN IF NOT EXISTS auto_assign BOOLEAN DEFAULT FALSE COMMENT 'Whether to auto-assign drivers in rotation',
-ADD COLUMN IF NOT EXISTS group_description TEXT NULL COMMENT 'Description for group members';
+-- Add new columns to RecurringEvents (MariaDB compatible)
+SET @sql = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+   WHERE TABLE_SCHEMA = DATABASE() 
+   AND TABLE_NAME = 'RecurringEvents' 
+   AND COLUMN_NAME = 'is_group_event') = 0,
+  'ALTER TABLE RecurringEvents ADD COLUMN is_group_event BOOLEAN DEFAULT FALSE COMMENT "Whether this is a group event with multiple families"',
+  'SELECT "Column is_group_event already exists"'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+   WHERE TABLE_SCHEMA = DATABASE() 
+   AND TABLE_NAME = 'RecurringEvents' 
+   AND COLUMN_NAME = 'is_private') = 0,
+  'ALTER TABLE RecurringEvents ADD COLUMN is_private BOOLEAN DEFAULT FALSE COMMENT "Whether this event is private (only visible to invited users)"',
+  'SELECT "Column is_private already exists"'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+   WHERE TABLE_SCHEMA = DATABASE() 
+   AND TABLE_NAME = 'RecurringEvents' 
+   AND COLUMN_NAME = 'max_participants') = 0,
+  'ALTER TABLE RecurringEvents ADD COLUMN max_participants INT NULL COMMENT "Maximum number of participants allowed"',
+  'SELECT "Column max_participants already exists"'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+   WHERE TABLE_SCHEMA = DATABASE() 
+   AND TABLE_NAME = 'RecurringEvents' 
+   AND COLUMN_NAME = 'auto_assign') = 0,
+  'ALTER TABLE RecurringEvents ADD COLUMN auto_assign BOOLEAN DEFAULT FALSE COMMENT "Whether to auto-assign drivers in rotation"',
+  'SELECT "Column auto_assign already exists"'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+   WHERE TABLE_SCHEMA = DATABASE() 
+   AND TABLE_NAME = 'RecurringEvents' 
+   AND COLUMN_NAME = 'group_description') = 0,
+  'ALTER TABLE RecurringEvents ADD COLUMN group_description TEXT NULL COMMENT "Description for group members"',
+  'SELECT "Column group_description already exists"'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- Add indexes
-ALTER TABLE RecurringEvents 
-ADD INDEX IF NOT EXISTS idx_is_group_event (is_group_event);
+SET @sql = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS 
+   WHERE TABLE_SCHEMA = DATABASE() 
+   AND TABLE_NAME = 'RecurringEvents' 
+   AND INDEX_NAME = 'idx_is_group_event') = 0,
+  'ALTER TABLE RecurringEvents ADD INDEX idx_is_group_event (is_group_event)',
+  'SELECT "Index idx_is_group_event already exists"'
+));
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- =====================================================
--- 6. SAMPLE DATA FOR TESTING
+-- 8. SAMPLE DATA FOR TESTING
 -- =====================================================
 
--- Insert a sample group event (Scouts)
-INSERT INTO RecurringEvents (name, description, day_of_week, start_time, end_time, location, activity_type, created_by, is_group_event, group_description) VALUES
+-- Insert a sample group event (Scouts) - only if it doesn't exist
+INSERT IGNORE INTO RecurringEvents (name, description, day_of_week, start_time, end_time, location, activity_type, created_by, is_group_event, group_description) VALUES
 ('Scouts Weekly Meeting', 'Weekly Scouts meeting for 8-10 year olds', 'Wed', '18:00:00', '19:30:00', 'Community Center', 'Club', 1, TRUE, 'Weekly Scouts meeting. Parents take turns driving children to and from the meeting.');
 
 -- Note: Replace '1' with an actual user_id from your Users table
 
 -- =====================================================
--- 7. MIGRATION HELPER QUERIES
+-- 9. MIGRATION HELPER QUERIES
 -- =====================================================
 
 -- Update existing EventAssignments to mark them as group assignments if they exist
@@ -136,7 +354,7 @@ SET group_assignment = TRUE
 WHERE event_id IN (SELECT id FROM RecurringEvents WHERE is_group_event = TRUE);
 
 -- =====================================================
--- 8. USEFUL QUERIES FOR THE APPLICATION
+-- 10. USEFUL QUERIES FOR THE APPLICATION
 -- =====================================================
 
 -- Get all members of a group event
@@ -164,7 +382,7 @@ WHERE event_id IN (SELECT id FROM RecurringEvents WHERE is_group_event = TRUE);
 -- ORDER BY egm.sent_at ASC;
 
 -- =====================================================
--- 9. CLEANUP QUERIES (if needed)
+-- 11. CLEANUP QUERIES (if needed)
 -- =====================================================
 
 -- To remove all group-related data (use with caution):
