@@ -69,15 +69,19 @@
 .fc-header-toolbar {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  padding: 15px;
+  padding: 8px 10px;
   border-radius: 8px 8px 0 0;
   margin-bottom: 0;
 }
 
-.fc-header-toolbar h2 {
+/* Make calendar date range header (e.g., 'Jul 13 – 19, 2025') even smaller */
+.fc-header-toolbar h2,
+.fc-header-toolbar .fc-toolbar-title {
   color: white !important;
   font-weight: 600;
-  font-size: 1rem; /* Even smaller font size */
+  font-size: 0.85rem !important; /* Even smaller font size for date range */
+  line-height: 1.1;
+  margin-bottom: 0;
 }
 
 .fc-button {
@@ -85,6 +89,11 @@
   border: 1px solid rgba(255, 255, 255, 0.3) !important;
   color: white !important;
   font-weight: 500;
+  font-size: 0.75rem !important;
+  padding: 2px 10px !important;
+  height: 1.8em !important;
+  min-width: 2.2em !important;
+  border-radius: 4px !important;
   transition: all 0.3s ease;
 }
 
@@ -96,6 +105,21 @@
 .fc-button-active {
   background-color: rgba(255, 255, 255, 0.4) !important;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.fc-button-group {
+  gap: 2px;
+}
+
+.fc .fc-button-primary {
+  background-color: rgba(255,255,255,0.18) !important;
+  border: 1px solid rgba(255,255,255,0.25) !important;
+  color: #fff !important;
+}
+
+.fc .fc-icon {
+  font-size: 1em !important;
+  vertical-align: middle;
 }
 
 /* Calendar body styling */
@@ -615,7 +639,7 @@ document.addEventListener('DOMContentLoaded', function() {
       height: 350, // Smaller height for right column
       timeZone: 'local', // Use local timezone
       initialDate: new Date(), // Start with current date
-      events: <%- JSON.stringify(calendarEvents || []) %>, // Use server-provided events
+      events: calendarEvents, // Use server-provided events
       
       // Enhanced event styling
       eventDisplay: 'block',
@@ -649,10 +673,28 @@ document.addEventListener('DOMContentLoaded', function() {
         // Add click handler for more details
         info.el.addEventListener('click', function(e) {
           e.preventDefault();
-          
           // Create a custom modal-like experience
           const event = info.event;
-          
+          const isGroupRecurring = event.extendedProps.type === 'group_recurring';
+          const instanceId = event.extendedProps.instance_id || event.extendedProps.instanceId || event.id;
+
+          // Prepare button labels based on driver assignment
+          let dropoffBtnLabel = '';
+          let pickupBtnLabel = '';
+          let bothBtnLabel = '';
+          if (isGroupRecurring) {
+            dropoffBtnLabel = (event.extendedProps.dropoff_driver && event.extendedProps.dropoff_driver !== 'Unassigned')
+              ? `Take Over Drop Off at ${event.title}`
+              : `I can Drop Off at ${event.title}`;
+            pickupBtnLabel = (event.extendedProps.pickup_driver && event.extendedProps.pickup_driver !== 'Unassigned')
+              ? `Take Over Pick Up from ${event.title}`
+              : `I can Pick Up from ${event.title}`;
+            bothBtnLabel = ((event.extendedProps.dropoff_driver && event.extendedProps.dropoff_driver !== 'Unassigned') ||
+                            (event.extendedProps.pickup_driver && event.extendedProps.pickup_driver !== 'Unassigned'))
+              ? `Take Over Both`
+              : `I can Do Both`;
+          }
+
           // Create modal HTML
           const modalHTML = `
             <div class="modal fade" id="eventModal" tabindex="-1" aria-labelledby="eventModalLabel" aria-hidden="true">
@@ -688,6 +730,30 @@ document.addEventListener('DOMContentLoaded', function() {
                             hour12: true 
                           })}` : ''}
                         </div>
+                        ${isGroupRecurring ? `
+                          <div class="alert alert-secondary mb-3">
+                            <strong>Dropoff:</strong> <span class="${event.extendedProps.dropoff_driver === 'Unassigned' ? 'text-danger' : 'text-success'}">
+                              ${event.extendedProps.dropoff_driver || 'Unassigned'}
+                            </span><br>
+                            <strong>Pickup:</strong> <span class="${event.extendedProps.pickup_driver === 'Unassigned' ? 'text-danger' : 'text-success'}">
+                              ${event.extendedProps.pickup_driver || 'Unassigned'}
+                            </span>
+                          </div>
+                          <div class="mt-3">
+                            <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
+                              <input type="hidden" name="assignmentType" value="dropoff">
+                              <button type="submit" class="btn btn-primary btn-sm me-2">${dropoffBtnLabel}</button>
+                            </form>
+                            <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
+                              <input type="hidden" name="assignmentType" value="pickup">
+                              <button type="submit" class="btn btn-success btn-sm me-2">${pickupBtnLabel}</button>
+                            </form>
+                            <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
+                              <input type="hidden" name="assignmentType" value="both">
+                              <button type="submit" class="btn btn-info btn-sm">${bothBtnLabel}</button>
+                            </form>
+                          </div>
+                        ` : ''}
                       </div>
                     </div>
                   </div>
@@ -895,12 +961,12 @@ function initLiftyMaps() {
   // Community map
   var mapElement = document.getElementById('map');
   if (mapElement && typeof google !== 'undefined' && google.maps) {
-    var userLat = <%= (user && user.home_lat != null) ? parseFloat(user.home_lat) : 'null' %>;
-    var userLng = <%= (user && user.home_lng != null) ? parseFloat(user.home_lng) : 'null' %>;
+    var userLat = <%= (user && user.home_lat != null) ? Number(user.home_lat) : 'null' %>;
+    var userLng = <%= (user && user.home_lng != null) ? Number(user.home_lng) : 'null' %>;
     var neighbors = <%- JSON.stringify(neighbors || []) %>;
     var map = new google.maps.Map(mapElement, {
       zoom: 12,
-      center: userLat && userLng ? { lat: parseFloat(userLat), lng: parseFloat(userLng) } : { lat: -36.8485, lng: 174.7633 }
+      center: (userLat !== null && userLng !== null) ? { lat: userLat, lng: userLng } : { lat: -36.8485, lng: 174.7633 }
     });
     
     // Only show user's marker if their address is not private

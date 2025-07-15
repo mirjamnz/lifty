@@ -246,6 +246,14 @@
                             </ul>
                           </div>
                         <% } %>
+                        <% if ((event.created_by === session.userId) || (groupMemberships && groupMemberships.some(m => m.event_id === event.id && m.role === 'admin'))) { %>
+                          <form method="POST" action="/recurring-events/<%= event.id %>/delete" style="display:inline;">
+                            <button type="submit" class="btn btn-outline-danger btn-sm"
+                              onclick="return confirm('Are you sure you want to delete this event? This cannot be undone for all participants!');">
+                              <i class="fas fa-trash me-1"></i>Delete
+                            </button>
+                          </form>
+                        <% } %>
                       </div>
                     </div>
                   </div>

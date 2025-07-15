@@ -328,10 +328,28 @@ router.get('/', async (req, res) => {
       WHERE egm.user_id = ? AND egm.role = 'parent' AND egm.is_active = TRUE
         AND ei.event_date >= CURDATE()
         AND ei.event_date <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
-        AND (ei.driver_id IS NULL OR ei.driver_id != ?)
+        AND (
+          -- No active dropoff assignments
+          NOT EXISTS (
+            SELECT 1 FROM EventAssignments ea 
+            WHERE ea.event_id = ei.event_id 
+            AND ea.event_date = ei.event_date 
+            AND ea.assignment_type = 'dropoff'
+            AND ea.is_cancelled = FALSE
+          )
+          OR
+          -- No active pickup assignments  
+          NOT EXISTS (
+            SELECT 1 FROM EventAssignments ea 
+            WHERE ea.event_id = ei.event_id 
+            AND ea.event_date = ei.event_date 
+            AND ea.assignment_type = 'pickup'
+            AND ea.is_cancelled = FALSE
+          )
+        )
       ORDER BY ei.event_date ASC, re.name
       LIMIT 20
-    `, [userId, days, userId]);
+    `, [userId, days]);
 
     // --- Admin Group Assignments ---
     let adminGroupAssignments = [];
@@ -356,6 +374,23 @@ router.get('/', async (req, res) => {
       }
     }
 
+    // --- My Kids' Group Assignments ---
+    let myKidsGroupAssignments = [];
+    if (children.length > 0) {
+      [myKidsGroupAssignments] = await db.query(`
+        SELECT ea.event_id, ea.event_date, ea.assignment_type, ea.status, re.name AS event_name, re.location, re.day_of_week, re.start_time, re.end_time, c.name AS child_name, u.name AS driver_name
+        FROM EventAssignments ea
+        JOIN RecurringEvents re ON ea.event_id = re.id
+        JOIN Children c ON ea.child_id = c.id
+        JOIN Users u ON ea.user_id = u.id
+        WHERE ea.child_id IN (?)
+          AND re.is_group_event = TRUE
+          AND ea.event_date >= CURDATE()
+          AND ea.status != 'cancelled' AND ea.is_cancelled = FALSE
+        ORDER BY ea.event_date ASC, re.name, ea.assignment_type, c.name
+      `, [children.map(c => c.id)]);
+    }
+
     res.render('rides', {
       session: req.session,
       children,
@@ -369,7 +404,8 @@ router.get('/', async (req, res) => {
       recurringAssignments,
       unassignedGroupInstances, // <-- pass to template
       range, // <-- pass selected range to template
-      adminGroupAssignments // <-- pass to template
+      adminGroupAssignments, // <-- pass to template
+      myKidsGroupAssignments // <-- pass to template
     });
 
     // Clear session success message after passing it to template

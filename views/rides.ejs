@@ -169,6 +169,53 @@
     </div>
   <% } %>
 
+  <% if (myKidsGroupAssignments && myKidsGroupAssignments.length > 0) { %>
+    <div class="card mb-4 border-primary">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fas fa-users me-2"></i>🧒 My Kids' Group Rides</h5>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover table-bordered align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Event</th>
+                <th>Child</th>
+                <th>Type</th>
+                <th>Date</th>
+                <th>Driver</th>
+                <th>Location</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% myKidsGroupAssignments.forEach(a => { %>
+                <tr>
+                  <td><strong><%= a.event_name %></strong></td>
+                  <td><%= a.child_name %></td>
+                  <td>
+                    <span class="badge bg-<%= a.assignment_type === 'dropoff' ? 'primary' : 'success' %>">
+                      <i class="fas fa-<%= a.assignment_type === 'dropoff' ? 'sign-in-alt' : 'sign-out-alt' %> me-1"></i>
+                      <%= a.assignment_type.charAt(0).toUpperCase() + a.assignment_type.slice(1) %>
+                    </span>
+                  </td>
+                  <td><%= new Date(a.event_date).toLocaleDateString() %></td>
+                  <td><strong><%= a.driver_name %></strong></td>
+                  <td><%= a.location %></td>
+                  <td>
+                    <span class="badge bg-<%= a.status === 'confirmed' ? 'success' : a.status === 'pending' ? 'warning text-dark' : a.status === 'completed' ? 'info' : 'secondary' %>">
+                      <%= a.status.charAt(0).toUpperCase() + a.status.slice(1) %>
+                    </span>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
   <!-- Next Upcoming Recurring Event Rides -->
   <% if (recurringAssignments && recurringAssignments.length > 0) { %>
     <div class="card mb-4 border-info">

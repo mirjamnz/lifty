@@ -801,4 +801,45 @@ router.post('/:id/add-children', async (req, res) => {
   }
 });
 
+// POST /recurring-events/:id/delete - Delete (soft) a recurring event
+router.post('/:id/delete', async (req, res) => {
+  const userId = req.session.userId;
+  const eventId = req.params.id;
+
+  if (!userId) return res.status(401).send('Not logged in');
+
+  try {
+    // Only allow the event creator or admin to delete
+    const [[event]] = await db.query('SELECT * FROM RecurringEvents WHERE id = ?', [eventId]);
+    if (!event) return res.status(404).send('Event not found');
+
+    // Check if user is creator or admin
+    let isAdmin = false;
+    if (event.created_by === userId) {
+      isAdmin = true;
+    } else {
+      // Check if user is group admin
+      const [[adminMember]] = await db.query(
+        'SELECT * FROM EventGroupMembers WHERE event_id = ? AND user_id = ? AND role = "admin" AND is_active = TRUE',
+        [eventId, userId]
+      );
+      if (adminMember) isAdmin = true;
+    }
+    if (!isAdmin) return res.status(403).send('You do not have permission to delete this event.');
+
+    // Soft delete: set is_active = FALSE
+    await db.query('UPDATE RecurringEvents SET is_active = FALSE WHERE id = ?', [eventId]);
+
+    // Optionally: clean up related data (future instances, memberships, etc.)
+    // await db.query('DELETE FROM EventInstances WHERE event_id = ?', [eventId]);
+    // await db.query('DELETE FROM EventGroupMembers WHERE event_id = ?', [eventId]);
+    // await db.query('DELETE FROM EventGroupInvitations WHERE event_id = ?', [eventId]);
+
+    res.redirect('/recurring-events?success=Event deleted successfully');
+  } catch (err) {
+    console.error('POST /recurring-events/:id/delete error:', err);
+    res.status(500).send('Failed to delete event.');
+  }
+});
+
 module.exports = router; 

@@ -136,15 +136,43 @@ router.get('/dashboard', async (req, res) => {
         
         // Only add if it's in the future
         if (eventDate >= today) {
+          const event_date_str = eventDate.toISOString().split('T')[0];
+          // Query all dropoff and pickup assignments for this event/date
+          const [dropoffDrivers] = await db.query(
+            `SELECT DISTINCT u.name AS driver_name FROM EventAssignments ea
+             JOIN Users u ON ea.user_id = u.id
+             WHERE ea.event_id = ? AND ea.event_date = ? AND ea.assignment_type = 'dropoff' AND ea.is_cancelled = FALSE`,
+            [event.id, event_date_str]
+          );
+          const [pickupDrivers] = await db.query(
+            `SELECT DISTINCT u.name AS driver_name FROM EventAssignments ea
+             JOIN Users u ON ea.user_id = u.id
+             WHERE ea.event_id = ? AND ea.event_date = ? AND ea.assignment_type = 'pickup' AND ea.is_cancelled = FALSE`,
+            [event.id, event_date_str]
+          );
+          const dropoff_driver = dropoffDrivers.length > 0
+            ? dropoffDrivers.map(d => d.driver_name).join(', ')
+            : 'Unassigned';
+          const pickup_driver = pickupDrivers.length > 0
+            ? pickupDrivers.map(d => d.driver_name).join(', ')
+            : 'Unassigned';
+          // Get the EventInstances.id for this event/date
+          const [[instance]] = await db.query(
+            'SELECT id FROM EventInstances WHERE event_id = ? AND event_date = ?',
+            [event.id, event_date_str]
+          );
           groupRecurringEvents.push({
-            id: `group_event_${event.id}_${eventDate.toISOString().split('T')[0]}`,
-            event_date: eventDate.toISOString().split('T')[0],
+            id: `group_event_${event.id}_${event_date_str}`,
+            event_date: event_date_str,
             event_name: event.event_name,
             day_of_week: event.day_of_week,
             start_time: event.start_time,
             end_time: event.end_time,
             location: event.location,
-            type: 'group_recurring'
+            type: 'group_recurring',
+            dropoff_driver: dropoff_driver,
+            pickup_driver: pickup_driver,
+            instance_id: instance ? instance.id : null
           });
         }
       }
@@ -245,7 +273,10 @@ router.get('/dashboard', async (req, res) => {
         description: `${event.location}`,
         backgroundColor: '#007bff',
         borderColor: '#0056b3',
-        type: event.type
+        type: event.type,
+        dropoff_driver: event.dropoff_driver,
+        pickup_driver: event.pickup_driver,
+        instance_id: event.instance_id
       })),
       ...subscribedRecurringEvents.map(event => ({
         id: event.id,
@@ -812,15 +843,43 @@ router.get('/calendar', async (req, res) => {
         
         // Only add if it's in the future
         if (eventDate >= today) {
+          const event_date_str = eventDate.toISOString().split('T')[0];
+          // Query all dropoff and pickup assignments for this event/date
+          const [dropoffDrivers] = await db.query(
+            `SELECT DISTINCT u.name AS driver_name FROM EventAssignments ea
+             JOIN Users u ON ea.user_id = u.id
+             WHERE ea.event_id = ? AND ea.event_date = ? AND ea.assignment_type = 'dropoff' AND ea.is_cancelled = FALSE`,
+            [event.id, event_date_str]
+          );
+          const [pickupDrivers] = await db.query(
+            `SELECT DISTINCT u.name AS driver_name FROM EventAssignments ea
+             JOIN Users u ON ea.user_id = u.id
+             WHERE ea.event_id = ? AND ea.event_date = ? AND ea.assignment_type = 'pickup' AND ea.is_cancelled = FALSE`,
+            [event.id, event_date_str]
+          );
+          const dropoff_driver = dropoffDrivers.length > 0
+            ? dropoffDrivers.map(d => d.driver_name).join(', ')
+            : 'Unassigned';
+          const pickup_driver = pickupDrivers.length > 0
+            ? pickupDrivers.map(d => d.driver_name).join(', ')
+            : 'Unassigned';
+          // Get the EventInstances.id for this event/date
+          const [[instance]] = await db.query(
+            'SELECT id FROM EventInstances WHERE event_id = ? AND event_date = ?',
+            [event.id, event_date_str]
+          );
           groupRecurringEvents.push({
-            id: `group_event_${event.id}_${eventDate.toISOString().split('T')[0]}`,
-            event_date: eventDate.toISOString().split('T')[0],
+            id: `group_event_${event.id}_${event_date_str}`,
+            event_date: event_date_str,
             event_name: event.event_name,
             day_of_week: event.day_of_week,
             start_time: event.start_time,
             end_time: event.end_time,
             location: event.location,
-            type: event.type
+            type: 'group_recurring',
+            dropoff_driver: dropoff_driver,
+            pickup_driver: pickup_driver,
+            instance_id: instance ? instance.id : null
           });
         }
       }
@@ -917,7 +976,10 @@ router.get('/calendar', async (req, res) => {
         description: `${event.location}`,
         backgroundColor: '#007bff',
         borderColor: '#0056b3',
-        type: event.type
+        type: event.type,
+        dropoff_driver: event.dropoff_driver,
+        pickup_driver: event.pickup_driver,
+        instance_id: event.instance_id
       })),
       ...subscribedRecurringEvents.map(event => ({
         id: event.id,

@@ -115,6 +115,8 @@ function requireAuth(req, res, next) {
 app.post('/event-instances/:instanceId/assign-self-driver', requireAuth, async (req, res) => {
   const instanceId = req.params.instanceId;
   const userId = req.session.userId;
+  // Accept assignmentType from body (default to 'both' for backward compatibility)
+  const assignmentType = req.body.assignmentType || 'both'; // 'dropoff', 'pickup', or 'both'
 
   try {
     // Get the event instance and event ID
@@ -131,10 +133,10 @@ app.post('/event-instances/:instanceId/assign-self-driver', requireAuth, async (
     }
     const eventId = instance.event_id;
 
-    // Check if user is a parent group member for this event
+    // Check if user is a parent group member for this event (allow both 'parent' and 'admin' roles)
     const [membership] = await db.query(`
       SELECT * FROM EventGroupMembers 
-      WHERE event_id = ? AND user_id = ? AND role = 'parent' AND is_active = TRUE
+      WHERE event_id = ? AND user_id = ? AND role IN ('parent', 'admin') AND is_active = TRUE
     `, [eventId, userId]);
     if (membership.length === 0) {
       req.session.error = 'You must be a parent group member to assign yourself as driver.';
@@ -159,17 +161,30 @@ app.post('/event-instances/:instanceId/assign-self-driver', requireAuth, async (
       'SELECT child_id FROM EventGroupMembers WHERE event_id = ? AND child_id IS NOT NULL AND is_active = TRUE',
       [eventId]
     );
+    // Determine which assignment types to create
+    let typesToAssign = [];
+    if (assignmentType === 'dropoff') typesToAssign = ['dropoff'];
+    else if (assignmentType === 'pickup') typesToAssign = ['pickup'];
+    else typesToAssign = ['dropoff', 'pickup'];
+
     for (const child of groupChildren) {
-      for (const assignment_type of ['dropoff', 'pickup']) {
+      for (const assignment_type of typesToAssign) {
         // Check if assignment already exists and is not cancelled
         const [[existingAssignment]] = await db.query(
           'SELECT id FROM EventAssignments WHERE event_id = ? AND event_date = ? AND child_id = ? AND assignment_type = ? AND is_cancelled = FALSE',
           [eventId, instance.event_date, child.child_id, assignment_type]
         );
-        if (!existingAssignment) {
+        if (existingAssignment) {
+          // Update the assignment to the new driver and set status to confirmed
           await db.query(
-            `INSERT INTO EventAssignments (event_id, event_date, user_id, child_id, assignment_type, group_assignment)
-             VALUES (?, ?, ?, ?, ?, TRUE)`,
+            'UPDATE EventAssignments SET user_id = ?, group_assignment = TRUE, status = "confirmed" WHERE id = ?',
+            [userId, existingAssignment.id]
+          );
+        } else {
+          // Create a new assignment with status confirmed
+          await db.query(
+            `INSERT INTO EventAssignments (event_id, event_date, user_id, child_id, assignment_type, group_assignment, status)
+             VALUES (?, ?, ?, ?, ?, TRUE, "confirmed")`,
             [eventId, instance.event_date, userId, child.child_id, assignment_type]
           );
         }
@@ -183,9 +198,9 @@ app.post('/event-instances/:instanceId/assign-self-driver', requireAuth, async (
     await db.query(`
       INSERT INTO EventGroupMessages (event_id, sender_id, message, message_type)
       VALUES (?, ?, ?, 'assignment')
-    `, [eventId, userId, `${user.name} has assigned themselves as driver for ${instance.event_date}`]);
+    `, [eventId, userId, `${user.name} has assigned themselves as driver for ${instance.event_date} (${typesToAssign.join(' & ')})`]);
 
-    req.session.success = 'You are now the driver for this event instance.';
+    req.session.success = `You are now the driver for this event instance (${typesToAssign.join(' & ')}).`;
     return res.redirect('/rides');
   } catch (err) {
     console.error('Assign self as driver error:', err);
