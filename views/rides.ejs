@@ -171,8 +171,16 @@
 
   <% if (myKidsGroupAssignments && myKidsGroupAssignments.length > 0) { %>
     <div class="card mb-4 border-primary">
-      <div class="card-header bg-primary text-white">
+      <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="fas fa-users me-2"></i>🧒 My Kids' Group Rides</h5>
+        <form method="get" action="/rides" class="d-flex align-items-center gap-2 mb-0">
+          <label for="range" class="form-label mb-0 me-2">Show:</label>
+          <select name="range" id="range" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="7" <%= range == '7' ? 'selected' : '' %>>Next 7 days</option>
+            <option value="30" <%= range == '30' ? 'selected' : '' %>>This Month (30 days)</option>
+            <option value="60" <%= range == '60' ? 'selected' : '' %>>Next 60 days</option>
+          </select>
+        </form>
       </div>
       <div class="card-body">
         <div class="table-responsive">
@@ -186,6 +194,7 @@
                 <th>Driver</th>
                 <th>Location</th>
                 <th>Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -206,6 +215,13 @@
                     <span class="badge bg-<%= a.status === 'confirmed' ? 'success' : a.status === 'pending' ? 'warning text-dark' : a.status === 'completed' ? 'info' : 'secondary' %>">
                       <%= a.status.charAt(0).toUpperCase() + a.status.slice(1) %>
                     </span>
+                  </td>
+                  <td>
+                    <% if (a.status === 'confirmed') { %>
+                      <a href="/recurring-events/<%= a.event_id %>/group" class="btn btn-sm btn-outline-info" target="_blank">
+                        <i class="fas fa-comments me-1"></i>Group Chat
+                      </a>
+                    <% } %>
                   </td>
                 </tr>
               <% }) %>
@@ -349,16 +365,8 @@
   <!-- Not Yet Assigned / Action Needed Section -->
   <% if (unassignedGroupInstances && unassignedGroupInstances.length > 0) { %>
     <div class="card mb-4 border-warning">
-      <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+      <div class="card-header bg-warning text-dark">
         <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Not Yet Assigned / Action Needed</h5>
-        <form method="get" action="/rides" class="d-flex align-items-center gap-2 mb-0">
-          <label for="range" class="form-label mb-0 me-2">Show:</label>
-          <select name="range" id="range" class="form-select form-select-sm" onchange="this.form.submit()">
-            <option value="7" <%= range == '7' ? 'selected' : '' %>>Next 7 days</option>
-            <option value="30" <%= range == '30' ? 'selected' : '' %>>This Month (30 days)</option>
-            <option value="60" <%= range == '60' ? 'selected' : '' %>>Next 60 days</option>
-          </select>
-        </form>
       </div>
       <div class="card-body">
         <div class="table-responsive">

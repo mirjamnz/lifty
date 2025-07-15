@@ -386,26 +386,54 @@ router.get('/', async (req, res) => {
         WHERE ea.child_id IN (?)
           AND re.is_group_event = TRUE
           AND ea.event_date >= CURDATE()
+          AND ea.event_date <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
           AND ea.status != 'cancelled' AND ea.is_cancelled = FALSE
         ORDER BY ea.event_date ASC, re.name, ea.assignment_type, c.name
-      `, [children.map(c => c.id)]);
+      `, [children.map(c => c.id), days]);
     }
+
+    // --- My Bookings Section: filter by range ---
+    const filteredMyBookings = myBookings.filter(b => {
+      const date = new Date(b.pickup_time);
+      const now = new Date();
+      const max = new Date();
+      max.setDate(now.getDate() + days);
+      return date >= now && date <= max;
+    });
+
+    // --- Upcoming Recurring Event Rides: filter by range ---
+    const filteredRecurringAssignments = recurringAssignments.filter(a => {
+      const date = new Date(a.event_date);
+      const now = new Date();
+      const max = new Date();
+      max.setDate(now.getDate() + days);
+      return date >= now && date <= max;
+    });
+
+    // --- Admin Group Assignments: filter by range ---
+    const filteredAdminGroupAssignments = adminGroupAssignments.filter(a => {
+      const date = new Date(a.event_date);
+      const now = new Date();
+      const max = new Date();
+      max.setDate(now.getDate() + days);
+      return date >= now && date <= max;
+    });
 
     res.render('rides', {
       session: req.session,
       children,
       rideOffers,
       requests,
-      userBookings,
-      myBookings,
+      userBookings: filteredMyBookings,
+      myBookings: filteredMyBookings,
       filter,
       expired,
       success: req.query.success || req.session.success,
-      recurringAssignments,
-      unassignedGroupInstances, // <-- pass to template
+      recurringAssignments: filteredRecurringAssignments,
+      unassignedGroupInstances, // <-- already filtered by range
       range, // <-- pass selected range to template
-      adminGroupAssignments, // <-- pass to template
-      myKidsGroupAssignments // <-- pass to template
+      adminGroupAssignments: filteredAdminGroupAssignments, // <-- filtered
+      myKidsGroupAssignments // <-- already filtered in SQL
     });
 
     // Clear session success message after passing it to template
