@@ -25,8 +25,8 @@ router.post('/register', async (req, res) => {
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
     const [userResult] = await db.query(
-      `INSERT INTO Users (name, email, password_hash, role)
-       VALUES (?, ?, ?, 'parent')`,
+      `INSERT INTO Users (name, email, password_hash, role, profile_completed)
+       VALUES (?, ?, ?, 'parent', 0)`,
       [name.trim(), email.trim(), hashedPassword]
     );
     const userId = userResult.insertId;
@@ -38,7 +38,14 @@ router.post('/register', async (req, res) => {
     res.redirect('/login');
   } catch (err) {
     console.error('❌ Register Error:', err);
-    res.status(500).render('register', { session: req.session });
+    // Always pass organizations to the view on error
+    let organizations = [];
+    try {
+      [organizations] = await db.query('SELECT * FROM Organizations ORDER BY name ASC');
+    } catch (e) {
+      console.error('❌ Error loading organizations for register (in error handler):', e);
+    }
+    res.status(500).render('register', { session: req.session, organizations });
   }
 });
 

@@ -12,7 +12,7 @@ router.get('/dashboard', async (req, res) => {
   try {
     // Get current user data (for home address display)
     const [[user]] = await db.query(
-      'SELECT id, name, email, home_address, home_lat, home_lng, is_address_private FROM Users WHERE id = ?',
+      'SELECT id, name, email, home_address, home_lat, home_lng, is_address_private, profile_completed FROM Users WHERE id = ?',
       [userId]
     );
 
@@ -299,10 +299,11 @@ router.get('/dashboard', async (req, res) => {
     const [organizations] = await db.query('SELECT * FROM Organizations ORDER BY name ASC');
 
     // Determine if profile is incomplete
-    const missingAddress = !user.home_address;
-    const missingChildren = children.length === 0;
-    const missingAffiliations = affiliations.length === 0;
-    const showProfileWizard = missingAddress || missingChildren || missingAffiliations;
+    // const missingAddress = !user.home_address;
+    // const missingChildren = children.length === 0;
+    // const missingAffiliations = affiliations.length === 0;
+    // const showProfileWizard = missingAddress || missingChildren || missingAffiliations;
+    const showProfileWizard = user.profile_completed !== 1 && user.profile_completed !== '1';
 
     res.render('dashboard', {
       session: req.session,
@@ -379,13 +380,26 @@ router.post('/add-child', async (req, res) => {
     return res.redirect('/dashboard');
   }
 
+  let childId = null;
   try {
+    // If a username is provided, check for uniqueness first
+    if (child_username) {
+      const [[existingUser]] = await db.query(
+        'SELECT id FROM Users WHERE username = ? OR email = ?',
+        [child_username.trim(), `${child_username.trim()}@child.local`]
+      );
+      if (existingUser) {
+        req.session.error = `Username '${child_username.trim()}' is already taken. Please choose another username.`;
+        return res.redirect('/dashboard');
+      }
+    }
+
+    // Insert child row
     const [childResult] = await db.query(
       'INSERT INTO Children (user_id, name, school, club) VALUES (?, ?, ?, ?)',
       [parentId, name.trim(), school.trim(), club?.trim() || null]
     );
-
-    const childId = childResult.insertId;
+    childId = childResult.insertId;
 
     await db.query(
       'INSERT INTO ParentChild (parent_id, child_id) VALUES (?, ?)',
@@ -426,8 +440,11 @@ router.post('/add-child', async (req, res) => {
           ]
         );
       } catch (err) {
+        // If user creation fails, delete the child row and parent-child link
+        await db.query('DELETE FROM ParentChild WHERE child_id = ?', [childId]);
+        await db.query('DELETE FROM Children WHERE id = ?', [childId]);
         console.error("❌ Failed to create child login account:", err.message);
-        req.session.error = "Child profile added, but login creation failed. Try again.";
+        req.session.error = `Child profile could not be created: ${err.message}`;
         return res.redirect('/dashboard');
       }
     }
@@ -435,8 +452,13 @@ router.post('/add-child', async (req, res) => {
     req.session.success = `✅ Child '${name}' added${child_username ? ' with login' : ''}.`;
     res.redirect('/dashboard');
   } catch (err) {
+    // If child row was created but something else failed, clean up
+    if (childId) {
+      await db.query('DELETE FROM ParentChild WHERE child_id = ?', [childId]);
+      await db.query('DELETE FROM Children WHERE id = ?', [childId]);
+    }
     console.error('❌ Add child error:', err.message, '\n', err.stack);
-    req.session.error = "Something went wrong while adding the child.";
+    req.session.error = `Something went wrong while adding the child: ${err.message}`;
     res.redirect('/dashboard');
   }
 });
@@ -1073,6 +1095,19 @@ router.post('/api/profile/children', async (req, res) => {
   } catch (err) {
     console.error('Wizard children save error:', err);
     return res.status(500).json({ success: false, error: 'Failed to save children.' });
+  }
+});
+
+// Add endpoint to mark profile as completed
+router.post('/api/profile/complete', async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    if (!userId) return res.status(401).json({ success: false, error: 'Not logged in' });
+    await db.query('UPDATE Users SET profile_completed = 1 WHERE id = ?', [userId]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error marking profile as completed:', err);
+    res.status(500).json({ success: false, error: 'Failed to mark profile as completed' });
   }
 });
 
