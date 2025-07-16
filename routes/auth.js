@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const db = require('../db');
 
 // GET /register (parents only)
@@ -30,9 +31,180 @@ router.post('/register', async (req, res) => {
   }
 });
 
+// GET /forgot-password
+router.get('/forgot-password', (req, res) => {
+  res.render('forgot-password', { 
+    error: null, 
+    success: null, 
+    session: req.session 
+  });
+});
+
+// POST /forgot-password
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  
+  if (!email) {
+    return res.render('forgot-password', {
+      error: 'Email address is required.',
+      success: null,
+      session: req.session
+    });
+  }
+
+  try {
+    // Check if user exists
+    const [[user]] = await db.query('SELECT id, name FROM Users WHERE email = ?', [email.trim()]);
+    
+    if (!user) {
+      // Don't reveal if email exists or not for security
+      return res.render('forgot-password', {
+        error: null,
+        success: 'If an account with that email exists, a password reset link has been sent.',
+        session: req.session
+      });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
+
+    // Store reset token in database
+    await db.query(
+      'UPDATE Users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?',
+      [resetToken, resetTokenExpiry, user.id]
+    );
+
+    // In a real application, you would send an email here
+    // For now, we'll just show the reset link (in production, remove this)
+    const resetUrl = `${req.protocol}://${req.get('host')}/reset-password?token=${resetToken}`;
+    
+    console.log('Password reset link for development:', resetUrl);
+
+    res.render('forgot-password', {
+      error: null,
+      success: `Password reset link sent! For development, here's the link: ${resetUrl}`,
+      session: req.session
+    });
+
+  } catch (err) {
+    console.error('❌ Forgot password error:', err);
+    res.render('forgot-password', {
+      error: 'An error occurred. Please try again.',
+      success: null,
+      session: req.session
+    });
+  }
+});
+
+// GET /reset-password
+router.get('/reset-password', async (req, res) => {
+  const { token } = req.query;
+  
+  if (!token) {
+    return res.redirect('/forgot-password');
+  }
+
+  try {
+    // Check if token is valid and not expired
+    const [[user]] = await db.query(
+      'SELECT id FROM Users WHERE reset_token = ? AND reset_token_expiry > NOW()',
+      [token]
+    );
+
+    if (!user) {
+      return res.render('forgot-password', {
+        error: 'Invalid or expired reset token. Please request a new password reset.',
+        success: null,
+        session: req.session
+      });
+    }
+
+    res.render('reset-password', {
+      token,
+      error: null,
+      session: req.session
+    });
+
+  } catch (err) {
+    console.error('❌ Reset password error:', err);
+    res.render('forgot-password', {
+      error: 'An error occurred. Please try again.',
+      success: null,
+      session: req.session
+    });
+  }
+});
+
+// POST /reset-password
+router.post('/reset-password', async (req, res) => {
+  const { token, password, confirmPassword } = req.body;
+  
+  if (!token || !password || !confirmPassword) {
+    return res.render('reset-password', {
+      token,
+      error: 'All fields are required.',
+      session: req.session
+    });
+  }
+
+  if (password !== confirmPassword) {
+    return res.render('reset-password', {
+      token,
+      error: 'Passwords do not match.',
+      session: req.session
+    });
+  }
+
+  if (password.length < 6) {
+    return res.render('reset-password', {
+      token,
+      error: 'Password must be at least 6 characters long.',
+      session: req.session
+    });
+  }
+
+  try {
+    // Check if token is valid and not expired
+    const [[user]] = await db.query(
+      'SELECT id FROM Users WHERE reset_token = ? AND reset_token_expiry > NOW()',
+      [token]
+    );
+
+    if (!user) {
+      return res.render('forgot-password', {
+        error: 'Invalid or expired reset token. Please request a new password reset.',
+        success: null,
+        session: req.session
+      });
+    }
+
+    // Hash new password and update user
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await db.query(
+      'UPDATE Users SET password_hash = ?, reset_token = NULL, reset_token_expiry = NULL WHERE id = ?',
+      [hashedPassword, user.id]
+    );
+
+    res.render('login', {
+      error: null,
+      success: 'Password has been reset successfully. You can now login with your new password.',
+      session: req.session
+    });
+
+  } catch (err) {
+    console.error('❌ Reset password error:', err);
+    res.render('reset-password', {
+      token,
+      error: 'An error occurred. Please try again.',
+      session: req.session
+    });
+  }
+});
+
 // GET /login
 router.get('/login', (req, res) => {
-  res.render('login', { error: null, session: req.session });
+  res.render('login', { error: null, success: null, session: req.session });
 });
 
 // POST /login
@@ -41,6 +213,7 @@ router.post('/login', async (req, res) => {
   if (!emailOrUsername || !password) {
     return res.render('login', {
       error: 'Both fields are required.',
+      success: null,
       session: req.session
     });
   }
@@ -58,6 +231,7 @@ router.post('/login', async (req, res) => {
     if (!user) {
       return res.render('login', {
         error: 'Invalid login credentials.',
+        success: null,
         session: req.session
       });
     }
@@ -66,6 +240,7 @@ router.post('/login', async (req, res) => {
     if (user.is_blocked) {
       return res.render('login', {
         error: 'Your account has been blocked. Please contact an administrator.',
+        success: null,
         session: req.session
       });
     }
@@ -74,6 +249,7 @@ router.post('/login', async (req, res) => {
     if (!isMatch) {
       return res.render('login', {
         error: 'Invalid login credentials.',
+        success: null,
         session: req.session
       });
     }

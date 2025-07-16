@@ -9,6 +9,10 @@
     <div class="alert alert-danger"><%= error %></div>
   <% } %>
 
+  <% if (success) { %>
+    <div class="alert alert-success"><%= success %></div>
+  <% } %>
+
   <form method="POST" action="/login" class="mx-auto" style="max-width: 400px;">
     <div class="mb-3">
       <label for="emailOrUsername" class="form-label">Email or Username</label>
@@ -35,6 +39,10 @@
 
     <button type="submit" class="btn btn-primary w-100">Login</button>
   </form>
+  
+  <div class="text-center mt-3">
+    <a href="/forgot-password" class="text-muted">Forgot your password?</a>
+  </div>
 </div>
 
 <footer class="bg-dark text-white py-4 mt-5">
