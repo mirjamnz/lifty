@@ -184,6 +184,11 @@
 .legend-recurring { background-color: #ffc107; }
 .legend-group-recurring { background-color: #007bff; }
 .legend-subscribed-recurring { background-color: #6c757d; }
+
+/* Ensure Google Maps Autocomplete dropdown appears above modal */
+.pac-container {
+  z-index: 2000 !important; /* Higher than Bootstrap modal (1050) and backdrop (1060) */
+}
 </style>
 
 <div class="container py-5">
@@ -480,8 +485,7 @@
           <form action="/add-child" method="POST">
             <div class="row g-2">
               <div class="col-md-6">
-                <input type="text"warden: wizard-home-address
-                name="name" class="form-control" placeholder="Child's Name" required autocomplete="name">
+                <input type="text" name="name" class="form-control" placeholder="Child's Name" required autocomplete="name">
               </div>
               <div class="col-md-6">
                 <input name="school" type="text" class="form-control autocomplete" data-type="school" placeholder="School Name" required autocomplete="off">
@@ -649,6 +653,14 @@
                 <div class="mb-2">
                   <label>Club (optional)</label>
                   <input type="text" class="form-control child-club-input" name="child_club" />
+                </div>
+                <div class="mb-2">
+                  <label>Child Username (for login)</label>
+                  <input type="text" class="form-control child-username-input" name="child_username" required />
+                </div>
+                <div class="mb-2">
+                  <label>Child Password (for login)</label>
+                  <input type="password" class="form-control child-password-input" name="child_password" required />
                 </div>
                 <button type="button" class="btn btn-sm btn-outline-danger remove-child-btn">Remove</button>
               </div>
@@ -970,17 +982,6 @@ document.addEventListener('DOMContentLoaded', function() {
         input.value = selected.value || selected.label || "";
         input.style.color = '#222';
         input.dispatchEvent(new Event('input', { bubbles: true }));
-      },
-      events: {
-        input: {
-          selection: (event) => {
-            const feedback = event.detail;
-            const selected = feedback.selection.value;
-            event.target.value = selected.value || selected.label || "";
-            event.target.style.color = '#222';
-            event.target.dispatchEvent(new Event('input', { bubbles: true }));
-          }
-        }
       }
     });
   });
@@ -1015,26 +1016,6 @@ document.addEventListener('DOMContentLoaded', function() {
     function clearWizardError() {
       const err = document.getElementById('wizard-error-msg');
       if (err) err.remove();
-    }
-
-    // Initialize Google Maps Autocomplete for wizard address
-    if (typeof google !== 'undefined' && google.maps) {
-      const wizardAddressInput = document.getElementById('wizard_home_address');
-      if (wizardAddressInput) {
-        const autocomplete = new google.maps.places.Autocomplete(wizardAddressInput);
-        autocomplete.addListener('place_changed', function() {
-          const place = autocomplete.getPlace();
-          if (place.geometry) {
-            document.getElementById('wizard_home_lat').value = place.geometry.location.lat();
-            document.getElementById('wizard_home_lng').value = place.geometry.location.lng();
-            clearWizardError();
-          } else {
-            showWizardError('Please select a valid address from the dropdown.');
-          }
-        });
-      }
-    } else {
-      console.error('Google Maps API not loaded for wizard address autocomplete');
     }
 
     // Wizard button event listeners
@@ -1078,11 +1059,13 @@ document.addEventListener('DOMContentLoaded', function() {
           const name = entry.querySelector('.child-name-input').value.trim();
           const org_id = entry.querySelector('.child-org-select').value;
           const club = entry.querySelector('.child-club-input').value.trim();
-          if (!name || !org_id) {
-            showWizardError('Each child must have a name and organization.');
+          const username = entry.querySelector('.child-username-input').value.trim();
+          const password = entry.querySelector('.child-password-input').value.trim();
+          if (!name || !org_id || !username || !password) {
+            showWizardError('Each child must have a name, organization, username, and password.');
             return;
           }
-          children.push({ name, org_id, club });
+          children.push({ name, org_id, club, username, password });
         }
         try {
           const resp = await fetch('/api/profile/children', {
@@ -1156,24 +1139,66 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 
-// Community Map Initialization
+// Community Map and Autocomplete Initialization
 function initLiftyMaps() {
   // Home address autocomplete
   const homeAddressInput = document.getElementById('home_address');
   if (homeAddressInput && typeof google !== 'undefined' && google.maps) {
+    console.log('Initializing autocomplete for home_address');
     const autocomplete = new google.maps.places.Autocomplete(homeAddressInput);
     autocomplete.addListener('place_changed', function() {
       const place = autocomplete.getPlace();
       if (place.geometry) {
         document.getElementById('home_lat').value = place.geometry.location.lat();
         document.getElementById('home_lng').value = place.geometry.location.lng();
+        console.log('Home address selected:', place.formatted_address, place.geometry.location);
+      } else {
+        console.log('No valid place selected for home_address');
       }
     });
+  } else {
+    console.error('Google Maps not loaded or home_address input not found');
+  }
+
+  // Wizard address autocomplete
+  const wizardAddressInput = document.getElementById('wizard_home_address');
+  if (wizardAddressInput && typeof google !== 'undefined' && google.maps) {
+    console.log('Initializing autocomplete for wizard_home_address');
+    const autocomplete = new google.maps.places.Autocomplete(wizardAddressInput, {
+      // Append dropdown to modal content to ensure correct stacking context
+      appendTo: document.querySelector('#profileWizardModal .modal-content')
+    });
+    autocomplete.addListener('place_changed', function() {
+      const place = autocomplete.getPlace();
+      if (place.geometry) {
+        document.getElementById('wizard_home_lat').value = place.geometry.location.lat();
+        document.getElementById('wizard_home_lng').value = place.geometry.location.lng();
+        console.log('Wizard address selected:', place.formatted_address, place.geometry.location);
+        // Clear any error message
+        const err = document.getElementById('wizard-error-msg');
+        if (err) err.remove();
+      } else {
+        console.log('No valid place selected for wizard_home_address');
+        // Show error if no valid place selected
+        let err = document.getElementById('wizard-error-msg');
+        if (!err) {
+          err = document.createElement('div');
+          err.id = 'wizard-error-msg';
+          err.className = 'alert alert-danger';
+          err.style.marginBottom = '10px';
+          document.querySelector('#wizard-step-1 form').prepend(err);
+        }
+        err.textContent = 'Please select a valid address from the dropdown.';
+      }
+    });
+  } else {
+    console.error('Google Maps not loaded or wizard_home_address input not found');
   }
 
   // Community map
   const mapElement = document.getElementById('map');
   if (mapElement && typeof google !== 'undefined' && google.maps) {
+    console.log('Initializing community map');
     const userLat = <%= (user && user.home_lat != null) ? Number(user.home_lat) : 'null' %>;
     const userLng = <%= (user && user.home_lng != null) ? Number(user.home_lng) : 'null' %>;
     let neighbors = [];
@@ -1211,6 +1236,8 @@ function initLiftyMaps() {
         });
       }
     });
+  } else {
+    console.error('Google Maps not loaded or map element not found');
   }
 }
 </script>

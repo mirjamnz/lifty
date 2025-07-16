@@ -1071,24 +1071,52 @@ router.post('/api/profile/children', async (req, res) => {
   }
   try {
     for (const child of children) {
-      const { name, org_id, club } = child;
-      if (!name || !org_id) {
-        return res.status(400).json({ success: false, error: 'Each child must have a name and organization.' });
+      const { name, org_id, club, username, password } = child;
+      if (!name || !org_id || !username || !password) {
+        return res.status(400).json({ success: false, error: 'Each child must have a name, organization, username, and password.' });
       }
+      
+      // Check for existing username/email
+      const [[existingUser]] = await db.query(
+        'SELECT id FROM Users WHERE username = ? OR email = ?',
+        [username.trim(), `${username.trim()}@child.local`]
+      );
+      if (existingUser) {
+        return res.status(400).json({ success: false, error: `Username '${username.trim()}' is already taken. Please choose another username.` });
+      }
+      
       // Lookup organization name by org_id
       const [[org]] = await db.query('SELECT name FROM Organizations WHERE id = ?', [org_id]);
       if (!org) {
         return res.status(400).json({ success: false, error: `Organization not found for child: ${name}` });
       }
+      
       // Insert child
       const [childResult] = await db.query(
         'INSERT INTO Children (user_id, name, school, club) VALUES (?, ?, ?, ?)',
         [parentId, name.trim(), org.name, club?.trim() || null]
       );
       const childId = childResult.insertId;
+      
+      // Create ParentChild link
       await db.query(
         'INSERT INTO ParentChild (parent_id, child_id) VALUES (?, ?)',
         [parentId, childId]
+      );
+      
+      // Create child user account
+      const hashedPassword = await bcrypt.hash(password, 10);
+      await db.query(
+        `INSERT INTO Users (name, username, email, password_hash, role, parent_id, child_profile_id)
+         VALUES (?, ?, ?, ?, 'child', ?, ?)`,
+        [
+          name.trim(),
+          username.trim(),
+          `${username.trim()}@child.local`,
+          hashedPassword,
+          parentId,
+          childId
+        ]
       );
     }
     return res.json({ success: true });
