@@ -6,46 +6,27 @@ const db = require('../db');
 
 // GET /register (parents only)
 router.get('/register', async (req, res) => {
-  try {
-    const [organizations] = await db.query('SELECT * FROM Organizations ORDER BY name ASC');
-    res.render('register', { session: req.session, organizations });
-  } catch (err) {
-    console.error('❌ Error loading organizations for register:', err);
-    res.render('register', { session: req.session, organizations: [] });
-  }
+  res.render('register', { session: req.session });
 });
 
 // POST /register (parents only)
 router.post('/register', async (req, res) => {
-  const { name, email, password, organization_id } = req.body;
-  if (!name || !email || !password || !organization_id) {
+  const { name, email, password } = req.body;
+  if (!name || !email || !password) {
     return res.status(400).send('All fields are required.');
   }
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
-    const [userResult] = await db.query(
+    await db.query(
       `INSERT INTO Users (name, email, password_hash, role, profile_completed)
        VALUES (?, ?, ?, 'parent', 0)`,
       [name.trim(), email.trim(), hashedPassword]
     );
-    const userId = userResult.insertId;
-    // Insert affiliation
-    await db.query(
-      'INSERT INTO UserAffiliations (user_id, organization_id, role, created_at) VALUES (?, ?, ?, NOW())',
-      [userId, organization_id, 'parent']
-    );
     res.redirect('/login');
   } catch (err) {
     console.error('❌ Register Error:', err);
-    // Always pass organizations to the view on error
-    let organizations = [];
-    try {
-      [organizations] = await db.query('SELECT * FROM Organizations ORDER BY name ASC');
-    } catch (e) {
-      console.error('❌ Error loading organizations for register (in error handler):', e);
-    }
-    res.status(500).render('register', { session: req.session, organizations });
+    res.status(500).render('register', { session: req.session });
   }
 });
 

@@ -17,18 +17,6 @@
       <label for="password" class="form-label">Password</label>
       <input type="password" name="password" id="password" class="form-control" required>
     </div>
-    <div class="mb-3">
-      <label for="organization_id" class="form-label">Organization (School, Club, or Event)</label>
-      <select name="organization_id" id="organization_id" class="form-select" required>
-        <option value="" disabled selected>Select your organization</option>
-        <% organizations.forEach(function(org) { %>
-          <option value="<%= org.id %>"><%= org.name %> (<%= org.type %>)</option>
-        <% }); %>
-      </select>
-      <small class="form-text text-muted">
-        Can't find your organization? <a href="/organizations/add" target="_blank">Add it here</a>.
-      </small>
-    </div>
     <button type="submit" class="btn btn-accent w-100">Register</button>
   </form>
 </div>

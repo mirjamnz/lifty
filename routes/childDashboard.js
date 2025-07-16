@@ -5,7 +5,7 @@ const db = require('../db');
 
 router.get('/child-dashboard', async (req, res) => {
   const userId = req.session.userId;
-  const range = parseInt(req.query.range) || 0; // 0 = today, 2 = next 2 days, 7 = next 7 days
+  const range = parseInt(req.query.range) || 2; // 0 = today, 2 = next 2 days, 7 = next 7 days
 
   try {
     // 1. Verify session and role
