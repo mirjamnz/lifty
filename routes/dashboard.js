@@ -293,6 +293,17 @@ router.get('/dashboard', async (req, res) => {
     console.log('Total calendar events:', calendarEvents.length);
     console.log('Calendar events:', calendarEvents);
 
+    // Load user affiliations
+    const [affiliations] = await db.query('SELECT * FROM UserAffiliations WHERE user_id = ?', [userId]);
+    // Load all organizations for the wizard
+    const [organizations] = await db.query('SELECT * FROM Organizations ORDER BY name ASC');
+
+    // Determine if profile is incomplete
+    const missingAddress = !user.home_address;
+    const missingChildren = children.length === 0;
+    const missingAffiliations = affiliations.length === 0;
+    const showProfileWizard = missingAddress || missingChildren || missingAffiliations;
+
     res.render('dashboard', {
       session: req.session,
       user,
@@ -302,7 +313,10 @@ router.get('/dashboard', async (req, res) => {
       groupInvitations,
       calendarEvents,
       success: req.session.success,
-      error: req.session.error
+      error: req.session.error,
+      organizations,
+      affiliations,
+      showProfileWizard
     });
 
     // Clear session messages
@@ -1001,6 +1015,64 @@ router.get('/calendar', async (req, res) => {
   } catch (err) {
     console.error('Calendar page error:', err);
     res.status(500).send('Failed to load calendar page.');
+  }
+});
+
+// API: Save home address from profile wizard
+router.post('/api/profile/address', async (req, res) => {
+  const userId = req.session.userId;
+  if (!userId) return res.status(401).json({ error: 'Not logged in' });
+  const { home_address, home_lat, home_lng, is_address_private } = req.body;
+  if (!home_address || !home_lat || !home_lng) {
+    return res.status(400).json({ error: 'Address, latitude, and longitude are required.' });
+  }
+  try {
+    const isPrivate = is_address_private === true || is_address_private === 'true' || is_address_private === 'on' ? 1 : 0;
+    await db.query(
+      'UPDATE Users SET home_address = ?, home_lat = ?, home_lng = ?, is_address_private = ? WHERE id = ?',
+      [home_address, parseFloat(home_lat), parseFloat(home_lng), isPrivate, userId]
+    );
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Wizard address save error:', err);
+    return res.status(500).json({ error: 'Failed to save address.' });
+  }
+});
+
+// API: Save children from profile wizard
+router.post('/api/profile/children', async (req, res) => {
+  const parentId = req.session.userId;
+  if (!parentId) return res.status(401).json({ success: false, error: 'Not logged in' });
+  const { children } = req.body;
+  if (!Array.isArray(children) || children.length === 0) {
+    return res.status(400).json({ success: false, error: 'At least one child is required.' });
+  }
+  try {
+    for (const child of children) {
+      const { name, org_id, club } = child;
+      if (!name || !org_id) {
+        return res.status(400).json({ success: false, error: 'Each child must have a name and organization.' });
+      }
+      // Lookup organization name by org_id
+      const [[org]] = await db.query('SELECT name FROM Organizations WHERE id = ?', [org_id]);
+      if (!org) {
+        return res.status(400).json({ success: false, error: `Organization not found for child: ${name}` });
+      }
+      // Insert child
+      const [childResult] = await db.query(
+        'INSERT INTO Children (user_id, name, school, club) VALUES (?, ?, ?, ?)',
+        [parentId, name.trim(), org.name, club?.trim() || null]
+      );
+      const childId = childResult.insertId;
+      await db.query(
+        'INSERT INTO ParentChild (parent_id, child_id) VALUES (?, ?)',
+        [parentId, childId]
+      );
+    }
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Wizard children save error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to save children.' });
   }
 });
 

@@ -5,23 +5,35 @@ const bcrypt = require('bcrypt');
 const db = require('../db');
 
 // GET /register (parents only)
-router.get('/register', (req, res) => {
-  res.render('register', { session: req.session });
+router.get('/register', async (req, res) => {
+  try {
+    const [organizations] = await db.query('SELECT * FROM Organizations ORDER BY name ASC');
+    res.render('register', { session: req.session, organizations });
+  } catch (err) {
+    console.error('❌ Error loading organizations for register:', err);
+    res.render('register', { session: req.session, organizations: [] });
+  }
 });
 
 // POST /register (parents only)
 router.post('/register', async (req, res) => {
-  const { name, email, password } = req.body;
-  if (!name || !email || !password) {
+  const { name, email, password, organization_id } = req.body;
+  if (!name || !email || !password || !organization_id) {
     return res.status(400).send('All fields are required.');
   }
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
-    await db.query(
+    const [userResult] = await db.query(
       `INSERT INTO Users (name, email, password_hash, role)
        VALUES (?, ?, ?, 'parent')`,
       [name.trim(), email.trim(), hashedPassword]
+    );
+    const userId = userResult.insertId;
+    // Insert affiliation
+    await db.query(
+      'INSERT INTO UserAffiliations (user_id, organization_id, role, created_at) VALUES (?, ?, ?, NOW())',
+      [userId, organization_id, 'parent']
     );
     res.redirect('/login');
   } catch (err) {

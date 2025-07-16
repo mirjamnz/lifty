@@ -43,6 +43,21 @@
     </div>
     <button type="submit" class="btn btn-primary w-100">Save Changes</button>
   </form>
+
+  <h5>Affiliations</h5>
+  <form method="POST" action="/admin/children/<%= child.id %>/affiliations">
+    <% organizations.forEach(org => { %>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="organization_ids" value="<%= org.id %>"
+          <%= affiliations.some(a => a.organization_id === org.id) ? 'checked' : '' %> id="org_<%= org.id %>">
+        <label class="form-check-label" for="org_<%= org.id %>">
+          <%= org.name %> (<%= org.type %>)
+        </label>
+      </div>
+    <% }) %>
+    <input type="hidden" name="role" value="child">
+    <button type="submit" class="btn btn-primary mt-2">Update Affiliations</button>
+  </form>
 </div>
 
 <%- include('../partials/footer1') %>

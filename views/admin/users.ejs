@@ -1,0 +1,48 @@
+<%- include('../partials/header1') %>
+<%- include(session && session.is_admin ? '../partials/navbar2' : '../partials/navbar1') %>
+
+<div class="container py-5">
+  <h2 class="mb-4 fw-bold">All Users</h2>
+  <div class="row mb-3">
+    <div class="col-md-6">
+      <input type="text" id="userSearch" class="form-control" placeholder="Search users by name, email, or role...">
+    </div>
+  </div>
+  <table class="table table-striped table-hover" id="usersTable">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Role</th>
+        <th>Blocked?</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% users.forEach(user => { %>
+        <tr>
+          <td><%= user.name %></td>
+          <td><%= user.email %></td>
+          <td><%= user.role %><%= user.is_admin ? ' (Admin)' : '' %></td>
+          <td><%= user.is_blocked ? 'Yes' : 'No' %></td>
+          <td>
+            <a href="/admin/users/<%= user.id %>/edit" class="btn btn-sm btn-primary">Edit</a>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<script>
+  document.getElementById('userSearch').addEventListener('input', function() {
+    const search = this.value.toLowerCase();
+    const rows = document.querySelectorAll('#usersTable tbody tr');
+    rows.forEach(row => {
+      const text = row.textContent.toLowerCase();
+      row.style.display = text.includes(search) ? '' : 'none';
+    });
+  });
+</script>
+
+<%- include('../partials/footer1') %> 

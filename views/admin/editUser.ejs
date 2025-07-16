@@ -1,0 +1,35 @@
+<%- include('../partials/header1') %>
+<%- include(session && session.is_admin ? '../partials/navbar2' : '../partials/navbar1') %>
+
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+          <h4 class="mb-0">Edit User Affiliations</h4>
+        </div>
+        <div class="card-body">
+          <h5 class="mb-3">User: <span class="fw-bold"><%= user.name %></span> <span class="badge bg-secondary"><%= user.email %></span></h5>
+          <form method="POST" action="/admin/users/<%= user.id %>/affiliations">
+            <% organizations.forEach(org => { %>
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" name="organization_ids" value="<%= org.id %>"
+                  <%= affiliations.some(a => a.organization_id === org.id) ? 'checked' : '' %> id="org_<%= org.id %>">
+                <label class="form-check-label" for="org_<%= org.id %>">
+                  <%= org.name %> (<%= org.type %>)
+                </label>
+              </div>
+            <% }) %>
+            <input type="hidden" name="role" value="parent">
+            <div class="d-flex justify-content-between mt-4">
+              <a href="/admin/users" class="btn btn-outline-secondary">Back to Users</a>
+              <button type="submit" class="btn btn-primary">Update Affiliations</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer1') %> 

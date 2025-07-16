@@ -610,7 +610,7 @@ document.addEventListener('DOMContentLoaded', function() {
   console.log('Calendar container found:', calendarEl);
   
   // Debug: Check calendar events data
-  const calendarEvents = <%- JSON.stringify(calendarEvents || []) %>;
+  let calendarEvents = JSON.parse(`<%- JSON.stringify(calendarEvents || []) %>`);
   console.log('Calendar events data:', calendarEvents);
   console.log('Number of events:', calendarEvents.length);
   console.log('Events structure:', JSON.stringify(calendarEvents, null, 2));
@@ -943,7 +943,219 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 
-// Google Maps/Places callback for address autocomplete and map
+<% if (showProfileWizard) { %>
+  <!-- Profile Completion Wizard Modal -->
+  <div class="modal" id="profileWizardModal" tabindex="-1" aria-labelledby="profileWizardLabel" aria-modal="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="profileWizardLabel">Complete Your Profile</h5>
+        </div>
+        <div class="modal-body">
+          <!-- Step 1: Home Address -->
+          <div class="wizard-step" id="wizard-step-1">
+            <h5>Step 1 of 3: Add Home Address</h5>
+            <form id="wizard-address-form">
+              <div class="mb-3">
+                <label for="wizard_home_address" class="form-label">Home Address</label>
+                <input type="text" class="form-control" id="wizard_home_address" name="home_address" placeholder="Enter your home address" required />
+                <input type="hidden" name="wizard_home_lat" id="wizard_home_lat" />
+                <input type="hidden" name="wizard_home_lng" id="wizard_home_lng" />
+              </div>
+              <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="wizard_is_address_private" name="is_address_private" />
+                <label class="form-check-label" for="wizard_is_address_private">Hide my address from other users</label>
+              </div>
+            </form>
+          </div>
+          <!-- Step 2: Add Children -->
+          <div class="wizard-step d-none" id="wizard-step-2">
+            <h5>Step 2 of 3: Add Children</h5>
+            <form id="wizard-children-form">
+              <div id="children-list"></div>
+              <button type="button" class="btn btn-outline-primary btn-sm mb-3" id="add-child-btn">+ Add Child</button>
+            </form>
+            <!-- Hidden template for child entry -->
+            <div id="child-entry-template" class="d-none">
+              <div class="child-entry mb-3 p-2 border rounded">
+                <div class="mb-2">
+                  <label>Child Name</label>
+                  <input type="text" class="form-control child-name-input" name="child_name" required />
+                </div>
+                <div class="mb-2">
+                  <label>School/Organization</label>
+                  <select class="form-select child-org-select" name="child_org">
+                    <option value="">Select organization</option>
+                    <% organizations.forEach(function(org) { %>
+                      <option value="<%= org.id %>"><%= org.name %> (<%= org.type %>)</option>
+                    <% }); %>
+                  </select>
+                </div>
+                <div class="mb-2">
+                  <label>Club (optional)</label>
+                  <input type="text" class="form-control child-club-input" name="child_club" />
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-danger remove-child-btn">Remove</button>
+              </div>
+            </div>
+          </div>
+          <!-- Step 3: Add Affiliations -->
+          <div class="wizard-step d-none" id="wizard-step-3">
+            <h5>Step 3 of 3: Add Additional Affiliations</h5>
+            <form id="wizard-affiliations-form">
+              <div class="mb-3">
+                <label class="form-label">Select organizations you are affiliated with:</label>
+                <div style="max-height: 200px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; padding: 10px;">
+                  <div>
+                    <% organizations.forEach(function(org) { %>
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="organization_ids" value="<%= org.id %>" id="org_<%= org.id %>" />
+                        <label class="form-check-label" for="org_<%= org.id %>"><%= org.name %> (<%= org.type %>)</label>
+                      </div>
+                    <% }); %>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+        <div class="modal-footer d-flex justify-content-between">
+          <button type="button" class="btn btn-secondary" id="wizard-back-btn" style="display:none;">Back</button>
+          <div>
+            <button type="button" class="btn btn-link" id="wizard-skip-btn">Skip</button>
+            <button type="button" class="btn btn-primary" id="wizard-next-btn">Next</button>
+            <button type="button" class="btn btn-success d-none" id="wizard-finish-btn">Finish</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+<% } %>
+<script>
+// Wizard JS code (no EJS control flow here)
+if (document.getElementById('profileWizardModal')) {
+  let wizardStep = 1;
+  const totalSteps = 3;
+  function showStep(step) {
+    for (let i = 1; i <= totalSteps; i++) {
+      document.getElementById('wizard-step-' + i).classList.toggle('d-none', i !== step);
+    }
+    document.getElementById('wizard-back-btn').style.display = step === 1 ? 'none' : '';
+    document.getElementById('wizard-next-btn').classList.toggle('d-none', step === totalSteps);
+    document.getElementById('wizard-finish-btn').classList.toggle('d-none', step !== totalSteps);
+  }
+  function showWizardError(msg) {
+    let err = document.getElementById('wizard-error-msg');
+    if (!err) {
+      err = document.createElement('div');
+      err.id = 'wizard-error-msg';
+      err.className = 'alert alert-danger';
+      err.style.marginBottom = '10px';
+      document.querySelector('#wizard-step-1 form').prepend(err);
+    }
+    err.textContent = msg;
+  }
+  function clearWizardError() {
+    const err = document.getElementById('wizard-error-msg');
+    if (err) err.remove();
+  }
+  document.getElementById('wizard-next-btn').onclick = async function() {
+    if (wizardStep === 1) {
+      clearWizardError();
+      const address = document.getElementById('wizard_home_address').value.trim();
+      const lat = document.getElementById('wizard_home_lat').value;
+      const lng = document.getElementById('wizard_home_lng').value;
+      const isPrivate = document.getElementById('wizard_is_address_private').checked;
+      if (!address || !lat || !lng) {
+        showWizardError('Please select your address from the dropdown so we can get the coordinates.');
+        return;
+      }
+      try {
+        const resp = await fetch('/api/profile/address', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ home_address: address, home_lat: lat, home_lng: lng, is_address_private: isPrivate })
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.success) {
+          showWizardError(data.error || 'Failed to save address. Please try again.');
+          return;
+        }
+      } catch (err) {
+        showWizardError('Network error. Please try again.');
+        return;
+      }
+    }
+    if (wizardStep === 2) {
+      clearWizardError();
+      const childrenList = document.getElementById('children-list');
+      const childEntries = Array.from(childrenList.querySelectorAll('.child-entry'));
+      if (childEntries.length === 0) {
+        showWizardError('Please add at least one child.');
+        return;
+      }
+      const children = [];
+      for (const entry of childEntries) {
+        const name = entry.querySelector('.child-name-input').value.trim();
+        const org_id = entry.querySelector('.child-org-select').value;
+        const club = entry.querySelector('.child-club-input').value.trim();
+        if (!name || !org_id) {
+          showWizardError('Each child must have a name and organization.');
+          return;
+        }
+        children.push({ name, org_id, club });
+      }
+      try {
+        const resp = await fetch('/api/profile/children', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ children })
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.success) {
+          showWizardError(data.error || 'Failed to save children. Please try again.');
+          return;
+        }
+      } catch (err) {
+        showWizardError('Network error. Please try again.');
+        return;
+      }
+    }
+    if (wizardStep < totalSteps) {
+      wizardStep++;
+      showStep(wizardStep);
+    }
+  };
+  document.getElementById('wizard-back-btn').onclick = function() {
+    if (wizardStep > 1) {
+      wizardStep--;
+      showStep(wizardStep);
+    }
+  };
+  document.getElementById('wizard-skip-btn').onclick = function() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('profileWizardModal'));
+    if (modal) modal.hide();
+  };
+  document.getElementById('wizard-finish-btn').onclick = function() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('profileWizardModal'));
+    if (modal) modal.hide();
+  };
+  document.getElementById('add-child-btn').onclick = function() {
+    const template = document.getElementById('child-entry-template').firstElementChild.cloneNode(true);
+    template.querySelector('.remove-child-btn').onclick = function() {
+      template.remove();
+    };
+    document.getElementById('children-list').appendChild(template);
+  };
+  // Show the modal on page load
+  document.addEventListener('DOMContentLoaded', function() {
+    showStep(1);
+    var wizardModal = new bootstrap.Modal(document.getElementById('profileWizardModal'), {backdrop: 'static', keyboard: false});
+    wizardModal.show();
+  });
+}
+</script>
+<script>
 function initLiftyMaps() {
   // Home address autocomplete
   var homeAddressInput = document.getElementById('home_address');
@@ -968,7 +1180,6 @@ function initLiftyMaps() {
       zoom: 12,
       center: (userLat !== null && userLng !== null) ? { lat: userLat, lng: userLng } : { lat: -36.8485, lng: 174.7633 }
     });
-    
     // Only show user's marker if their address is not private
     if (userLat && userLng && !<%= user && user.is_address_private == 1 ? 'true' : 'false' %>) {
       new google.maps.Marker({
@@ -978,7 +1189,6 @@ function initLiftyMaps() {
         icon: { url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png' }
       });
     }
-    
     // Show neighbors (all have public addresses since we filtered in the query)
     neighbors.forEach(function(neighbor) {
       if (neighbor.home_lat && neighbor.home_lng) {
@@ -999,8 +1209,5 @@ function initLiftyMaps() {
   }
 }
 </script>
-
-<!-- Google Maps API: only load ONCE, with callback -->
 <script async defer src="https://maps.googleapis.com/maps/api/js?key=<%= GMAPS_API_KEY %>&libraries=places&callback=initLiftyMaps"></script>
-
 <%- include('partials/footer1') %>

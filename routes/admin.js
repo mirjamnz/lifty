@@ -139,6 +139,21 @@ router.post('/users/:id/privacy', async (req, res) => {
   }
 });
 
+// Edit user affiliations (POST)
+router.post('/users/:id/affiliations', async (req, res) => {
+  const userId = req.params.id;
+  let orgIds = req.body.organization_ids || [];
+  if (!Array.isArray(orgIds)) orgIds = [orgIds];
+  await db.query('DELETE FROM UserAffiliations WHERE user_id = ?', [userId]);
+  for (const orgId of orgIds) {
+    await db.query(
+      'INSERT INTO UserAffiliations (user_id, organization_id, role, created_at) VALUES (?, ?, ?, NOW())',
+      [userId, orgId, 'parent']
+    );
+  }
+  res.redirect(`/admin/users/${userId}/edit?success=Affiliations updated`);
+});
+
 // Manage Block Status (POST)
 router.post('/users/:id/:action', async (req, res) => {
   const userId = req.params.id;
@@ -924,6 +939,62 @@ router.get('/messages', async (req, res) => {
   } catch (err) {
     console.error('Admin messages error:', err);
     res.status(500).send('Failed to load messages overview');
+  }
+});
+
+// Edit user affiliations (GET)
+router.get('/users/:id/edit', async (req, res) => {
+  const userId = req.params.id;
+  const [[user]] = await db.query('SELECT * FROM Users WHERE id = ?', [userId]);
+  const [organizations] = await db.query('SELECT * FROM Organizations ORDER BY name ASC');
+  const [affiliations] = await db.query('SELECT * FROM UserAffiliations WHERE user_id = ?', [userId]);
+  res.render('admin/editUser', { user, organizations, affiliations, session: req.session });
+});
+// Edit user affiliations (POST)
+router.post('/users/:id/affiliations', async (req, res) => {
+  const userId = req.params.id;
+  let orgIds = req.body.organization_ids || [];
+  if (!Array.isArray(orgIds)) orgIds = [orgIds];
+  await db.query('DELETE FROM UserAffiliations WHERE user_id = ?', [userId]);
+  for (const orgId of orgIds) {
+    await db.query(
+      'INSERT INTO UserAffiliations (user_id, organization_id, role, created_at) VALUES (?, ?, ?, NOW())',
+      [userId, orgId, 'parent']
+    );
+  }
+  res.redirect(`/admin/users/${userId}/edit?success=Affiliations updated`);
+});
+// Edit child affiliations (GET)
+router.get('/children/:id/edit', async (req, res) => {
+  const childId = req.params.id;
+  const [[child]] = await db.query('SELECT * FROM Children WHERE id = ?', [childId]);
+  const [organizations] = await db.query('SELECT * FROM Organizations ORDER BY name ASC');
+  const [affiliations] = await db.query('SELECT * FROM UserAffiliations WHERE child_id = ?', [childId]);
+  res.render('admin/editChild', { child, organizations, affiliations, session: req.session });
+});
+// Edit child affiliations (POST)
+router.post('/children/:id/affiliations', async (req, res) => {
+  const childId = req.params.id;
+  let orgIds = req.body.organization_ids || [];
+  if (!Array.isArray(orgIds)) orgIds = [orgIds];
+  await db.query('DELETE FROM UserAffiliations WHERE child_id = ?', [childId]);
+  for (const orgId of orgIds) {
+    await db.query(
+      'INSERT INTO UserAffiliations (child_id, organization_id, role, created_at) VALUES (?, ?, ?, NOW())',
+      [childId, orgId, 'child']
+    );
+  }
+  res.redirect(`/admin/children/${childId}/edit?success=Affiliations updated`);
+});
+
+// List all users (admin)
+router.get('/users', async (req, res) => {
+  try {
+    const [users] = await db.query('SELECT * FROM Users ORDER BY id DESC');
+    res.render('admin/users', { users, session: req.session });
+  } catch (err) {
+    console.error('Admin users list error:', err);
+    res.status(500).send('Failed to load users list');
   }
 });
 

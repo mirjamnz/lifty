@@ -512,6 +512,19 @@ router.post('/:id/assign', async (req, res) => {
         skipped++;
         continue;
       }
+      // Ensure child is a group member (role 'child')
+      if (event.is_group_event) {
+        const [[existingGroupMember]] = await db.query(
+          'SELECT id FROM EventGroupMembers WHERE event_id = ? AND user_id = ? AND child_id = ? AND is_active = TRUE',
+          [eventId, userId, cid]
+        );
+        if (!existingGroupMember) {
+          await db.query(
+            'INSERT INTO EventGroupMembers (event_id, user_id, child_id, role) VALUES (?, ?, ?, ?)',
+            [eventId, userId, cid, 'child']
+          );
+        }
+      }
       await db.query(
         `INSERT INTO EventAssignments (event_id, event_date, user_id, child_id, assignment_type, notes, group_assignment)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
