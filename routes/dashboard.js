@@ -337,6 +337,9 @@ router.get('/dashboard', async (req, res) => {
     // const showProfileWizard = missingAddress || missingChildren || missingAffiliations;
     const showProfileWizard = user.profile_completed !== 1 && user.profile_completed !== '1';
 
+    // DEBUG PRINT
+    console.log('DEBUG: user.profile_completed =', user.profile_completed, 'showProfileWizard =', showProfileWizard);
+
     res.render('dashboard', {
       session: req.session,
       user,
