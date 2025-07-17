@@ -105,7 +105,7 @@ router.post('/assign-request/:id', async (req, res) => {
 
     // Assign the ride request
     await db.query(
-      `UPDATE RideRequests SET assigned_user_id = ? WHERE id = ?`,
+      `UPDATE RideRequests SET assigned_user_id = ?, status = 'Assigned' WHERE id = ?`,
       [userId, requestId]
     );
     console.log(`✅ Ride request ${requestId} assigned to user ${userId}`);

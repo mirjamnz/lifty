@@ -37,7 +37,11 @@ router.get('/child-dashboard', async (req, res) => {
       [user.child_profile_id, todayStr, maxDateStr]
     );
     requests.forEach(request => {
-      request.status = request.status || (request.assigned_user_id ? 'Assigned' : 'Pending');
+      if (request.assigned_user_id) {
+        request.status = 'Assigned';
+      } else {
+        request.status = request.status || 'Pending';
+      }
       request.formatted_time = new Date(request.pickup_time).toLocaleString('en-NZ', { dateStyle: 'medium', timeStyle: 'short' });
       request.type = 'request';
     });

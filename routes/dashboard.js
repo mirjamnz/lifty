@@ -109,7 +109,7 @@ router.get('/dashboard', async (req, res) => {
         FROM RideRequests rr 
         JOIN Children c ON rr.child_id = c.id 
         LEFT JOIN Users u ON rr.assigned_user_id = u.id
-        WHERE rr.user_id = ? AND rr.pickup_time >= NOW()
+        WHERE rr.user_id = ? AND rr.pickup_time >= NOW() AND rr.assigned_user_id IS NULL
       `, [userId]);
     }
 
@@ -884,7 +884,7 @@ router.get('/calendar', async (req, res) => {
         FROM RideRequests rr 
         JOIN Children c ON rr.child_id = c.id 
         LEFT JOIN Users u ON rr.assigned_user_id = u.id
-        WHERE rr.user_id = ? AND rr.pickup_time >= NOW()
+        WHERE rr.user_id = ? AND rr.pickup_time >= NOW() AND rr.assigned_user_id IS NULL
       `, [userId]);
     }
 
