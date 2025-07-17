@@ -76,7 +76,8 @@ router.get('/dashboard', async (req, res) => {
     
     // Get ride requests where user is assigned as driver (RideRequests)
     const [assignedRides] = await db.query(`
-      SELECT rr.id, rr.pickup_time, rr.pickup_location, rr.dropoff_location, c.name as child_name, 'request' as type
+      SELECT rr.id, rr.pickup_time, rr.pickup_location, rr.dropoff_location, c.name as child_name, 
+             rr.status, rr.assigned_user_id, 'request' as type
       FROM RideRequests rr 
       JOIN Children c ON rr.child_id = c.id 
       WHERE rr.assigned_user_id = ? AND rr.pickup_time >= NOW()
@@ -88,14 +89,31 @@ router.get('/dashboard', async (req, res) => {
     let childrenRides = [];
     if (childIds.length > 0) {
       [childrenRides] = await db.query(`
-        SELECT rr.id, rr.pickup_time, rr.pickup_location, rr.dropoff_location, c.name as child_name, 'child_request' as type
+        SELECT rr.id, rr.pickup_time, rr.pickup_location, rr.dropoff_location, c.name as child_name, 
+               rr.status, rr.assigned_user_id, u.name as driver_name, 'child_request' as type
         FROM RideRequests rr 
         JOIN Children c ON rr.child_id = c.id 
+        LEFT JOIN Users u ON rr.assigned_user_id = u.id
         WHERE rr.child_id IN (?) AND rr.pickup_time >= NOW()
       `, [childIds]);
     }
 
     console.log('Children rides found:', childrenRides.length);
+    
+    // Get ride requests created by the user (for their children)
+    let myRideRequests = [];
+    if (childIds.length > 0) {
+      [myRideRequests] = await db.query(`
+        SELECT rr.id, rr.pickup_time, rr.pickup_location, rr.dropoff_location, c.name as child_name, 
+               rr.status, rr.assigned_user_id, u.name as driver_name, 'my_request' as type
+        FROM RideRequests rr 
+        JOIN Children c ON rr.child_id = c.id 
+        LEFT JOIN Users u ON rr.assigned_user_id = u.id
+        WHERE rr.user_id = ? AND rr.pickup_time >= NOW()
+      `, [userId]);
+    }
+
+    console.log('My ride requests found:', myRideRequests.length);
     
     // Get recurring event assignments for user's children (if they have children)
     let recurringAssignments = [];
@@ -244,7 +262,8 @@ router.get('/dashboard', async (req, res) => {
         description: `${ride.pickup_location} → ${ride.dropoff_location || 'Unknown'}`,
         backgroundColor: '#dc3545',
         borderColor: '#c82333',
-        type: ride.type
+        type: ride.type,
+        status: ride.status || 'assigned'
       })),
       ...childrenRides.map(ride => ({
         id: `child_ride_${ride.id}`,
@@ -253,7 +272,20 @@ router.get('/dashboard', async (req, res) => {
         description: `${ride.pickup_location} → ${ride.dropoff_location || 'Unknown'}`,
         backgroundColor: '#28a745',
         borderColor: '#1e7e34',
-        type: ride.type
+        type: ride.type,
+        driver_name: ride.driver_name,
+        status: ride.status || (ride.assigned_user_id ? 'assigned' : 'pending')
+      })),
+      ...myRideRequests.map(ride => ({
+        id: `my_ride_${ride.id}`,
+        title: `My Request: ${ride.child_name}`,
+        start: ride.pickup_time,
+        description: `${ride.pickup_location} → ${ride.dropoff_location || 'Unknown'}`,
+        backgroundColor: '#007bff',
+        borderColor: '#0056b3',
+        type: ride.type,
+        driver_name: ride.driver_name,
+        status: ride.status || (ride.assigned_user_id ? 'assigned' : 'pending')
       })),
       ...recurringAssignments.map(event => ({
         id: `event_${event.id}`,
@@ -823,7 +855,8 @@ router.get('/calendar', async (req, res) => {
     
     // Get ride requests where user is assigned as driver (RideRequests)
     const [assignedRides] = await db.query(`
-      SELECT rr.id, rr.pickup_time, rr.pickup_location, rr.dropoff_location, c.name as child_name, 'request' as type
+      SELECT rr.id, rr.pickup_time, rr.pickup_location, rr.dropoff_location, c.name as child_name, 
+             rr.status, rr.assigned_user_id, 'request' as type
       FROM RideRequests rr 
       JOIN Children c ON rr.child_id = c.id 
       WHERE rr.assigned_user_id = ? AND rr.pickup_time >= NOW()
@@ -833,11 +866,26 @@ router.get('/calendar', async (req, res) => {
     let childrenRides = [];
     if (childIds.length > 0) {
       [childrenRides] = await db.query(`
-        SELECT rr.id, rr.pickup_time, rr.pickup_location, rr.dropoff_location, c.name as child_name, 'child_request' as type
+        SELECT rr.id, rr.pickup_time, rr.pickup_location, rr.dropoff_location, c.name as child_name, 
+               rr.status, rr.assigned_user_id, u.name as driver_name, 'child_request' as type
         FROM RideRequests rr 
         JOIN Children c ON rr.child_id = c.id 
+        LEFT JOIN Users u ON rr.assigned_user_id = u.id
         WHERE rr.child_id IN (?) AND rr.pickup_time >= NOW()
       `, [childIds]);
+    }
+
+    // Get ride requests created by the user (for their children)
+    let myRideRequests = [];
+    if (childIds.length > 0) {
+      [myRideRequests] = await db.query(`
+        SELECT rr.id, rr.pickup_time, rr.pickup_location, rr.dropoff_location, c.name as child_name, 
+               rr.status, rr.assigned_user_id, u.name as driver_name, 'my_request' as type
+        FROM RideRequests rr 
+        JOIN Children c ON rr.child_id = c.id 
+        LEFT JOIN Users u ON rr.assigned_user_id = u.id
+        WHERE rr.user_id = ? AND rr.pickup_time >= NOW()
+      `, [userId]);
     }
 
     // Get recurring event assignments for user's children (if they have children)
@@ -983,7 +1031,8 @@ router.get('/calendar', async (req, res) => {
         description: `${ride.pickup_location} → ${ride.dropoff_location || 'Unknown'}`,
         backgroundColor: '#dc3545',
         borderColor: '#c82333',
-        type: ride.type
+        type: ride.type,
+        status: ride.status || 'assigned'
       })),
       ...childrenRides.map(ride => ({
         id: `child_ride_${ride.id}`,
@@ -992,7 +1041,20 @@ router.get('/calendar', async (req, res) => {
         description: `${ride.pickup_location} → ${ride.dropoff_location || 'Unknown'}`,
         backgroundColor: '#28a745',
         borderColor: '#1e7e34',
-        type: ride.type
+        type: ride.type,
+        driver_name: ride.driver_name,
+        status: ride.status || (ride.assigned_user_id ? 'assigned' : 'pending')
+      })),
+      ...myRideRequests.map(ride => ({
+        id: `my_ride_${ride.id}`,
+        title: `My Request: ${ride.child_name}`,
+        start: new Date(ride.pickup_time).toISOString().slice(0, 19).replace('T', ' '),
+        description: `${ride.pickup_location} → ${ride.dropoff_location || 'Unknown'}`,
+        backgroundColor: '#007bff', // A different color for my requests
+        borderColor: '#0056b3',
+        type: ride.type,
+        driver_name: ride.driver_name,
+        status: ride.status || (ride.assigned_user_id ? 'assigned' : 'pending')
       })),
       ...recurringAssignments.map(event => ({
         id: `event_${event.id}`,

@@ -27,6 +27,12 @@
   color: white !important;
 }
 
+.event-my-request {
+  background-color: #007bff !important;
+  border-color: #0056b3 !important;
+  color: white !important;
+}
+
 .event-recurring {
   background-color: #ffc107 !important;
   border-color: #e0a800 !important;
@@ -565,6 +571,10 @@
               <span>Child's Ride</span>
             </div>
             <div class="legend-item">
+              <div class="legend-color" style="background-color: #007bff;"></div>
+              <span>My Ride Request</span>
+            </div>
+            <div class="legend-item">
               <div class="legend-color legend-recurring"></div>
               <span>Recurring Event</span>
             </div>
@@ -762,6 +772,7 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             const event = info.event;
             const isGroupRecurring = event.extendedProps.type === 'group_recurring';
+            const isRideRequest = event.extendedProps.type === 'request' || event.extendedProps.type === 'child_request' || event.extendedProps.type === 'my_request';
             const instanceId = event.extendedProps.instance_id || event.extendedProps.instanceId || event.id;
 
             let dropoffBtnLabel = '';
@@ -780,6 +791,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 : `I can Do Both`;
             }
 
+            // Get status badge HTML for ride requests
+            let statusBadge = '';
+            if (isRideRequest) {
+              const status = event.extendedProps.status || 'pending';
+              let badgeClass = 'bg-secondary';
+              let statusText = 'Unknown';
+              
+              if (status === 'pending' || status === 'Pending') {
+                badgeClass = 'bg-warning text-dark';
+                statusText = 'Pending';
+              } else if (status === 'assigned' || status === 'Assigned') {
+                badgeClass = 'bg-primary';
+                statusText = 'Assigned';
+              } else if (status === 'completed' || status === 'Completed') {
+                badgeClass = 'bg-success';
+                statusText = 'Completed';
+              } else if (status === 'cancelled' || status === 'Cancelled') {
+                badgeClass = 'bg-danger';
+                statusText = 'Cancelled';
+              }
+              
+              statusBadge = `<span class="badge ${badgeClass} mb-2">${statusText}</span>`;
+            }
+
             const modalHTML = `
               <div class="modal fade" id="eventModal" tabindex="-1" aria-labelledby="eventModalLabel" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
@@ -793,6 +828,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="modal-body">
                       <div class="row">
                         <div class="col-12">
+                          ${statusBadge}
                           <p class="text-muted mb-3">
                             <i class="fas fa-info-circle me-2"></i>
                             ${event.extendedProps.description || 'No description'}
@@ -814,6 +850,12 @@ document.addEventListener('DOMContentLoaded', function() {
                               hour12: true 
                             })}` : ''}
                           </div>
+                          ${isRideRequest && event.extendedProps.driver_name ? `
+                            <div class="alert alert-success mb-3">
+                              <i class="fas fa-user me-2"></i>
+                              <strong>Driver:</strong> ${event.extendedProps.driver_name}
+                            </div>
+                          ` : ''}
                           ${isGroupRecurring ? `
                             <div class="alert alert-secondary mb-3">
                               <strong>Dropoff:</strong> <span class="${event.extendedProps.dropoff_driver === 'Unassigned' ? 'text-danger' : 'text-success'}">
@@ -836,6 +878,16 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <input type="hidden" name="assignmentType" value="both">
                                 <button type="submit" class="btn btn-info btn-sm">${bothBtnLabel}</button>
                               </form>
+                            </div>
+                          ` : ''}
+                          ${isRideRequest ? `
+                            <div class="mt-3">
+                              <a href="/rides" class="btn btn-outline-primary btn-sm me-2">
+                                <i class="fas fa-car me-1"></i>View Ride Details
+                              </a>
+                              <a href="/messages/group/ride/${event.id.replace(/^(ride_|child_ride_|my_ride_)/, '')}" class="btn btn-outline-info btn-sm">
+                                <i class="fas fa-comments me-1"></i>Chat
+                              </a>
                             </div>
                           ` : ''}
                         </div>
@@ -905,6 +957,8 @@ document.addEventListener('DOMContentLoaded', function() {
             classes.push('event-drive');
           } else if (event.extendedProps.type === 'child_request') {
             classes.push('event-ride');
+          } else if (event.extendedProps.type === 'my_request') {
+            classes.push('event-my-request');
           } else if (event.extendedProps.type === 'recurring') {
             classes.push('event-recurring');
           } else if (event.extendedProps.type === 'group_recurring') {
