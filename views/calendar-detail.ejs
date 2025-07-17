@@ -305,18 +305,52 @@ document.addEventListener('DOMContentLoaded', function() {
       // Custom event rendering
       eventDidMount: function(info) {
         console.log('Event mounted:', info.event);
-        
-        // Add tooltip with more details using vanilla JavaScript
         const event = info.event;
-        
-        // Use vanilla JavaScript for tooltip-like behavior
         info.el.title = event.title + ' - ' + (event.extendedProps.description || 'No description');
-        
-        // Add click handler for more details
         info.el.addEventListener('click', function(e) {
           e.preventDefault();
-          
-          // Create modal HTML
+          const isGroupRecurring = event.extendedProps.type === 'group_recurring';
+          const isRideRequest = event.extendedProps.type === 'request' || event.extendedProps.type === 'child_request' || event.extendedProps.type === 'my_request';
+          const instanceId = event.extendedProps.instance_id || event.extendedProps.instanceId || event.id;
+
+          let dropoffBtnLabel = '';
+          let pickupBtnLabel = '';
+          let bothBtnLabel = '';
+          if (isGroupRecurring) {
+            dropoffBtnLabel = (event.extendedProps.dropoff_driver && event.extendedProps.dropoff_driver !== 'Unassigned')
+              ? `Take Over Drop Off at ${event.title}`
+              : `I can Drop Off at ${event.title}`;
+            pickupBtnLabel = (event.extendedProps.pickup_driver && event.extendedProps.pickup_driver !== 'Unassigned')
+              ? `Take Over Pick Up from ${event.title}`
+              : `I can Pick Up from ${event.title}`;
+            bothBtnLabel = ((event.extendedProps.dropoff_driver && event.extendedProps.dropoff_driver !== 'Unassigned') ||
+                            (event.extendedProps.pickup_driver && event.extendedProps.pickup_driver !== 'Unassigned'))
+              ? `Take Over Both`
+              : `I can Do Both`;
+          }
+
+          // Get status badge HTML for ride requests
+          let statusBadge = '';
+          if (isRideRequest) {
+            const status = event.extendedProps.status || 'pending';
+            let badgeClass = 'bg-secondary';
+            let statusText = 'Unknown';
+            if (status === 'pending' || status === 'Pending') {
+              badgeClass = 'bg-warning text-dark';
+              statusText = 'Pending';
+            } else if (status === 'assigned' || status === 'Assigned') {
+              badgeClass = 'bg-primary';
+              statusText = 'Assigned';
+            } else if (status === 'completed' || status === 'Completed') {
+              badgeClass = 'bg-success';
+              statusText = 'Completed';
+            } else if (status === 'cancelled' || status === 'Cancelled') {
+              badgeClass = 'bg-danger';
+              statusText = 'Cancelled';
+            }
+            statusBadge = `<span class="badge ${badgeClass} mb-2">${statusText}</span>`;
+          }
+
           const modalHTML = `
             <div class="modal fade" id="eventModal" tabindex="-1" aria-labelledby="eventModalLabel" aria-hidden="true">
               <div class="modal-dialog modal-dialog-centered">
@@ -330,6 +364,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   <div class="modal-body">
                     <div class="row">
                       <div class="col-12">
+                        ${statusBadge}
                         <p class="text-muted mb-3">
                           <i class="fas fa-info-circle me-2"></i>
                           ${event.extendedProps.description || 'No description'}
@@ -351,6 +386,46 @@ document.addEventListener('DOMContentLoaded', function() {
                             hour12: true 
                           })}` : ''}
                         </div>
+                        ${isRideRequest && event.extendedProps.driver_name ? `
+                          <div class="alert alert-success mb-3">
+                            <i class="fas fa-user me-2"></i>
+                            <strong>Driver:</strong> ${event.extendedProps.driver_name}
+                          </div>
+                        ` : ''}
+                        ${isGroupRecurring ? `
+                          <div class="alert alert-secondary mb-3">
+                            <strong>Dropoff:</strong> <span class="${event.extendedProps.dropoff_driver === 'Unassigned' ? 'text-danger' : 'text-success'}">
+                              ${event.extendedProps.dropoff_driver || 'Unassigned'}
+                            </span><br>
+                            <strong>Pickup:</strong> <span class="${event.extendedProps.pickup_driver === 'Unassigned' ? 'text-danger' : 'text-success'}">
+                              ${event.extendedProps.pickup_driver || 'Unassigned'}
+                            </span>
+                          </div>
+                          <div class="mt-3">
+                            <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
+                              <input type="hidden" name="assignmentType" value="dropoff">
+                              <button type="submit" class="btn btn-primary btn-sm me-2">${dropoffBtnLabel}</button>
+                            </form>
+                            <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
+                              <input type="hidden" name="assignmentType" value="pickup">
+                              <button type="submit" class="btn btn-success btn-sm me-2">${pickupBtnLabel}</button>
+                            </form>
+                            <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
+                              <input type="hidden" name="assignmentType" value="both">
+                              <button type="submit" class="btn btn-info btn-sm">${bothBtnLabel}</button>
+                            </form>
+                          </div>
+                        ` : ''}
+                        ${isRideRequest ? `
+                          <div class="mt-3">
+                            <a href="/rides" class="btn btn-outline-primary btn-sm me-2">
+                              <i class="fas fa-car me-1"></i>View Ride Details
+                            </a>
+                            <a href="/messages/group/ride/${event.id.replace(/^(ride_|child_ride_|my_ride_)/, '')}" class="btn btn-outline-info btn-sm">
+                              <i class="fas fa-comments me-1"></i>Chat
+                            </a>
+                          </div>
+                        ` : ''}
                       </div>
                     </div>
                   </div>
@@ -358,29 +433,21 @@ document.addEventListener('DOMContentLoaded', function() {
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                       <i class="fas fa-times me-1"></i>Close
                     </button>
-                    <a href="/rides" class="btn btn-primary">
-                      <i class="fas fa-car me-1"></i>Manage Rides
+                    <a href="/calendar" class="btn btn-primary">
+                      <i class="fas fa-calendar-alt me-1"></i>View Full Calendar
                     </a>
                   </div>
                 </div>
               </div>
             </div>
           `;
-          
-          // Remove existing modal if any
           const existingModal = document.getElementById('eventModal');
           if (existingModal) {
             existingModal.remove();
           }
-          
-          // Add modal to body
           document.body.insertAdjacentHTML('beforeend', modalHTML);
-          
-          // Show modal
           const modal = new bootstrap.Modal(document.getElementById('eventModal'));
           modal.show();
-          
-          // Clean up modal after it's hidden
           document.getElementById('eventModal').addEventListener('hidden.bs.modal', function() {
             this.remove();
           });
