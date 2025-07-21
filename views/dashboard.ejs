@@ -200,6 +200,105 @@
 }
 </style>
 
+<script>
+function initLiftyMaps() {
+  // Wizard address autocomplete (only wizard-related part)
+  const wizardAddressInput = document.getElementById('wizard_home_address');
+  if (wizardAddressInput && typeof google !== 'undefined' && google.maps) {
+    console.log('Initializing autocomplete for wizard_home_address');
+    const autocomplete = new google.maps.places.Autocomplete(wizardAddressInput, {
+      appendTo: document.querySelector('#profileWizardModal .modal-content')
+    });
+    autocomplete.addListener('place_changed', function() {
+      const place = autocomplete.getPlace();
+      if (place.geometry) {
+        document.getElementById('wizard_home_lat').value = place.geometry.location.lat();
+        document.getElementById('wizard_home_lng').value = place.geometry.location.lng();
+        console.log('Wizard address selected:', place.formatted_address, place.geometry.location);
+        const err = document.getElementById('wizard-error-msg');
+        if (err) err.remove();
+      } else {
+        console.log('No valid place selected for wizard_home_address');
+        let err = document.getElementById('wizard-error-msg');
+        if (!err) {
+          err = document.createElement('div');
+          err.id = 'wizard-error-msg';
+          err.className = 'alert alert-danger';
+          err.style.marginBottom = '10px';
+          document.querySelector('#wizard-step-1 form').prepend(err);
+        }
+        err.textContent = 'Please select a valid address from the dropdown.';
+      }
+    });
+  } else {
+    console.error('Google Maps not loaded or wizard_home_address input not found');
+  }
+
+  // Non-wizard-related map code (unchanged)
+  const homeAddressInput = document.getElementById('home_address');
+  if (homeAddressInput && typeof google !== 'undefined' && google.maps) {
+    console.log('Initializing autocomplete for home_address');
+    const autocomplete = new google.maps.places.Autocomplete(homeAddressInput);
+    autocomplete.addListener('place_changed', function() {
+      const place = autocomplete.getPlace();
+      if (place.geometry) {
+        document.getElementById('home_lat').value = place.geometry.location.lat();
+        document.getElementById('home_lng').value = place.geometry.location.lng();
+        console.log('Home address selected:', place.formatted_address, place.geometry.location);
+      } else {
+        console.log('No valid place selected for home_address');
+      }
+    });
+  } else {
+    console.error('Google Maps not loaded or home_address input not found');
+  }
+
+  const mapElement = document.getElementById('map');
+  if (mapElement && typeof google !== 'undefined' && google.maps) {
+    console.log('Initializing community map');
+    const userLat = <%= (user && user.home_lat != null) ? Number(user.home_lat) : 'null' %>;
+    const userLng = <%= (user && user.home_lng != null) ? Number(user.home_lng) : 'null' %>;
+    let neighbors = [];
+    try {
+      neighbors = JSON.parse('<%- JSON.stringify(neighbors || []) %>');
+    } catch (e) {
+      console.error('Error parsing neighbors:', e);
+      neighbors = [];
+    }
+    const map = new google.maps.Map(mapElement, {
+      zoom: 12,
+      center: (userLat !== null && userLng !== null) ? { lat: userLat, lng: userLng } : { lat: -36.8485, lng: 174.7633 }
+    });
+    if (userLat && userLng && <%= !(user && user.is_address_private == 1) %>) {
+      new google.maps.Marker({
+        position: { lat: parseFloat(userLat), lng: parseFloat(userLng) },
+        map: map,
+        title: 'Your Location',
+        icon: { url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png' }
+      });
+    }
+    neighbors.forEach(function(neighbor) {
+      if (neighbor.home_lat && neighbor.home_lng) {
+        const marker = new google.maps.Marker({
+          position: { lat: parseFloat(neighbor.home_lat), lng: parseFloat(neighbor.home_lng) },
+          map: map,
+          title: neighbor.name,
+          icon: { url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png' }
+        });
+        const infowindow = new google.maps.InfoWindow({
+          content: '<div><strong>' + neighbor.name + '</strong><br>' + neighbor.home_address + '</div>'
+        });
+        marker.addListener('click', function() {
+          infowindow.open(map, marker);
+        });
+      }
+    });
+  } else {
+    console.error('Google Maps not loaded or map element not found');
+  }
+}
+</script>
+
 <div class="container py-5">
   <div class="row">
     <div class="col-md-8">
@@ -619,6 +718,7 @@
         <div class="modal-footer d-flex justify-content-between">
           <button type="button" class="btn btn-secondary" id="wizard-back-btn" style="display:none;">Back</button>
           <div>
+            <button type="button" class="btn btn-danger me-2" id="wizard-quit-btn">Quit</button>
             <button type="button" class="btn btn-link" id="wizard-skip-btn">Skip</button>
             <button type="button" class="btn btn-primary" id="wizard-next-btn">Next</button>
             <button type="button" class="btn btn-success d-none" id="wizard-finish-btn">Finish</button>
@@ -631,433 +731,71 @@
 <!-- Dependencies -->
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/autocomplete.js@0.38.0/dist/autocomplete.min.js"></script>
+
+<!-- Initialize autocomplete only for input elements, not select elements -->
+<script>
+// Ensure autocomplete only applies to input elements, not select elements
+document.addEventListener('DOMContentLoaded', function() {
+  // Only initialize autocomplete on input elements with the autocomplete class
+  document.querySelectorAll('input.autocomplete').forEach(input => {
+    const type = input.dataset.type || 'organization';
+    
+    if (typeof autoComplete !== 'undefined') {
+      new autoComplete({
+        selector: () => input,
+        threshold: 1,
+        debounce: 200,
+        searchEngine: "loose",
+        data: {
+          src: async (query) => {
+            try {
+              const res = await fetch(`/organizations/autocomplete?term=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}`);
+              return await res.json();
+            } catch (err) {
+              console.error("Autocomplete fetch error", err);
+              return [];
+            }
+          },
+          keys: ["label"]
+        },
+        resultsList: {
+          noResults: true,
+          maxResults: 10,
+          render: true
+        },
+        resultItem: {
+          highlight: true,
+          content: (data) => data.label
+        },
+        onSelection: (feedback) => {
+          const selected = feedback.selection.value;
+          input.value = selected.value || selected.label || "";
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        },
+        events: {
+          input: {
+            selection: (event) => {
+              const feedback = event.detail;
+              const selected = feedback.selection.value;
+              event.target.value = selected.value || selected.label || "";
+              event.target.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+          }
+        }
+      });
+    }
+  });
+});
+</script>
 
 <!-- Debug -->
 <script>console.log('showProfileWizard:', <%= showProfileWizard ? 'true' : 'false' %>);</script>
 
-<script>
-// Add Child Only Mode
-let addChildOnlyMode = false;
-
-// Open Add Child Wizard button handler
-const openAddChildWizardBtn = document.getElementById('openAddChildWizard');
-if (openAddChildWizardBtn) {
-  openAddChildWizardBtn.onclick = function() {
-    addChildOnlyMode = true;
-    const wizardModal = new bootstrap.Modal(document.getElementById('profileWizardModal'), {
-      backdrop: 'static',
-      keyboard: false
-    });
-    wizardModal.show();
-    // Only show step 2
-    document.getElementById('wizard-step-1').classList.add('d-none');
-    document.getElementById('wizard-step-2').classList.remove('d-none');
-    document.getElementById('wizard-step-3').classList.add('d-none');
-    document.getElementById('wizard-back-btn').style.display = 'none';
-    document.getElementById('wizard-skip-btn').style.display = 'none';
-    document.getElementById('wizard-next-btn').style.display = 'none';
-    document.getElementById('wizard-finish-btn').classList.remove('d-none');
-    document.getElementById('wizard-finish-btn').textContent = 'Add Child';
-    document.getElementById('profileWizardLabel').textContent = 'Add a Child';
-    // Clear children-list
-    document.getElementById('children-list').innerHTML = '';
-  };
-}
-
-// Patch wizard finish button for add child only mode
-const wizardFinishBtn = document.getElementById('wizard-finish-btn');
-if (wizardFinishBtn) {
-  wizardFinishBtn.onclick = async function() {
-    if (addChildOnlyMode) {
-      const childrenList = document.getElementById('children-list');
-      const childEntries = Array.from(childrenList.querySelectorAll('.child-entry'));
-      if (childEntries.length === 0) {
-        let err = document.getElementById('wizard-error-msg');
-        if (!err) {
-          err = document.createElement('div');
-          err.id = 'wizard-error-msg';
-          err.className = 'alert alert-danger';
-          err.style.marginBottom = '10px';
-          document.querySelector('#wizard-step-2 form').prepend(err);
-        }
-        err.textContent = 'Please add at least one child.';
-        return;
-      }
-      const children = [];
-      for (const entry of childEntries) {
-        const name = entry.querySelector('.child-name-input').value.trim();
-        const org_id = entry.querySelector('.child-org-select').value;
-        const club = entry.querySelector('.child-club-input').value.trim();
-        const username = entry.querySelector('.child-username-input').value.trim();
-        const password = entry.querySelector('.child-password-input').value.trim();
-        if (!name || !org_id || !username || !password) {
-          let err = document.getElementById('wizard-error-msg');
-          if (!err) {
-            err = document.createElement('div');
-            err.id = 'wizard-error-msg';
-            err.className = 'alert alert-danger';
-            err.style.marginBottom = '10px';
-            document.querySelector('#wizard-step-2 form').prepend(err);
-          }
-          err.textContent = 'Each child must have a name, organization, username, and password.';
-          return;
-        }
-        children.push({ name, org_id, club, username, password });
-      }
-      try {
-        const resp = await fetch('/api/profile/children', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ children })
-        });
-        const data = await resp.json();
-        if (!resp.ok || !data.success) {
-          let err = document.getElementById('wizard-error-msg');
-          if (!err) {
-            err = document.createElement('div');
-            err.id = 'wizard-error-msg';
-            err.className = 'alert alert-danger';
-            err.style.marginBottom = '10px';
-            document.querySelector('#wizard-step-2 form').prepend(err);
-          }
-          err.textContent = data.error || 'Failed to save children. Please try again.';
-          return;
-        }
-        // Success: reload page
-        window.location.reload();
-      } catch (err) {
-        let errDiv = document.getElementById('wizard-error-msg');
-        if (!errDiv) {
-          errDiv = document.createElement('div');
-          errDiv.id = 'wizard-error-msg';
-          errDiv.className = 'alert alert-danger';
-          errDiv.style.marginBottom = '10px';
-          document.querySelector('#wizard-step-2 form').prepend(errDiv);
-        }
-        errDiv.textContent = 'Network error. Please try again.';
-        return;
-      }
-    }
-  };
-}
-
-// Only auto-show the wizard on page load if showProfileWizard is true
 <% if (showProfileWizard) { %>
+<script>
 document.addEventListener('DOMContentLoaded', function() {
-  const wizardModal = new bootstrap.Modal(document.getElementById('profileWizardModal'), {
-    backdrop: 'static',
-    keyboard: false
-  });
-  wizardModal.show();
-  // Show step 1 (address) as default
-  document.getElementById('wizard-step-1').classList.remove('d-none');
-  document.getElementById('wizard-step-2').classList.add('d-none');
-  document.getElementById('wizard-step-3').classList.add('d-none');
-  document.getElementById('wizard-back-btn').style.display = '';
-  document.getElementById('wizard-skip-btn').style.display = '';
-  document.getElementById('wizard-next-btn').style.display = '';
-  document.getElementById('wizard-finish-btn').classList.add('d-none');
-  document.getElementById('wizard-finish-btn').textContent = 'Finish';
-  document.getElementById('profileWizardLabel').textContent = 'Complete Your Profile';
-});
-<% } %>
-
-// Single DOMContentLoaded listener to avoid conflicts
-document.addEventListener('DOMContentLoaded', function() {
-  console.log('DOM fully loaded');
-
-  // Debug: Check if Bootstrap is loaded
-  if (typeof bootstrap === 'undefined') {
-    console.error('Bootstrap is not defined! Check if the CDN loaded properly.');
-  } else {
-    console.log('Bootstrap loaded successfully');
-  }
-
-  // FullCalendar Initialization
-  if (typeof FullCalendar !== 'undefined') {
-    const calendarEl = document.getElementById('calendar');
-    if (calendarEl) {
-      let calendarEvents = [];
-      try {
-        calendarEvents = JSON.parse('<%- JSON.stringify(calendarEvents || []) %>');
-      } catch (e) {
-        console.error('Error parsing calendarEvents:', e);
-        calendarEvents = [];
-      }
-      console.log('Calendar events data:', calendarEvents);
-      console.log('Number of events:', calendarEvents.length);
-
-      const calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: calendarEvents.length > 0 ? 'listWeek' : 'dayGridMonth',
-        headerToolbar: {
-          left: 'prev,next today',
-          center: 'title',
-          right: 'dayGridMonth,timeGridWeek,listWeek'
-        },
-        height: 350,
-        timeZone: 'local',
-        initialDate: new Date(),
-        events: calendarEvents,
-        eventDisplay: 'block',
-        eventTimeFormat: {
-          hour: '2-digit',
-          minute: '2-digit',
-          meridiem: 'short'
-        },
-        eventDidMount: function(info) {
-          console.log('Event mounted:', info.event);
-          const event = info.event;
-          const tooltipContent = `
-            <div class="text-start">
-              <strong>${event.title}</strong><br>
-              <small>${event.extendedProps.description || 'No description'}</small><br>
-              <small>${event.start.toLocaleTimeString('en-US', { 
-                hour: '2-digit', 
-                minute: '2-digit',
-                hour12: true 
-              })}</small>
-            </div>
-          `;
-          info.el.title = event.title + ' - ' + (event.extendedProps.description || 'No description');
-          
-          info.el.addEventListener('click', function(e) {
-            e.preventDefault();
-            const event = info.event;
-            const isGroupRecurring = event.extendedProps.type === 'group_recurring';
-            const isRideRequest = event.extendedProps.type === 'request' || event.extendedProps.type === 'child_request' || event.extendedProps.type === 'my_request';
-            const instanceId = event.extendedProps.instance_id || event.extendedProps.instanceId || event.id;
-
-            let dropoffBtnLabel = '';
-            let pickupBtnLabel = '';
-            let bothBtnLabel = '';
-            if (isGroupRecurring) {
-              dropoffBtnLabel = (event.extendedProps.dropoff_driver && event.extendedProps.dropoff_driver !== 'Unassigned')
-                ? `Take Over Drop Off at ${event.title}`
-                : `I can Drop Off at ${event.title}`;
-              pickupBtnLabel = (event.extendedProps.pickup_driver && event.extendedProps.pickup_driver !== 'Unassigned')
-                ? `Take Over Pick Up from ${event.title}`
-                : `I can Pick Up from ${event.title}`;
-              bothBtnLabel = ((event.extendedProps.dropoff_driver && event.extendedProps.dropoff_driver !== 'Unassigned') ||
-                              (event.extendedProps.pickup_driver && event.extendedProps.pickup_driver !== 'Unassigned'))
-                ? `Take Over Both`
-                : `I can Do Both`;
-            }
-
-            // Get status badge HTML for ride requests
-            let statusBadge = '';
-            if (isRideRequest) {
-              const status = event.extendedProps.status || 'pending';
-              let badgeClass = 'bg-secondary';
-              let statusText = 'Unknown';
-              
-              if (status === 'pending' || status === 'Pending') {
-                badgeClass = 'bg-warning text-dark';
-                statusText = 'Pending';
-              } else if (status === 'assigned' || status === 'Assigned') {
-                badgeClass = 'bg-primary';
-                statusText = 'Assigned';
-              } else if (status === 'completed' || status === 'Completed') {
-                badgeClass = 'bg-success';
-                statusText = 'Completed';
-              } else if (status === 'cancelled' || status === 'Cancelled') {
-                badgeClass = 'bg-danger';
-                statusText = 'Cancelled';
-              }
-              
-              statusBadge = `<span class="badge ${badgeClass} mb-2">${statusText}</span>`;
-            }
-
-            const modalHTML = `
-              <div class="modal fade" id="eventModal" tabindex="-1" aria-labelledby="eventModalLabel" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered">
-                  <div class="modal-content">
-                    <div class="modal-header">
-                      <h5 class="modal-title" id="eventModalLabel">
-                        <i class="fas fa-calendar-event me-2"></i>${event.title}
-                      </h5>
-                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                      <div class="row">
-                        <div class="col-12">
-                          ${statusBadge}
-                          <p class="text-muted mb-3">
-                            <i class="fas fa-info-circle me-2"></i>
-                            ${event.extendedProps.description || 'No description'}
-                          </p>
-                          <div class="alert alert-info">
-                            <i class="fas fa-clock me-2"></i>
-                            <strong>Time:</strong> ${event.start.toLocaleString('en-US', { 
-                              weekday: 'long',
-                              year: 'numeric', 
-                              month: 'long', 
-                              day: 'numeric',
-                              hour: '2-digit', 
-                              minute: '2-digit',
-                              hour12: true 
-                            })}
-                            ${event.end ? `<br><i class="fas fa-stop-circle me-2"></i><strong>End:</strong> ${event.end.toLocaleString('en-US', { 
-                              hour: '2-digit', 
-                              minute: '2-digit',
-                              hour12: true 
-                            })}` : ''}
-                          </div>
-                          ${isRideRequest && event.extendedProps.driver_name ? `
-                            <div class="alert alert-success mb-3">
-                              <i class="fas fa-user me-2"></i>
-                              <strong>Driver:</strong> ${event.extendedProps.driver_name}
-                            </div>
-                          ` : ''}
-                          ${isGroupRecurring ? `
-                            <div class="alert alert-secondary mb-3">
-                              <strong>Dropoff:</strong> <span class="${event.extendedProps.dropoff_driver === 'Unassigned' ? 'text-danger' : 'text-success'}">
-                                ${event.extendedProps.dropoff_driver || 'Unassigned'}
-                              </span><br>
-                              <strong>Pickup:</strong> <span class="${event.extendedProps.pickup_driver === 'Unassigned' ? 'text-danger' : 'text-success'}">
-                                ${event.extendedProps.pickup_driver || 'Unassigned'}
-                              </span>
-                            </div>
-                            <div class="mt-3">
-                              <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
-                                <input type="hidden" name="assignmentType" value="dropoff">
-                                <button type="submit" class="btn btn-primary btn-sm me-2">${dropoffBtnLabel}</button>
-                              </form>
-                              <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
-                                <input type="hidden" name="assignmentType" value="pickup">
-                                <button type="submit" class="btn btn-success btn-sm me-2">${pickupBtnLabel}</button>
-                              </form>
-                              <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
-                                <input type="hidden" name="assignmentType" value="both">
-                                <button type="submit" class="btn btn-info btn-sm">${bothBtnLabel}</button>
-                              </form>
-                            </div>
-                          ` : ''}
-                          ${isRideRequest ? `
-                            <div class="mt-3">
-                              <a href="/rides" class="btn btn-outline-primary btn-sm me-2">
-                                <i class="fas fa-car me-1"></i>View Ride Details
-                              </a>
-                              <a href="/messages/group/ride/${event.id.replace(/^(ride_|child_ride_|my_ride_)/, '')}" class="btn btn-outline-info btn-sm">
-                                <i class="fas fa-comments me-1"></i>Chat
-                              </a>
-                            </div>
-                          ` : ''}
-                        </div>
-                      </div>
-                    </div>
-                    <div class="modal-footer">
-                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                        <i class="fas fa-times me-1"></i>Close
-                      </button>
-                      <a href="/calendar" class="btn btn-primary">
-                        <i class="fas fa-calendar-alt me-1"></i>View Full Calendar
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            `;
-            const existingModal = document.getElementById('eventModal');
-            if (existingModal) { existingModal.remove(); }
-            document.body.insertAdjacentHTML('beforeend', modalHTML);
-            const modal = new bootstrap.Modal(document.getElementById('eventModal'));
-            modal.show();
-            document.getElementById('eventModal').addEventListener('hidden.bs.modal', function() { this.remove(); });
-          });
-        },
-        dayCellDidMount: function(arg) {
-          const date = arg.date;
-          const dayOfWeek = date.getDay();
-          if (dayOfWeek === 0 || dayOfWeek === 6) {
-            arg.el.style.backgroundColor = '#f8f9fa';
-            arg.el.style.fontWeight = 'bold';
-          }
-          const today = new Date();
-          if (date.toDateString() === today.toDateString()) {
-            arg.el.style.border = '2px solid #007bff';
-            arg.el.style.borderRadius = '8px';
-          }
-        },
-        loading: function(isLoading) { console.log('Calendar loading state:', isLoading); },
-        views: {
-          dayGridMonth: { dayMaxEvents: 3, moreLinkClick: 'popover' },
-          timeGridWeek: { slotMinTime: '06:00:00', slotMaxTime: '22:00:00' }
-        },
-        eventClassNames: function(arg) {
-          const event = arg.event;
-          const classes = [];
-          if (event.extendedProps.type === 'request') {
-            classes.push('event-drive');
-          } else if (event.extendedProps.type === 'child_request') {
-            classes.push('event-ride');
-          } else if (event.extendedProps.type === 'my_request') {
-            classes.push('event-my-request');
-          } else if (event.extendedProps.type === 'recurring') {
-            classes.push('event-recurring');
-          } else if (event.extendedProps.type === 'group_recurring') {
-            classes.push('event-group-recurring');
-          } else if (event.extendedProps.type === 'subscribed_recurring') {
-            classes.push('event-subscribed-recurring');
-          }
-          return classes;
-        }
-      });
-      console.log('FullCalendar instance created');
-      calendar.render();
-      console.log('FullCalendar rendered');
-      setTimeout(() => {
-        const calendarContainer = calendarEl.querySelector('.fc');
-        if (calendarContainer) {
-          console.log('Calendar DOM structure created:', {
-            width: calendarContainer.offsetWidth,
-            height: calendarContainer.offsetHeight,
-            visible: calendarContainer.offsetWidth > 0 && calendarContainer.offsetHeight > 0
-          });
-          const eventElements = calendarContainer.querySelectorAll('.fc-event');
-          console.log('Event elements found:', eventElements.length);
-        } else {
-          console.error('Calendar DOM structure not found');
-        }
-      }, 100);
-    } else {
-      console.error('Calendar container not found');
-    }
-  } else {
-    console.error('FullCalendar not defined');
-  }
-
-  // School/Club Autocomplete
-  const autocompleteInputs = document.querySelectorAll('.autocomplete');
-  autocompleteInputs.forEach(input => {
-    const type = input.dataset.type;
-    new autoComplete({
-      selector: () => input,
-      threshold: 1,
-      debounce: 200,
-      searchEngine: "loose",
-      data: {
-        src: async (query) => {
-          try {
-            const res = await fetch(`/organizations/autocomplete?term=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}`);
-            return await res.json();
-          } catch (err) {
-            console.error("Autocomplete fetch error", err);
-            return [];
-          }
-        },
-        keys: ["label"]
-      },
-      resultsList: { noResults: true, maxResults: 10, render: true },
-      resultItem: { highlight: true, content: (data) => data.label },
-      onSelection: (feedback) => {
-        const selected = feedback.selection.value;
-        input.value = selected.value || selected.label || "";
-        input.style.color = '#222';
-        input.dispatchEvent(new Event('input', { bubbles: true }));
-      }
-    });
-  });
+  // Add Child Only Mode
+  let addChildOnlyMode = false;
 
   // Wizard Modal Initialization
   if (document.getElementById('profileWizardModal')) {
@@ -1081,7 +819,7 @@ document.addEventListener('DOMContentLoaded', function() {
         err.id = 'wizard-error-msg';
         err.className = 'alert alert-danger';
         err.style.marginBottom = '10px';
-        document.querySelector('#wizard-step-1 form').prepend(err);
+        document.querySelector('#wizard-step-' + wizardStep + ' form').prepend(err);
       }
       err.textContent = msg;
     }
@@ -1089,6 +827,103 @@ document.addEventListener('DOMContentLoaded', function() {
     function clearWizardError() {
       const err = document.getElementById('wizard-error-msg');
       if (err) err.remove();
+    }
+
+    // Open Add Child Wizard button handler
+    const openAddChildWizardBtn = document.getElementById('openAddChildWizard');
+    if (openAddChildWizardBtn) {
+      openAddChildWizardBtn.onclick = function() {
+        addChildOnlyMode = true;
+        const wizardModal = new bootstrap.Modal(document.getElementById('profileWizardModal'), {
+          backdrop: 'static',
+          keyboard: false
+        });
+        wizardModal.show();
+        // Only show step 2
+        document.getElementById('wizard-step-1').classList.add('d-none');
+        document.getElementById('wizard-step-2').classList.remove('d-none');
+        document.getElementById('wizard-step-3').classList.add('d-none');
+        document.getElementById('wizard-back-btn').style.display = 'none';
+        document.getElementById('wizard-skip-btn').style.display = 'none';
+        document.getElementById('wizard-next-btn').style.display = 'none';
+        document.getElementById('wizard-finish-btn').classList.remove('d-none');
+        document.getElementById('wizard-finish-btn').textContent = 'Add Child';
+        document.getElementById('profileWizardLabel').textContent = 'Add a Child';
+        // Clear children-list and add one child entry by default
+        const childrenList = document.getElementById('children-list');
+        childrenList.innerHTML = '';
+        const template = document.getElementById('child-entry-template').firstElementChild.cloneNode(true);
+        template.querySelector('.remove-child-btn').onclick = function() {
+          template.remove();
+        };
+        childrenList.appendChild(template);
+      };
+    }
+
+    // Add Quit button handler
+    const wizardQuitBtn = document.getElementById('wizard-quit-btn');
+    if (wizardQuitBtn) {
+      wizardQuitBtn.onclick = async function() {
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('profileWizardModal'));
+        modal.hide();
+        // Optionally mark wizard as skipped (uncomment if desired):
+        // await fetch('/api/profile/complete', { method: 'POST' });
+        // window.location.reload();
+      };
+    }
+
+    // Patch wizard finish button for add child only mode
+    const wizardFinishBtn = document.getElementById('wizard-finish-btn');
+    if (wizardFinishBtn) {
+      wizardFinishBtn.onclick = async function() {
+        if (addChildOnlyMode) {
+          const childrenList = document.getElementById('children-list');
+          const childEntries = Array.from(childrenList.querySelectorAll('.child-entry'));
+          if (childEntries.length === 0) {
+            showWizardError('Please add at least one child.');
+            return;
+          }
+          const children = [];
+          for (const entry of childEntries) {
+            const name = entry.querySelector('.child-name-input').value.trim();
+            const org_id = entry.querySelector('.child-org-select').value;
+            const club = entry.querySelector('.child-club-input').value.trim();
+            const username = entry.querySelector('.child-username-input').value.trim();
+            const password = entry.querySelector('.child-password-input').value.trim();
+            if (!name || !org_id || !username || !password) {
+              showWizardError('Each child must have a name, organization, username, and password.');
+              return;
+            }
+            children.push({
+              name,
+              organization_id: Number(org_id),
+              club,
+              username,
+              password,
+              parent_id: <%= session.userId %>
+            });
+          }
+          try {
+            const resp = await fetch('/api/profile/children', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ children })
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.success) {
+              showWizardError(data.error || 'Failed to save children. Please try again.');
+              return;
+            }
+            // Success: hide modal and reload page
+            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('profileWizardModal'));
+            modal.hide();
+            window.location.reload();
+          } catch (err) {
+            showWizardError('Network error. Please try again.');
+            return;
+          }
+        }
+      };
     }
 
     // Wizard button event listeners
@@ -1138,7 +973,14 @@ document.addEventListener('DOMContentLoaded', function() {
             showWizardError('Each child must have a name, organization, username, and password.');
             return;
           }
-          children.push({ name, org_id, club, username, password });
+          children.push({
+            name,
+            organization_id: Number(org_id),
+            club,
+            username,
+            password,
+            parent_id: <%= session.userId %>
+          });
         }
         try {
           const resp = await fetch('/api/profile/children', {
@@ -1173,19 +1015,11 @@ document.addEventListener('DOMContentLoaded', function() {
       try {
         const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('profileWizardModal'));
         modal.hide();
-        await fetch('/api/profile/complete', { method: 'POST' });
+        // await fetch('/api/profile/complete', { method: 'POST' }); // Commented out as per instructions
         window.location.reload();
       } catch (err) {
         console.error('Error skipping wizard:', err);
-      }
-    };
-
-    document.getElementById('wizard-finish-btn').onclick = async function() {
-      try {
-        await fetch('/api/profile/complete', { method: 'POST' });
-        window.location.reload();
-      } catch (err) {
-        console.error('Error finishing wizard:', err);
+        showWizardError('Network error. Please try again.');
       }
     };
 
@@ -1203,118 +1037,15 @@ document.addEventListener('DOMContentLoaded', function() {
         backdrop: 'static',
         keyboard: false
       });
-      // Do not call wizardModal.show() here to prevent unconditional display
       showStep(1);
       console.log('Wizard modal initialized');
     } catch (e) {
       console.error('Error initializing wizard modal:', e);
     }
-  } else {
-    console.log('Profile wizard modal not found in DOM');
   }
 });
-
-// Community Map and Autocomplete Initialization
-function initLiftyMaps() {
-  // Home address autocomplete
-  const homeAddressInput = document.getElementById('home_address');
-  if (homeAddressInput && typeof google !== 'undefined' && google.maps) {
-    console.log('Initializing autocomplete for home_address');
-    const autocomplete = new google.maps.places.Autocomplete(homeAddressInput);
-    autocomplete.addListener('place_changed', function() {
-      const place = autocomplete.getPlace();
-      if (place.geometry) {
-        document.getElementById('home_lat').value = place.geometry.location.lat();
-        document.getElementById('home_lng').value = place.geometry.location.lng();
-        console.log('Home address selected:', place.formatted_address, place.geometry.location);
-      } else {
-        console.log('No valid place selected for home_address');
-      }
-    });
-  } else {
-    console.error('Google Maps not loaded or home_address input not found');
-  }
-
-  // Wizard address autocomplete
-  const wizardAddressInput = document.getElementById('wizard_home_address');
-  if (wizardAddressInput && typeof google !== 'undefined' && google.maps) {
-    console.log('Initializing autocomplete for wizard_home_address');
-    const autocomplete = new google.maps.places.Autocomplete(wizardAddressInput, {
-      // Append dropdown to modal content to ensure correct stacking context
-      appendTo: document.querySelector('#profileWizardModal .modal-content')
-    });
-    autocomplete.addListener('place_changed', function() {
-      const place = autocomplete.getPlace();
-      if (place.geometry) {
-        document.getElementById('wizard_home_lat').value = place.geometry.location.lat();
-        document.getElementById('wizard_home_lng').value = place.geometry.location.lng();
-        console.log('Wizard address selected:', place.formatted_address, place.geometry.location);
-        // Clear any error message
-        const err = document.getElementById('wizard-error-msg');
-        if (err) err.remove();
-      } else {
-        console.log('No valid place selected for wizard_home_address');
-        // Show error if no valid place selected
-        let err = document.getElementById('wizard-error-msg');
-        if (!err) {
-          err = document.createElement('div');
-          err.id = 'wizard-error-msg';
-          err.className = 'alert alert-danger';
-          err.style.marginBottom = '10px';
-          document.querySelector('#wizard-step-1 form').prepend(err);
-        }
-        err.textContent = 'Please select a valid address from the dropdown.';
-      }
-    });
-  } else {
-    console.error('Google Maps not loaded or wizard_home_address input not found');
-  }
-
-  // Community map
-  const mapElement = document.getElementById('map');
-  if (mapElement && typeof google !== 'undefined' && google.maps) {
-    console.log('Initializing community map');
-    const userLat = <%= (user && user.home_lat != null) ? Number(user.home_lat) : 'null' %>;
-    const userLng = <%= (user && user.home_lng != null) ? Number(user.home_lng) : 'null' %>;
-    let neighbors = [];
-    try {
-      neighbors = JSON.parse('<%- JSON.stringify(neighbors || []) %>');
-    } catch (e) {
-      console.error('Error parsing neighbors:', e);
-      neighbors = [];
-    }
-    const map = new google.maps.Map(mapElement, {
-      zoom: 12,
-      center: (userLat !== null && userLng !== null) ? { lat: userLat, lng: userLng } : { lat: -36.8485, lng: 174.7633 }
-    });
-    if (userLat && userLng && !<%= user && user.is_address_private == 1 ? 'true' : 'false' %>) {
-      new google.maps.Marker({
-        position: { lat: parseFloat(userLat), lng: parseFloat(userLng) },
-        map: map,
-        title: 'Your Location',
-        icon: { url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png' }
-      });
-    }
-    neighbors.forEach(function(neighbor) {
-      if (neighbor.home_lat && neighbor.home_lng) {
-        const marker = new google.maps.Marker({
-          position: { lat: parseFloat(neighbor.home_lat), lng: parseFloat(neighbor.home_lng) },
-          map: map,
-          title: neighbor.name,
-          icon: { url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png' }
-        });
-        const infowindow = new google.maps.InfoWindow({
-          content: '<div><strong>' + neighbor.name + '</strong><br>' + neighbor.home_address + '</div>'
-        });
-        marker.addListener('click', function() {
-          infowindow.open(map, marker);
-        });
-      }
-    });
-  } else {
-    console.error('Google Maps not loaded or map element not found');
-  }
-}
 </script>
+<% } %>
+
 <script async defer src="https://maps.googleapis.com/maps/api/js?key=<%= GMAPS_API_KEY %>&libraries=places&callback=initLiftyMaps"></script>
 <%- include('partials/footer1') %>

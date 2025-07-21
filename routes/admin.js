@@ -333,6 +333,10 @@ router.post('/children/add', async (req, res) => {
     }
     await db.query('START TRANSACTION');
     
+    // Look up organization_id from school name
+    const [[org]] = await db.query('SELECT id FROM Organizations WHERE name = ? AND type = "school"', [school.trim()]);
+    const organizationId = org ? org.id : null;
+    
     // Create child record for the first parent (primary parent)
     const primaryParentId = validParents[0];
     const [childResult] = await db.query(
@@ -350,12 +354,30 @@ router.post('/children/add', async (req, res) => {
     if (userResult.affectedRows === 0) {
       throw new Error('Failed to insert into Users table');
     }
+    const childUserId = userResult.insertId;
     
     // Create ParentChild entries for all parents
     for (const parentId of validParents) {
       await db.query(
         'INSERT INTO ParentChild (parent_id, child_id, created_at) VALUES (?, ?, NOW())',
         [parentId, childId]
+      );
+    }
+    
+    // Create UserAffiliations if organization was found
+    if (organizationId) {
+      // Parent affiliations for all parents
+      for (const parentId of validParents) {
+        await db.query(
+          'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
+          [parentId, childId, organizationId, 'parent']
+        );
+      }
+      
+      // Child affiliation
+      await db.query(
+        'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
+        [childUserId, childId, organizationId, 'child']
       );
     }
     
@@ -400,6 +422,10 @@ router.post('/children/:id/edit', async (req, res) => {
       return res.redirect('/admin/dashboard');
     }
     
+    // Look up organization_id from school name
+    const [[org]] = await db.query('SELECT id FROM Organizations WHERE name = ? AND type = "school"', [school.trim()]);
+    const organizationId = org ? org.id : null;
+    
     // Update the child record
     await db.query(
       'UPDATE Children SET name = ?, school = ?, club = ?, user_id = ? WHERE id = ?',
@@ -412,6 +438,32 @@ router.post('/children/:id/edit', async (req, res) => {
       await db.query('DELETE FROM ParentChild WHERE child_id = ? AND parent_id = ?', [req.params.id, currentChild.user_id]);
       // Add new ParentChild entry
       await db.query('INSERT INTO ParentChild (parent_id, child_id, created_at) VALUES (?, ?, NOW())', [user_id, req.params.id]);
+    }
+    
+    // Update UserAffiliations if organization was found
+    if (organizationId) {
+      // Remove old affiliations for this child
+      await db.query('DELETE FROM UserAffiliations WHERE child_id = ?', [req.params.id]);
+      
+      // Get all parents for this child
+      const [parents] = await db.query('SELECT parent_id FROM ParentChild WHERE child_id = ?', [req.params.id]);
+      
+      // Create new affiliations for all parents
+      for (const parent of parents) {
+        await db.query(
+          'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
+          [parent.parent_id, req.params.id, organizationId, 'parent']
+        );
+      }
+      
+      // Get child user account if it exists
+      const [[childUser]] = await db.query('SELECT id FROM Users WHERE child_profile_id = ?', [req.params.id]);
+      if (childUser) {
+        await db.query(
+          'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
+          [childUser.id, req.params.id, organizationId, 'child']
+        );
+      }
     }
     
     await db.query('COMMIT');
@@ -441,6 +493,10 @@ router.post('/children/:id/delete', async (req, res) => {
       await db.query('DELETE FROM Users WHERE id = ?', [userId]);
       console.log(`Deleted user with child_profile_id ${childId}: User ID ${userId}`);
     }
+
+    // Delete UserAffiliations for this child
+    await db.query('DELETE FROM UserAffiliations WHERE child_id = ?', [childId]);
+    console.log(`Deleted UserAffiliations entries for child ID ${childId}`);
 
     // Delete ParentChild entries for this child
     await db.query('DELETE FROM ParentChild WHERE child_id = ?', [childId]);

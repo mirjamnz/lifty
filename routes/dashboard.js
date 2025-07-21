@@ -416,6 +416,7 @@ router.post('/add-child', async (req, res) => {
   }
 
   let childId = null;
+  let childUserId = null;
   try {
     // If a username is provided, check for uniqueness first
     if (child_username) {
@@ -428,6 +429,10 @@ router.post('/add-child', async (req, res) => {
         return res.redirect('/dashboard');
       }
     }
+
+    // Look up organization_id from school name
+    const [[org]] = await db.query('SELECT id FROM Organizations WHERE name = ? AND type = "school"', [school.trim()]);
+    const organizationId = org ? org.id : null;
 
     // Insert child row
     const [childResult] = await db.query(
@@ -462,7 +467,7 @@ router.post('/add-child', async (req, res) => {
     if (child_username && child_password) {
       const hashed = await bcrypt.hash(child_password, 10);
       try {
-        await db.query(
+        const [childUserResult] = await db.query(
           `INSERT INTO Users (name, username, email, password_hash, role, parent_id, child_profile_id)
            VALUES (?, ?, ?, ?, 'child', ?, ?)`,
           [
@@ -474,6 +479,7 @@ router.post('/add-child', async (req, res) => {
             childId
           ]
         );
+        childUserId = childUserResult.insertId;
       } catch (err) {
         // If user creation fails, delete the child row and parent-child link
         await db.query('DELETE FROM ParentChild WHERE child_id = ?', [childId]);
@@ -481,6 +487,23 @@ router.post('/add-child', async (req, res) => {
         console.error("❌ Failed to create child login account:", err.message);
         req.session.error = `Child profile could not be created: ${err.message}`;
         return res.redirect('/dashboard');
+      }
+    }
+
+    // Create UserAffiliations if organization was found
+    if (organizationId) {
+      // Parent affiliation
+      await db.query(
+        'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
+        [parentId, childId, organizationId, 'parent']
+      );
+      
+      // Child affiliation (if child user account was created)
+      if (childUserId) {
+        await db.query(
+          'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
+          [childUserId, childId, organizationId, 'child']
+        );
       }
     }
 
@@ -518,6 +541,10 @@ router.post('/edit-child/:id', async (req, res) => {
       return res.status(403).send('Unauthorized or child not found.');
     }
 
+    // Look up organization_id from school name
+    const [[org]] = await db.query('SELECT id FROM Organizations WHERE name = ? AND type = "school"', [school.trim()]);
+    const organizationId = org ? org.id : null;
+
     await db.query(
       'UPDATE Children SET name = ?, school = ?, club = ? WHERE id = ?',
       [name.trim(), school.trim(), club?.trim() || null, childId]
@@ -553,6 +580,31 @@ router.post('/edit-child/:id', async (req, res) => {
       );
     }
 
+    // Update UserAffiliations
+    if (organizationId) {
+      // Remove old affiliations for this child
+      await db.query('DELETE FROM UserAffiliations WHERE child_id = ?', [childId]);
+      
+      // Get all parents for this child
+      const [parents] = await db.query('SELECT parent_id FROM ParentChild WHERE child_id = ?', [childId]);
+      
+      // Create new affiliations for all parents
+      for (const parent of parents) {
+        await db.query(
+          'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
+          [parent.parent_id, childId, organizationId, 'parent']
+        );
+      }
+      
+      // Create affiliation for child user account if it exists
+      if (user) {
+        await db.query(
+          'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
+          [user.id, childId, organizationId, 'child']
+        );
+      }
+    }
+
     req.session.success = `✅ Child '${name}' updated successfully.`;
     res.redirect('/dashboard');
   } catch (err) {
@@ -574,6 +626,8 @@ router.get('/delete-child/:id', async (req, res) => {
     await db.query('DELETE FROM ParentChild WHERE child_id = ? AND parent_id = ?', [childId, userId]);
     const [[linkCount]] = await db.query('SELECT COUNT(*) as cnt FROM ParentChild WHERE child_id = ?', [childId]);
     if (linkCount.cnt === 0) {
+      // Delete UserAffiliations for this child
+      await db.query('DELETE FROM UserAffiliations WHERE child_id = ?', [childId]);
       // Delete any user accounts linked to this child
       await db.query('DELETE FROM Users WHERE child_profile_id = ?', [childId]);
       // Now delete the child
@@ -1171,7 +1225,7 @@ router.post('/api/profile/children', async (req, res) => {
       
       // Create child user account
       const hashedPassword = await bcrypt.hash(password, 10);
-      await db.query(
+      const [childUserResult] = await db.query(
         `INSERT INTO Users (name, username, email, password_hash, role, parent_id, child_profile_id)
          VALUES (?, ?, ?, ?, 'child', ?, ?)`,
         [
@@ -1182,6 +1236,20 @@ router.post('/api/profile/children', async (req, res) => {
           parentId,
           childId
         ]
+      );
+      const childUserId = childUserResult.insertId;
+      
+      // Create UserAffiliations for both parent and child
+      // Parent affiliation
+      await db.query(
+        'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
+        [parentId, childId, org_id, 'parent']
+      );
+      
+      // Child affiliation
+      await db.query(
+        'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
+        [childUserId, childId, org_id, 'child']
       );
     }
     return res.json({ success: true });
@@ -1201,6 +1269,29 @@ router.post('/api/profile/complete', async (req, res) => {
   } catch (err) {
     console.error('Error marking profile as completed:', err);
     res.status(500).json({ success: false, error: 'Failed to mark profile as completed' });
+  }
+});
+
+// API: Get UserAffiliations for debugging
+router.get('/api/user-affiliations', async (req, res) => {
+  const userId = req.session.userId;
+  if (!userId) return res.status(401).json({ error: 'Not logged in' });
+  
+  try {
+    const [affiliations] = await db.query(`
+      SELECT ua.*, u.name as user_name, c.name as child_name, o.name as organization_name
+      FROM UserAffiliations ua
+      JOIN Users u ON ua.user_id = u.id
+      JOIN Children c ON ua.child_id = c.id
+      JOIN Organizations o ON ua.organization_id = o.id
+      WHERE ua.user_id = ?
+      ORDER BY ua.created_at DESC
+    `, [userId]);
+    
+    return res.json({ success: true, affiliations });
+  } catch (err) {
+    console.error('Get user affiliations error:', err);
+    return res.status(500).json({ error: 'Failed to get user affiliations.' });
   }
 });
 
