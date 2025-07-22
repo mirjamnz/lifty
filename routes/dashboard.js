@@ -1267,19 +1267,28 @@ router.post('/api/profile/children', async (req, res) => {
       // Create UserAffiliations for both parent and child
       console.log('🧙‍♂️ API: Creating UserAffiliations for child:', name, 'childId:', childId, 'orgId:', actualOrgId);
       
-      // Parent affiliation
-      await connection.query(
-        'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
-        [parentId, childId, actualOrgId, 'parent']
-      );
-      console.log('🧙‍♂️ API: Created parent affiliation');
-      
-      // Child affiliation
-      await connection.query(
-        'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
-        [childUserId, childId, actualOrgId, 'child']
-      );
-      console.log('🧙‍♂️ API: Created child affiliation');
+      try {
+        // Parent affiliation
+        console.log('🧙‍♂️ API: Attempting parent affiliation insert with values:', { parentId, childId, actualOrgId });
+        await connection.query(
+          'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
+          [parentId, childId, actualOrgId, 'parent']
+        );
+        console.log('🧙‍♂️ API: Created parent affiliation');
+        
+        // Child affiliation
+        console.log('🧙‍♂️ API: Attempting child affiliation insert with values:', { childUserId, childId, actualOrgId });
+        await connection.query(
+          'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
+          [childUserId, childId, actualOrgId, 'child']
+        );
+        console.log('🧙‍♂️ API: Created child affiliation');
+      } catch (affiliationErr) {
+        console.error('🧙‍♂️ API: ERROR during UserAffiliations creation:', affiliationErr);
+        console.error('🧙‍♂️ API: Error message:', affiliationErr.message);
+        console.error('🧙‍♂️ API: Error code:', affiliationErr.code);
+        throw affiliationErr; // Re-throw to trigger rollback
+      }
     }
     
     // Commit transaction

@@ -927,7 +927,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Wizard button event listeners
+    console.log('🧙‍♂️ Wizard: Setting up Next button event handler');
     document.getElementById('wizard-next-btn').onclick = async function() {
+      console.log('🧙‍♂️ Wizard: Next button clicked! Current step:', wizardStep);
       if (wizardStep === 1) {
         clearWizardError();
         const address = document.getElementById('wizard_home_address').value.trim();
@@ -1017,9 +1019,14 @@ document.addEventListener('DOMContentLoaded', function() {
           return;
         }
       }
+      
+      console.log('🧙‍♂️ Wizard: About to advance to next step. Current step:', wizardStep, 'Total steps:', totalSteps);
       if (wizardStep < totalSteps) {
         wizardStep++;
+        console.log('🧙‍♂️ Wizard: Advancing to step:', wizardStep);
         showStep(wizardStep);
+      } else {
+        console.log('🧙‍♂️ Wizard: Reached final step, not advancing');
       }
     };
 
