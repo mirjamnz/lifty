@@ -5,6 +5,16 @@ const db = require('../db');
 const isAdmin = require('../middleware/isAdmin');
 const bcrypt = require('bcrypt');
 
+// Add cache-busting middleware for admin routes
+router.use((req, res, next) => {
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  res.set('Last-Modified', new Date().toUTCString());
+  res.set('ETag', `"${Date.now()}"`);
+  next();
+});
+
 router.use(isAdmin);
 
 // Admin Dashboard

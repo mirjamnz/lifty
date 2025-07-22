@@ -12,6 +12,11 @@ const adminRoutes = require('./routes/admin');
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
+// Disable EJS cache in development
+if (process.env.NODE_ENV !== 'production') {
+  app.set('view cache', false);
+}
+
 // Static files
 app.use(express.static(path.join(__dirname, 'public')));
 

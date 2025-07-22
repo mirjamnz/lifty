@@ -10,8 +10,7 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME || 'lifty',
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0,
-  debug: true // Enable debug output
+  queueLimit: 0
 });
 
 module.exports = pool;

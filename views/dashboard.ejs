@@ -642,7 +642,7 @@ function initLiftyMaps() {
         <div class="modal-body">
           <!-- Step 1: Home Address -->
           <div class="wizard-step" id="wizard-step-1">
-            <h5>Step 1 of 3: Add Home Address</h5>
+            <h5>Step 1 of 2: Add Home Address</h5>
             <form id="wizard-address-form">
               <div class="mb-3">
                 <label for="wizard_home_address" class="form-label">Home Address</label>
@@ -658,7 +658,7 @@ function initLiftyMaps() {
           </div>
           <!-- Step 2: Add Children -->
           <div class="wizard-step d-none" id="wizard-step-2">
-            <h5>Step 2 of 3: Add Children</h5>
+            <h5>Step 2 of 2: Add Children</h5>
             <form id="wizard-children-form">
               <div id="children-list"></div>
               <button type="button" class="btn btn-outline-primary btn-sm mb-3" id="add-child-btn">+ Add Child</button>
@@ -695,25 +695,7 @@ function initLiftyMaps() {
               </div>
             </div>
           </div>
-          <!-- Step 3: Add Affiliations -->
-          <div class="wizard-step d-none" id="wizard-step-3">
-            <h5>Step 3 of 3: Add Additional Affiliations</h5>
-            <form id="wizard-affiliations-form">
-              <div class="mb-3">
-                <label class="form-label">Select organizations you are affiliated with:</label>
-                <div style="max-height: 200px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; padding: 10px;">
-                  <div>
-                    <% organizations.forEach(function(org) { %>
-                      <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="organization_ids" value="<%= org.id %>" id="org_<%= org.id %>" />
-                        <label class="form-check-label" for="org_<%= org.id %>"><%= org.name %> (<%= org.type %>)</label>
-                      </div>
-                    <% }); %>
-                  </div>
-                </div>
-              </div>
-            </form>
-          </div>
+
         </div>
         <div class="modal-footer d-flex justify-content-between">
           <button type="button" class="btn btn-secondary" id="wizard-back-btn" style="display:none;">Back</button>
@@ -801,7 +783,7 @@ document.addEventListener('DOMContentLoaded', function() {
   if (document.getElementById('profileWizardModal')) {
     console.log('Profile wizard modal found, initializing...');
     let wizardStep = 1;
-    const totalSteps = 3;
+    const totalSteps = 2; // Simplified to 2 steps
 
     function showStep(step) {
       for (let i = 1; i <= totalSteps; i++) {
@@ -842,7 +824,6 @@ document.addEventListener('DOMContentLoaded', function() {
         // Only show step 2
         document.getElementById('wizard-step-1').classList.add('d-none');
         document.getElementById('wizard-step-2').classList.remove('d-none');
-        document.getElementById('wizard-step-3').classList.add('d-none');
         document.getElementById('wizard-back-btn').style.display = 'none';
         document.getElementById('wizard-skip-btn').style.display = 'none';
         document.getElementById('wizard-next-btn').style.display = 'none';
@@ -1011,6 +992,13 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
           }
           console.log('🧙‍♂️ Wizard: Children saved successfully!');
+          
+          // Complete the wizard and reload the page
+          console.log('🧙‍♂️ Wizard: Completing wizard and reloading page');
+          const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('profileWizardModal'));
+          modal.hide();
+          window.location.reload();
+          return;
         } catch (err) {
           console.error('🧙‍♂️ Wizard: Error saving children:', err);
           console.error('🧙‍♂️ Wizard: Error details:', err.message);
@@ -1020,13 +1008,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       }
       
-      console.log('🧙‍♂️ Wizard: About to advance to next step. Current step:', wizardStep, 'Total steps:', totalSteps);
+      // Only advance to next step if not on the final step
       if (wizardStep < totalSteps) {
         wizardStep++;
         console.log('🧙‍♂️ Wizard: Advancing to step:', wizardStep);
         showStep(wizardStep);
-      } else {
-        console.log('🧙‍♂️ Wizard: Reached final step, not advancing');
       }
     };
 

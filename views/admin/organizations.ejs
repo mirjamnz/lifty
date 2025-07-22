@@ -1,24 +1,6 @@
+<!--views/admin/organizations.ejs -->
 <%- include('../partials/header1') %>
 <%- include(session && session.is_admin ? '../partials/navbar2' : '../partials/navbar1') %>
-
-<style>
-.search-highlight {
-  background-color: #fff3cd;
-  padding: 2px 4px;
-  border-radius: 3px;
-}
-
-.filter-active {
-  background-color: #e7f3ff;
-  border-color: #0d6efd;
-}
-
-.results-count {
-  font-size: 0.9rem;
-  color: #6c757d;
-  margin-bottom: 1rem;
-}
-</style>
 
 <div class="container py-5">
   <div class="d-flex justify-content-between align-items-center mb-4">
