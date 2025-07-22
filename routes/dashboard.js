@@ -1182,11 +1182,24 @@ router.post('/api/profile/address', async (req, res) => {
 
 // API: Save children from profile wizard
 router.post('/api/profile/children', async (req, res) => {
+  console.log('🧙‍♂️ API: ==========================================');
+  console.log('🧙‍♂️ API: WIZARD API CALLED!');
+  console.log('🧙‍♂️ API: Request method:', req.method);
+  console.log('🧙‍♂️ API: Request URL:', req.url);
+  console.log('🧙‍♂️ API: Request headers:', req.headers);
+  console.log('🧙‍♂️ API: Request body:', req.body);
+  console.log('🧙‍♂️ API: Session user ID:', req.session.userId);
   console.log('🧙‍♂️ API: Received children data:', JSON.stringify(req.body, null, 2));
+  
   const parentId = req.session.userId;
-  if (!parentId) return res.status(401).json({ success: false, error: 'Not logged in' });
+  if (!parentId) {
+    console.log('🧙‍♂️ API: ERROR - Not logged in!');
+    return res.status(401).json({ success: false, error: 'Not logged in' });
+  }
+  
   const { children } = req.body;
   if (!Array.isArray(children) || children.length === 0) {
+    console.log('🧙‍♂️ API: ERROR - Invalid children data!');
     return res.status(400).json({ success: false, error: 'At least one child is required.' });
   }
   

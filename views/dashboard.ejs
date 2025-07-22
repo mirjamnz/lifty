@@ -983,22 +983,36 @@ document.addEventListener('DOMContentLoaded', function() {
           });
         }
         try {
+          console.log('🧙‍♂️ Wizard: About to send API call...');
+          console.log('🧙‍♂️ Wizard: Children data:', children);
           console.log('🧙‍♂️ Wizard: Sending children data:', JSON.stringify({ children }, null, 2));
+          
+          const requestBody = JSON.stringify({ children });
+          console.log('🧙‍♂️ Wizard: Request body:', requestBody);
+          
           const resp = await fetch('/api/profile/children', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ children })
+            body: requestBody
           });
+          
+          console.log('🧙‍♂️ Wizard: Response received!');
           console.log('🧙‍♂️ Wizard: Response status:', resp.status);
+          console.log('🧙‍♂️ Wizard: Response headers:', resp.headers);
+          
           const data = await resp.json();
           console.log('🧙‍♂️ Wizard: Response data:', data);
+          
           if (!resp.ok || !data.success) {
+            console.log('🧙‍♂️ Wizard: API call failed!');
             showWizardError(data.error || 'Failed to save children. Please try again.');
             return;
           }
           console.log('🧙‍♂️ Wizard: Children saved successfully!');
         } catch (err) {
           console.error('🧙‍♂️ Wizard: Error saving children:', err);
+          console.error('🧙‍♂️ Wizard: Error details:', err.message);
+          console.error('🧙‍♂️ Wizard: Error stack:', err.stack);
           showWizardError('Network error. Please try again.');
           return;
         }
