@@ -1189,7 +1189,12 @@ router.post('/api/profile/children', async (req, res) => {
   if (!Array.isArray(children) || children.length === 0) {
     return res.status(400).json({ success: false, error: 'At least one child is required.' });
   }
+  
+  // Start database transaction
+  const connection = await db.getConnection();
   try {
+    await connection.beginTransaction();
+    console.log('🧙‍♂️ API: Started transaction');
     for (const child of children) {
       const { name, organization_id, org_id, club, username, password } = child;
       const actualOrgId = organization_id || org_id;
@@ -1198,36 +1203,40 @@ router.post('/api/profile/children', async (req, res) => {
       }
       
       // Check for existing username/email
-      const [[existingUser]] = await db.query(
+      const [[existingUser]] = await connection.query(
         'SELECT id FROM Users WHERE username = ? OR email = ?',
         [username.trim(), `${username.trim()}@child.local`]
       );
       if (existingUser) {
+        await connection.rollback();
         return res.status(400).json({ success: false, error: `Username '${username.trim()}' is already taken. Please choose another username.` });
       }
       
       // Lookup organization name by organization_id
-      const [[org]] = await db.query('SELECT name FROM Organizations WHERE id = ?', [actualOrgId]);
+      const [[org]] = await connection.query('SELECT name FROM Organizations WHERE id = ?', [actualOrgId]);
       if (!org) {
+        await connection.rollback();
         return res.status(400).json({ success: false, error: `Organization not found for child: ${name}` });
       }
       
       // Insert child
-      const [childResult] = await db.query(
+      const [childResult] = await connection.query(
         'INSERT INTO Children (user_id, name, school, club) VALUES (?, ?, ?, ?)',
         [parentId, name.trim(), org.name, club?.trim() || null]
       );
       const childId = childResult.insertId;
+      console.log('🧙‍♂️ API: Created child record with ID:', childId);
       
       // Create ParentChild link
-      await db.query(
+      await connection.query(
         'INSERT INTO ParentChild (parent_id, child_id) VALUES (?, ?)',
         [parentId, childId]
       );
+      console.log('🧙‍♂️ API: Created ParentChild link');
       
       // Create child user account
       const hashedPassword = await bcrypt.hash(password, 10);
-      const [childUserResult] = await db.query(
+      const [childUserResult] = await connection.query(
         `INSERT INTO Users (name, username, email, password_hash, role, parent_id, child_profile_id)
          VALUES (?, ?, ?, ?, 'child', ?, ?)`,
         [
@@ -1240,27 +1249,45 @@ router.post('/api/profile/children', async (req, res) => {
         ]
       );
       const childUserId = childUserResult.insertId;
+      console.log('🧙‍♂️ API: Created child user account with ID:', childUserId);
       
       // Create UserAffiliations for both parent and child
       console.log('🧙‍♂️ API: Creating UserAffiliations for child:', name, 'childId:', childId, 'orgId:', actualOrgId);
       
       // Parent affiliation
-      await db.query(
+      await connection.query(
         'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
         [parentId, childId, actualOrgId, 'parent']
       );
       console.log('🧙‍♂️ API: Created parent affiliation');
       
       // Child affiliation
-      await db.query(
+      await connection.query(
         'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
         [childUserId, childId, actualOrgId, 'child']
       );
       console.log('🧙‍♂️ API: Created child affiliation');
     }
+    
+    // Commit transaction
+    await connection.commit();
+    console.log('🧙‍♂️ API: Transaction committed successfully');
+    connection.release();
     return res.json({ success: true });
   } catch (err) {
-    console.error('Wizard children save error:', err);
+    console.error('🧙‍♂️ API: Wizard children save error:', err);
+    
+    // Rollback transaction on error
+    if (connection) {
+      try {
+        await connection.rollback();
+        console.log('🧙‍♂️ API: Transaction rolled back due to error');
+      } catch (rollbackErr) {
+        console.error('🧙‍♂️ API: Error during rollback:', rollbackErr);
+      }
+      connection.release();
+    }
+    
     return res.status(500).json({ success: false, error: 'Failed to save children.' });
   }
 });
