@@ -1182,6 +1182,7 @@ router.post('/api/profile/address', async (req, res) => {
 
 // API: Save children from profile wizard
 router.post('/api/profile/children', async (req, res) => {
+  console.log('🧙‍♂️ API: Received children data:', JSON.stringify(req.body, null, 2));
   const parentId = req.session.userId;
   if (!parentId) return res.status(401).json({ success: false, error: 'Not logged in' });
   const { children } = req.body;
@@ -1190,8 +1191,9 @@ router.post('/api/profile/children', async (req, res) => {
   }
   try {
     for (const child of children) {
-      const { name, org_id, club, username, password } = child;
-      if (!name || !org_id || !username || !password) {
+      const { name, organization_id, org_id, club, username, password } = child;
+      const actualOrgId = organization_id || org_id;
+      if (!name || !actualOrgId || !username || !password) {
         return res.status(400).json({ success: false, error: 'Each child must have a name, organization, username, and password.' });
       }
       
@@ -1204,8 +1206,8 @@ router.post('/api/profile/children', async (req, res) => {
         return res.status(400).json({ success: false, error: `Username '${username.trim()}' is already taken. Please choose another username.` });
       }
       
-      // Lookup organization name by org_id
-      const [[org]] = await db.query('SELECT name FROM Organizations WHERE id = ?', [org_id]);
+      // Lookup organization name by organization_id
+      const [[org]] = await db.query('SELECT name FROM Organizations WHERE id = ?', [actualOrgId]);
       if (!org) {
         return res.status(400).json({ success: false, error: `Organization not found for child: ${name}` });
       }
@@ -1240,17 +1242,21 @@ router.post('/api/profile/children', async (req, res) => {
       const childUserId = childUserResult.insertId;
       
       // Create UserAffiliations for both parent and child
+      console.log('🧙‍♂️ API: Creating UserAffiliations for child:', name, 'childId:', childId, 'orgId:', actualOrgId);
+      
       // Parent affiliation
       await db.query(
         'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
-        [parentId, childId, org_id, 'parent']
+        [parentId, childId, actualOrgId, 'parent']
       );
+      console.log('🧙‍♂️ API: Created parent affiliation');
       
       // Child affiliation
       await db.query(
         'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
-        [childUserId, childId, org_id, 'child']
+        [childUserId, childId, actualOrgId, 'child']
       );
+      console.log('🧙‍♂️ API: Created child affiliation');
     }
     return res.json({ success: true });
   } catch (err) {

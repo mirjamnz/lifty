@@ -896,7 +896,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             children.push({
               name,
-              organization_id: Number(org_id),
+              org_id: Number(org_id),
               club,
               username,
               password,
@@ -983,17 +983,22 @@ document.addEventListener('DOMContentLoaded', function() {
           });
         }
         try {
+          console.log('🧙‍♂️ Wizard: Sending children data:', JSON.stringify({ children }, null, 2));
           const resp = await fetch('/api/profile/children', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ children })
           });
+          console.log('🧙‍♂️ Wizard: Response status:', resp.status);
           const data = await resp.json();
+          console.log('🧙‍♂️ Wizard: Response data:', data);
           if (!resp.ok || !data.success) {
             showWizardError(data.error || 'Failed to save children. Please try again.');
             return;
           }
+          console.log('🧙‍♂️ Wizard: Children saved successfully!');
         } catch (err) {
+          console.error('🧙‍♂️ Wizard: Error saving children:', err);
           showWizardError('Network error. Please try again.');
           return;
         }
