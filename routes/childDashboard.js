@@ -5,7 +5,7 @@ const db = require('../db');
 
 router.get('/child-dashboard', async (req, res) => {
   const userId = req.session.userId;
-  const range = parseInt(req.query.range) || 2; // 0 = today, 2 = next 2 days, 7 = next 7 days
+  const range = parseInt(req.query.range) || 7; // 0 = today, 2 = next 2 days, 7 = next 7 days, 14 = next 2 weeks, 30 = next 1 month
 
   try {
     // 1. Verify session and role
@@ -106,7 +106,10 @@ router.get('/child-dashboard', async (req, res) => {
         const daysDiff = Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24));
         let newRange = 0;
         if (daysDiff > 0 && daysDiff <= 2) newRange = 2;
-        else if (daysDiff > 2) newRange = 7;
+        else if (daysDiff > 2 && daysDiff <= 7) newRange = 7;
+        else if (daysDiff > 7 && daysDiff <= 14) newRange = 14;
+        else if (daysDiff > 14 && daysDiff <= 30) newRange = 30;
+        else if (daysDiff > 30) newRange = 30;
         if (newRange !== range) {
           return res.redirect(`/child-dashboard?range=${newRange}&autojump=1`);
         }
