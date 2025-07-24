@@ -712,7 +712,279 @@ function initLiftyMaps() {
 
 <!-- Dependencies -->
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/locales-all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@fullcalendar/timegrid@5.11.3/main.global.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Dashboard Calendar Initialization -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('Dashboard Calendar - Starting FullCalendar initialization');
+  
+  // Debug: Check if FullCalendar is available
+  if (typeof FullCalendar === 'undefined') {
+    console.error('FullCalendar is not defined! Check if the CDN loaded properly.');
+    return;
+  }
+  console.log('FullCalendar library loaded successfully:', FullCalendar);
+  
+  // Debug: Check if calendar container exists
+  const calendarEl = document.getElementById('calendar');
+  if (!calendarEl) {
+    console.error('Calendar container element not found!');
+    return;
+  }
+  console.log('Calendar container found:', calendarEl);
+  
+  // Debug: Check calendar events data
+  const calendarEvents = <%- JSON.stringify(calendarEvents || []) %>;
+  console.log('Dashboard calendar events data:', calendarEvents);
+  console.log('Number of events:', calendarEvents.length);
+  
+  // Check if events have valid dates
+  calendarEvents.forEach((event, index) => {
+    console.log(`Dashboard Event ${index}:`, {
+      id: event.id,
+      title: event.title,
+      start: event.start,
+      startType: typeof event.start,
+      startValid: event.start ? new Date(event.start).toString() : 'INVALID',
+      startParsed: event.start ? new Date(event.start) : null
+    });
+  });
+  
+  try {
+    // Initialize FullCalendar for dashboard
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: 'dayGridMonth',
+      headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: 'dayGridMonth,timeGridWeek,listWeek'
+      },
+      height: 350, // Fixed height for sidebar
+      timeZone: 'local', // Use local timezone
+      initialDate: new Date(), // Start with current date
+      events: calendarEvents,
+      
+      // Enhanced event styling
+      eventDisplay: 'block',
+      eventTimeFormat: {
+        hour: '2-digit',
+        minute: '2-digit',
+        meridiem: 'short'
+      },
+      
+      // Custom event rendering
+      eventDidMount: function(info) {
+        console.log('Dashboard Event mounted:', info.event);
+        const event = info.event;
+        info.el.title = event.title + ' - ' + (event.extendedProps.description || 'No description');
+        
+        // Add click handler for event details
+        info.el.addEventListener('click', function(e) {
+          e.preventDefault();
+          const isRideRequest = event.extendedProps.type === 'request' || event.extendedProps.type === 'child_request' || event.extendedProps.type === 'my_request';
+          
+          // Get status badge HTML for ride requests
+          let statusBadge = '';
+          if (isRideRequest) {
+            const status = event.extendedProps.status || 'pending';
+            let badgeClass = 'bg-secondary';
+            let statusText = 'Unknown';
+            if (status === 'pending' || status === 'Pending') {
+              badgeClass = 'bg-warning text-dark';
+              statusText = 'Pending';
+            } else if (status === 'assigned' || status === 'Assigned') {
+              badgeClass = 'bg-primary';
+              statusText = 'Assigned';
+            } else if (status === 'completed' || status === 'Completed') {
+              badgeClass = 'bg-success';
+              statusText = 'Completed';
+            } else if (status === 'cancelled' || status === 'Cancelled') {
+              badgeClass = 'bg-danger';
+              statusText = 'Cancelled';
+            }
+            statusBadge = `<span class="badge ${badgeClass} mb-2">${statusText}</span>`;
+          }
+
+          const modalHTML = `
+            <div class="modal fade" id="eventModal" tabindex="-1" aria-labelledby="eventModalLabel" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <h5 class="modal-title" id="eventModalLabel">
+                      <i class="fas fa-calendar-event me-2"></i>${event.title}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                  </div>
+                  <div class="modal-body">
+                    <div class="row">
+                      <div class="col-12">
+                        ${statusBadge}
+                        <p class="text-muted mb-3">
+                          <i class="fas fa-info-circle me-2"></i>
+                          ${event.extendedProps.description || 'No description'}
+                        </p>
+                        <div class="alert alert-info">
+                          <i class="fas fa-clock me-2"></i>
+                          <strong>Time:</strong> ${event.start.toLocaleString('en-NZ', { 
+                            weekday: 'long',
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric',
+                            hour: '2-digit', 
+                            minute: '2-digit',
+                            hour12: true 
+                          })}
+                          ${event.end ? `<br><i class="fas fa-stop-circle me-2"></i><strong>End:</strong> ${event.end.toLocaleString('en-NZ', { 
+                            hour: '2-digit', 
+                            minute: '2-digit',
+                            hour12: true 
+                          })}` : ''}
+                        </div>
+                        ${isRideRequest && event.extendedProps.driver_name ? `
+                          <div class="alert alert-success mb-3">
+                            <i class="fas fa-user me-2"></i>
+                            <strong>Driver:</strong> ${event.extendedProps.driver_name}
+                          </div>
+                        ` : ''}
+                        ${isRideRequest ? `
+                          <div class="mt-3">
+                            <a href="/rides" class="btn btn-outline-primary btn-sm me-2">
+                              <i class="fas fa-car me-1"></i>View Ride Details
+                            </a>
+                            <a href="/messages/group/ride/${event.id.replace(/^(ride_|child_ride_|my_ride_)/, '')}" class="btn btn-outline-info btn-sm">
+                              <i class="fas fa-comments me-1"></i>Chat
+                            </a>
+                          </div>
+                        ` : ''}
+                      </div>
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                      <i class="fas fa-times me-1"></i>Close
+                    </button>
+                    <a href="/calendar" class="btn btn-primary">
+                      <i class="fas fa-calendar-alt me-1"></i>View Full Calendar
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+          const existingModal = document.getElementById('eventModal');
+          if (existingModal) {
+            existingModal.remove();
+          }
+          document.body.insertAdjacentHTML('beforeend', modalHTML);
+          const modal = new bootstrap.Modal(document.getElementById('eventModal'));
+          modal.show();
+          document.getElementById('eventModal').addEventListener('hidden.bs.modal', function() {
+            this.remove();
+          });
+        });
+      },
+      
+      // Day cell rendering for highlighting
+      dayCellDidMount: function(arg) {
+        const date = arg.date;
+        const dayOfWeek = date.getDay();
+        
+        // Add weekend styling
+        if (dayOfWeek === 0 || dayOfWeek === 6) {
+          arg.el.style.backgroundColor = '#f8f9fa';
+          arg.el.style.fontWeight = 'bold';
+        }
+        
+        // Add today highlighting
+        const today = new Date();
+        if (date.toDateString() === today.toDateString()) {
+          arg.el.style.border = '2px solid #007bff';
+          arg.el.style.borderRadius = '8px';
+        }
+      },
+      
+      // Loading state
+      loading: function(isLoading) {
+        console.log('Dashboard Calendar loading state:', isLoading);
+      },
+      
+      // View-specific settings
+      views: {
+        dayGridMonth: {
+          dayMaxEvents: 3, // Show max 3 events per day in sidebar
+          moreLinkClick: 'popover'
+        },
+        timeGridWeek: {
+          slotMinTime: '06:00:00',
+          slotMaxTime: '22:00:00'
+        },
+        listWeek: {
+          listDayFormat: { weekday: 'long', month: 'long', day: 'numeric' },
+          listDaySideFormat: { weekday: 'long' }
+        }
+      },
+      
+      // Custom event colors based on type
+      eventClassNames: function(arg) {
+        const event = arg.event;
+        const classes = [];
+        
+        // Add type-specific classes
+        if (event.extendedProps.type === 'request') {
+          classes.push('event-drive');
+        } else if (event.extendedProps.type === 'child_request') {
+          classes.push('event-ride');
+        } else if (event.extendedProps.type === 'my_request') {
+          classes.push('event-my-request');
+        } else if (event.extendedProps.type === 'recurring') {
+          classes.push('event-recurring');
+        } else if (event.extendedProps.type === 'group_recurring') {
+          classes.push('event-group-recurring');
+        } else if (event.extendedProps.type === 'subscribed_recurring') {
+          classes.push('event-subscribed-recurring');
+        }
+        
+        return classes;
+      }
+    });
+    
+    console.log('Dashboard FullCalendar instance created:', calendar);
+    
+    // Render the calendar
+    calendar.render();
+    console.log('Dashboard FullCalendar rendered successfully');
+    
+    // Debug: Check if calendar is visible
+    setTimeout(() => {
+      const calendarContainer = calendarEl.querySelector('.fc');
+      if (calendarContainer) {
+        console.log('Dashboard Calendar DOM structure created:', calendarContainer);
+        console.log('Dashboard Calendar dimensions:', {
+          width: calendarContainer.offsetWidth,
+          height: calendarContainer.offsetHeight,
+          visible: calendarContainer.offsetWidth > 0 && calendarContainer.offsetHeight > 0
+        });
+        
+        // Check for events in the DOM
+        const eventElements = calendarContainer.querySelectorAll('.fc-event');
+        console.log('Dashboard Event elements found in DOM:', eventElements.length);
+        eventElements.forEach((el, index) => {
+          console.log(`Dashboard Event element ${index}:`, el.textContent, el);
+        });
+      } else {
+        console.error('Dashboard Calendar DOM structure not found after render');
+      }
+    }, 100);
+    
+  } catch (error) {
+    console.error('Error initializing Dashboard FullCalendar:', error);
+    console.error('Error stack:', error.stack);
+  }
+});
+</script>
 
 <!-- Initialize autocomplete only for input elements, not select elements -->
 <script>

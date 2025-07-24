@@ -371,7 +371,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         </p>
                         <div class="alert alert-info">
                           <i class="fas fa-clock me-2"></i>
-                          <strong>Time:</strong> ${event.start.toLocaleString('en-US', { 
+                          <strong>Time:</strong> ${event.start.toLocaleString('en-NZ', { 
                             weekday: 'long',
                             year: 'numeric', 
                             month: 'long', 
@@ -380,7 +380,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             minute: '2-digit',
                             hour12: true 
                           })}
-                          ${event.end ? `<br><i class="fas fa-stop-circle me-2"></i><strong>End:</strong> ${event.end.toLocaleString('en-US', { 
+                          ${event.end ? `<br><i class="fas fa-stop-circle me-2"></i><strong>End:</strong> ${event.end.toLocaleString('en-NZ', { 
                             hour: '2-digit', 
                             minute: '2-digit',
                             hour12: true 

@@ -1081,7 +1081,7 @@ router.get('/calendar', async (req, res) => {
       ...rideOffers.map(offer => ({
         id: `offer_${offer.id}`,
         title: `Drive: To ${offer.dropoff_location}`,
-        start: new Date(offer.pickup_time).toISOString().slice(0, 19).replace('T', ' '),
+        start: offer.pickup_time, // Use the original date string directly
         description: `${offer.pickup_location} → ${offer.dropoff_location}`,
         backgroundColor: '#dc3545',
         borderColor: '#c82333',
@@ -1090,7 +1090,7 @@ router.get('/calendar', async (req, res) => {
       ...assignedRides.map(ride => ({
         id: `ride_${ride.id}`,
         title: `Drive: ${ride.child_name}`,
-        start: new Date(ride.pickup_time).toISOString().slice(0, 19).replace('T', ' '),
+        start: ride.pickup_time, // Use the original date string directly
         description: `${ride.pickup_location} → ${ride.dropoff_location || 'Unknown'}`,
         backgroundColor: '#dc3545',
         borderColor: '#c82333',
@@ -1100,7 +1100,7 @@ router.get('/calendar', async (req, res) => {
       ...childrenRides.map(ride => ({
         id: `child_ride_${ride.id}`,
         title: `Ride: ${ride.child_name}`,
-        start: new Date(ride.pickup_time).toISOString().slice(0, 19).replace('T', ' '),
+        start: ride.pickup_time, // Use the original date string directly
         description: `${ride.pickup_location} → ${ride.dropoff_location || 'Unknown'}`,
         backgroundColor: '#28a745',
         borderColor: '#1e7e34',
@@ -1111,7 +1111,7 @@ router.get('/calendar', async (req, res) => {
       ...myRideRequests.map(ride => ({
         id: `my_ride_${ride.id}`,
         title: `My Request: ${ride.child_name}`,
-        start: new Date(ride.pickup_time).toISOString().slice(0, 19).replace('T', ' '),
+        start: ride.pickup_time, // Use the original date string directly
         description: `${ride.pickup_location} → ${ride.dropoff_location || 'Unknown'}`,
         backgroundColor: '#007bff', // A different color for my requests
         borderColor: '#0056b3',
