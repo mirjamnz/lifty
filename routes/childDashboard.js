@@ -59,21 +59,44 @@ router.get('/child-dashboard', async (req, res) => {
       offer.type = 'offer';
     });
 
-    // 5. Load child's recurring event assignments (filtered by range) - Fixed to prevent duplicates
+    // 5. Load child's recurring event assignments (filtered by range) - Consolidated by event/date
     const [recurringAssignments] = await db.query(`
-      SELECT ea.event_id, ea.child_id, ea.user_id, ea.event_date, ea.status, ea.is_cancelled, ea.notes,
-             re.name AS event_name, re.location, re.day_of_week, re.start_time, re.end_time, u.name AS assigned_parent_name,
-             GROUP_CONCAT(ea.assignment_type ORDER BY ea.assignment_type) AS assignment_types
+      SELECT 
+        ea.event_id, 
+        ea.child_id, 
+        ea.event_date, 
+        ea.is_cancelled, 
+        ea.notes,
+        re.name AS event_name, 
+        re.location, 
+        re.day_of_week, 
+        re.start_time, 
+        re.end_time,
+        GROUP_CONCAT(DISTINCT ea.assignment_type ORDER BY ea.assignment_type) AS assignment_types,
+        GROUP_CONCAT(DISTINCT u.name ORDER BY u.name SEPARATOR ' & ') AS assigned_parent_names,
+        GROUP_CONCAT(DISTINCT ea.status ORDER BY ea.status SEPARATOR ' & ') AS statuses
       FROM EventAssignments ea
       JOIN RecurringEvents re ON ea.event_id = re.id
       JOIN Users u ON ea.user_id = u.id
       WHERE ea.child_id = ? AND ea.event_date >= ? AND ea.event_date <= ? AND ea.status != 'cancelled' AND ea.is_cancelled = FALSE
-      GROUP BY ea.event_id, ea.child_id, ea.user_id, ea.event_date, ea.status, ea.is_cancelled, ea.notes, re.name, re.location, re.day_of_week, re.start_time, re.end_time, u.name
+      GROUP BY ea.event_id, ea.child_id, ea.event_date, ea.is_cancelled, ea.notes, re.name, re.location, re.day_of_week, re.start_time, re.end_time
       ORDER BY ea.event_date ASC, re.name
     `, [user.child_profile_id, todayStr, maxDateStr]);
     recurringAssignments.forEach(assignment => {
       assignment.formatted_time = new Date(assignment.event_date).toLocaleString('en-NZ', { dateStyle: 'medium', timeStyle: 'short' });
       assignment.type = 'recurring';
+      
+      // Determine overall status - if any assignment is confirmed, show confirmed
+      const statuses = assignment.statuses.split(' & ');
+      assignment.status = statuses.includes('confirmed') ? 'confirmed' : 
+                         statuses.includes('pending') ? 'pending' : 
+                         statuses.includes('completed') ? 'completed' : 'pending';
+      
+      // Format assignment types for display
+      const types = assignment.assignment_types.split(',');
+      assignment.assignment_display = types.length > 1 ? 
+        `${types[0]} & ${types[1]}` : 
+        types[0];
     });
 
     // After fetching requests, offers, recurringAssignments
