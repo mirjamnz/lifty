@@ -119,11 +119,13 @@ router.get('/dashboard', async (req, res) => {
     let recurringAssignments = [];
     if (childIds.length > 0) {
       [recurringAssignments] = await db.query(`
-        SELECT ea.id, ea.event_date, re.name as event_name, re.day_of_week, re.start_time, re.end_time, re.location, c.name as child_name, 'recurring' as type
+        SELECT ea.event_id, ea.event_date, re.name as event_name, re.day_of_week, re.start_time, re.end_time, re.location, c.name as child_name, 'recurring' as type,
+               GROUP_CONCAT(ea.assignment_type ORDER BY ea.assignment_type) AS assignment_types
         FROM EventAssignments ea
         JOIN RecurringEvents re ON ea.event_id = re.id
         JOIN Children c ON ea.child_id = c.id
         WHERE ea.child_id IN (?) AND ea.event_date >= CURDATE() AND ea.status != 'cancelled' AND ea.is_cancelled = FALSE
+        GROUP BY ea.event_id, ea.event_date, re.name, re.day_of_week, re.start_time, re.end_time, re.location, c.name
         ORDER BY ea.event_date ASC
       `, [childIds]);
     }
@@ -288,7 +290,7 @@ router.get('/dashboard', async (req, res) => {
         status: ride.status || (ride.assigned_user_id ? 'assigned' : 'pending')
       })),
       ...recurringAssignments.map(event => ({
-        id: `event_${event.id}`,
+        id: `event_${event.event_id}_${event.event_date}_${event.child_name.replace(/\s+/g, '_')}`,
         title: `${event.event_name} (${event.child_name})`,
         start: `${event.event_date}T${event.start_time}`,
         end: event.end_time ? `${event.event_date}T${event.end_time}` : undefined,
@@ -709,11 +711,13 @@ router.get('/api/calendar-events', async (req, res) => {
     let recurringAssignments = [];
     if (childIds.length > 0) {
       [recurringAssignments] = await db.query(
-        `SELECT ea.id, ea.event_date, re.name as event_name, re.day_of_week, re.start_time, re.end_time, re.location, c.name as child_name
+        `SELECT ea.event_id, ea.event_date, re.name as event_name, re.day_of_week, re.start_time, re.end_time, re.location, c.name as child_name,
+                GROUP_CONCAT(ea.assignment_type ORDER BY ea.assignment_type) AS assignment_types
          FROM EventAssignments ea
          JOIN RecurringEvents re ON ea.event_id = re.id
          JOIN Children c ON ea.child_id = c.id
-         WHERE ea.child_id IN (?) AND ea.event_date >= CURDATE() AND ea.event_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)`,
+         WHERE ea.child_id IN (?) AND ea.event_date >= CURDATE() AND ea.event_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+         GROUP BY ea.event_id, ea.event_date, re.name, re.day_of_week, re.start_time, re.end_time, re.location, c.name`,
         [childIds]
       );
     }
@@ -949,11 +953,13 @@ router.get('/calendar', async (req, res) => {
     let recurringAssignments = [];
     if (childIds.length > 0) {
       [recurringAssignments] = await db.query(`
-        SELECT ea.id, ea.event_date, re.name as event_name, re.day_of_week, re.start_time, re.end_time, re.location, c.name as child_name, 'recurring' as type
+        SELECT ea.event_id, ea.event_date, re.name as event_name, re.day_of_week, re.start_time, re.end_time, re.location, c.name as child_name, 'recurring' as type,
+               GROUP_CONCAT(ea.assignment_type ORDER BY ea.assignment_type) AS assignment_types
         FROM EventAssignments ea
         JOIN RecurringEvents re ON ea.event_id = re.id
         JOIN Children c ON ea.child_id = c.id
         WHERE ea.child_id IN (?) AND ea.event_date >= CURDATE() AND ea.status != 'cancelled' AND ea.is_cancelled = FALSE
+        GROUP BY ea.event_id, ea.event_date, re.name, re.day_of_week, re.start_time, re.end_time, re.location, c.name
         ORDER BY ea.event_date ASC
       `, [childIds]);
     }
@@ -1114,7 +1120,7 @@ router.get('/calendar', async (req, res) => {
         status: ride.status || (ride.assigned_user_id ? 'assigned' : 'pending')
       })),
       ...recurringAssignments.map(event => ({
-        id: `event_${event.id}`,
+        id: `event_${event.event_id}_${event.event_date}_${event.child_name.replace(/\s+/g, '_')}`,
         title: `${event.event_name} (${event.child_name})`,
         start: `${event.event_date}T${event.start_time}`,
         end: event.end_time ? `${event.event_date}T${event.end_time}` : undefined,

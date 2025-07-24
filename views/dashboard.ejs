@@ -853,11 +853,14 @@ document.addEventListener('DOMContentLoaded', function() {
       };
     }
 
-    // Patch wizard finish button for add child only mode
+    // Wizard finish button handler for both add child only mode and profile completion
     const wizardFinishBtn = document.getElementById('wizard-finish-btn');
     if (wizardFinishBtn) {
       wizardFinishBtn.onclick = async function() {
+        console.log('🧙‍♂️ Wizard: Finish button clicked! addChildOnlyMode:', addChildOnlyMode);
+        
         if (addChildOnlyMode) {
+          // Add Child Only Mode logic
           const childrenList = document.getElementById('children-list');
           const childEntries = Array.from(childrenList.querySelectorAll('.child-entry'));
           if (childEntries.length === 0) {
@@ -900,6 +903,77 @@ document.addEventListener('DOMContentLoaded', function() {
             modal.hide();
             window.location.reload();
           } catch (err) {
+            showWizardError('Network error. Please try again.');
+            return;
+          }
+        } else {
+          // Profile Completion Mode logic (Step 2 - Children)
+          console.log('🧙‍♂️ Wizard: Processing profile completion finish...');
+          clearWizardError();
+          const childrenList = document.getElementById('children-list');
+          const childEntries = Array.from(childrenList.querySelectorAll('.child-entry'));
+          if (childEntries.length === 0) {
+            showWizardError('Please add at least one child.');
+            return;
+          }
+          const children = [];
+          for (const entry of childEntries) {
+            const name = entry.querySelector('.child-name-input').value.trim();
+            const org_id = entry.querySelector('.child-org-select').value;
+            const club = entry.querySelector('.child-club-input').value.trim();
+            const username = entry.querySelector('.child-username-input').value.trim();
+            const password = entry.querySelector('.child-password-input').value.trim();
+            if (!name || !org_id || !username || !password) {
+              showWizardError('Each child must have a name, organization, username, and password.');
+              return;
+            }
+            children.push({
+              name,
+              org_id: Number(org_id),
+              club,
+              username,
+              password,
+              parent_id: <%= session.userId %>
+            });
+          }
+          try {
+            console.log('🧙‍♂️ Wizard: About to send API call...');
+            console.log('🧙‍♂️ Wizard: Children data:', children);
+            console.log('🧙‍♂️ Wizard: Sending children data:', JSON.stringify({ children }, null, 2));
+            
+            const requestBody = JSON.stringify({ children });
+            console.log('🧙‍♂️ Wizard: Request body:', requestBody);
+            
+            const resp = await fetch('/api/profile/children', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: requestBody
+            });
+            
+            console.log('🧙‍♂️ Wizard: Response received!');
+            console.log('🧙‍♂️ Wizard: Response status:', resp.status);
+            console.log('🧙‍♂️ Wizard: Response headers:', resp.headers);
+            
+            const data = await resp.json();
+            console.log('🧙‍♂️ Wizard: Response data:', data);
+            
+            if (!resp.ok || !data.success) {
+              console.log('🧙‍♂️ Wizard: API call failed!');
+              showWizardError(data.error || 'Failed to save children. Please try again.');
+              return;
+            }
+            console.log('🧙‍♂️ Wizard: Children saved successfully!');
+            
+            // Complete the wizard and reload the page
+            console.log('🧙‍♂️ Wizard: Completing wizard and reloading page');
+            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('profileWizardModal'));
+            modal.hide();
+            window.location.reload();
+            return;
+          } catch (err) {
+            console.error('🧙‍♂️ Wizard: Error saving children:', err);
+            console.error('🧙‍♂️ Wizard: Error details:', err.message);
+            console.error('🧙‍♂️ Wizard: Error stack:', err.stack);
             showWizardError('Network error. Please try again.');
             return;
           }
@@ -1043,7 +1117,7 @@ document.addEventListener('DOMContentLoaded', function() {
       document.getElementById('children-list').appendChild(template);
     };
 
-    // Initialize the modal without showing it
+    // Initialize the modal and show it automatically for new users
     try {
       const wizardModal = new bootstrap.Modal(document.getElementById('profileWizardModal'), {
         backdrop: 'static',
@@ -1051,6 +1125,10 @@ document.addEventListener('DOMContentLoaded', function() {
       });
       showStep(1);
       console.log('Wizard modal initialized');
+      
+      // Show the modal automatically for new users
+      wizardModal.show();
+      console.log('Wizard modal shown automatically');
     } catch (e) {
       console.error('Error initializing wizard modal:', e);
     }

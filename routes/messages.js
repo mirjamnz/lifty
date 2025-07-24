@@ -224,7 +224,8 @@ router.get('/group/ride/:rideRequestId', async (req, res) => {
     child,
     parentUser,
     driverUser,
-    messages
+    messages,
+    eventType: 'ride'
   });
 });
 
@@ -321,7 +322,7 @@ router.get('/group/offer/:offerId', async (req, res) => {
     offer,
     driverUser,
     messages,
-    isOfferGroup: true
+    eventType: 'offer'
   });
 });
 
@@ -361,6 +362,118 @@ router.post('/group/offer/:offerId/send', async (req, res) => {
     [senderId, message, 'offer', offerId]
   );
   res.redirect(`/messages/group/offer/${offerId}`);
+});
+
+// GET /messages/group/recurring/:eventId - Get group messages for a recurring event
+router.get('/group/recurring/:eventId', async (req, res) => {
+  const userId = req.session.userId;
+  const eventId = req.params.eventId;
+  
+  if (!userId) return res.status(401).send('Not logged in');
+
+  try {
+    // Check if user is a child and has assignments to this event
+    const [[user]] = await db.query('SELECT * FROM Users WHERE id = ?', [userId]);
+    if (user.role !== 'child') {
+      return res.status(403).send('Access denied. This route is for children only.');
+    }
+
+    // Check if child has assignments to this event
+    const [assignments] = await db.query(`
+      SELECT ea.*, re.name AS event_name, re.location, re.day_of_week, re.start_time, re.end_time
+      FROM EventAssignments ea
+      JOIN RecurringEvents re ON ea.event_id = re.id
+      WHERE ea.event_id = ? AND ea.child_id = ? AND ea.status != 'cancelled' AND ea.is_cancelled = FALSE
+    `, [eventId, user.child_profile_id]);
+
+    if (assignments.length === 0) {
+      return res.status(403).send('You do not have access to this event group.');
+    }
+
+    // Get event details
+    const [[event]] = await db.query(`
+      SELECT re.*, u.name AS created_by_name
+      FROM RecurringEvents re
+      JOIN Users u ON re.created_by = u.id
+      WHERE re.id = ?
+    `, [eventId]);
+
+    if (!event) {
+      return res.status(404).send('Event not found.');
+    }
+
+    // Get group messages
+    const [messages] = await db.query(`
+      SELECT egm.*, u.name AS sender_name
+      FROM EventGroupMessages egm
+      JOIN Users u ON egm.sender_id = u.id
+      WHERE egm.event_id = ?
+      ORDER BY egm.sent_at ASC
+    `, [eventId]);
+
+    // Get group members (parents only, not children)
+    const [members] = await db.query(`
+      SELECT egm.*, u.name AS user_name, u.email
+      FROM EventGroupMembers egm
+      JOIN Users u ON egm.user_id = u.id
+      WHERE egm.event_id = ? AND egm.is_active = TRUE AND egm.child_id IS NULL
+      ORDER BY egm.role DESC, u.name
+    `, [eventId]);
+
+    res.render('messages-group', {
+      session: req.session,
+      messages,
+      members,
+      event,
+      eventType: 'recurring',
+      eventId: eventId,
+      childName: assignments[0].child_name || 'Child'
+    });
+
+  } catch (err) {
+    console.error('Recurring event group messages error:', err);
+    res.status(500).send('Error loading group messages.');
+  }
+});
+
+// POST /messages/group/recurring/:eventId/send - Send message to recurring event group chat
+router.post('/group/recurring/:eventId/send', async (req, res) => {
+  const userId = req.session.userId;
+  const eventId = req.params.eventId;
+  const { message } = req.body;
+
+  if (!userId || !message || !message.trim()) {
+    return res.status(400).send('Message cannot be empty.');
+  }
+
+  try {
+    // Check if user is a child and has assignments to this event
+    const [[user]] = await db.query('SELECT * FROM Users WHERE id = ?', [userId]);
+    if (user.role !== 'child') {
+      return res.status(403).send('Access denied. This route is for children only.');
+    }
+
+    // Check if child has assignments to this event
+    const [assignments] = await db.query(`
+      SELECT ea.* FROM EventAssignments ea
+      WHERE ea.event_id = ? AND ea.child_id = ? AND ea.status != 'cancelled' AND ea.is_cancelled = FALSE
+    `, [eventId, user.child_profile_id]);
+
+    if (assignments.length === 0) {
+      return res.status(403).send('You do not have access to this event group.');
+    }
+
+    // Insert the message
+    await db.query(
+      'INSERT INTO EventGroupMessages (event_id, sender_id, message, message_type) VALUES (?, ?, ?, ?)',
+      [eventId, userId, message.trim(), 'chat']
+    );
+
+    res.redirect(`/messages/group/recurring/${eventId}`);
+  } catch (err) {
+    console.error('Send recurring event group message error:', err);
+    res.status(500).send('Error sending message.');
+  }
 });
 
 // GET /messages/all - Get all messages (direct + group) for the logged-in user

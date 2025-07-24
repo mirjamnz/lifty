@@ -59,14 +59,17 @@ router.get('/child-dashboard', async (req, res) => {
       offer.type = 'offer';
     });
 
-    // 5. Load child's recurring event assignments (filtered by range)
+    // 5. Load child's recurring event assignments (filtered by range) - Fixed to prevent duplicates
     const [recurringAssignments] = await db.query(`
-      SELECT ea.*, re.name AS event_name, re.location, re.day_of_week, re.start_time, re.end_time, u.name AS assigned_parent_name
+      SELECT ea.event_id, ea.child_id, ea.user_id, ea.event_date, ea.status, ea.is_cancelled, ea.notes,
+             re.name AS event_name, re.location, re.day_of_week, re.start_time, re.end_time, u.name AS assigned_parent_name,
+             GROUP_CONCAT(ea.assignment_type ORDER BY ea.assignment_type) AS assignment_types
       FROM EventAssignments ea
       JOIN RecurringEvents re ON ea.event_id = re.id
       JOIN Users u ON ea.user_id = u.id
       WHERE ea.child_id = ? AND ea.event_date >= ? AND ea.event_date <= ? AND ea.status != 'cancelled' AND ea.is_cancelled = FALSE
-      ORDER BY ea.event_date ASC, re.name, ea.assignment_type
+      GROUP BY ea.event_id, ea.child_id, ea.user_id, ea.event_date, ea.status, ea.is_cancelled, ea.notes, re.name, re.location, re.day_of_week, re.start_time, re.end_time, u.name
+      ORDER BY ea.event_date ASC, re.name
     `, [user.child_profile_id, todayStr, maxDateStr]);
     recurringAssignments.forEach(assignment => {
       assignment.formatted_time = new Date(assignment.event_date).toLocaleString('en-NZ', { dateStyle: 'medium', timeStyle: 'short' });

@@ -8,7 +8,15 @@
       <div class="card mb-4">
         <div class="card-header bg-primary text-white d-flex align-items-center">
           <i class="fas fa-comments me-2"></i>
-          <h5 class="mb-0">Group Chat for Ride #<%= ride.id %></h5>
+          <h5 class="mb-0">
+            <% if (typeof eventType !== 'undefined' && eventType === 'recurring') { %>
+              Group Chat for <%= event.name %>
+            <% } else if (typeof eventType !== 'undefined' && eventType === 'offer') { %>
+              Group Chat for Ride Offer #<%= offer.id %>
+            <% } else { %>
+              Group Chat for Ride #<%= ride.id %>
+            <% } %>
+          </h5>
           <a href="<%= session.role === 'child' ? '/child-dashboard' : '/rides' %>" class="btn btn-light btn-sm ms-auto">
             <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
           </a>
@@ -34,7 +42,7 @@
           <% } %>
         </div>
         <div class="card-footer bg-light">
-          <form method="POST" action="/messages/group/ride/<%= ride.id %>/send" class="d-flex align-items-end gap-2">
+          <form method="POST" action="<% if (typeof eventType !== 'undefined' && eventType === 'recurring') { %>/messages/group/recurring/<%= eventId %>/send<% } else if (typeof eventType !== 'undefined' && eventType === 'offer') { %>/messages/group/offer/<%= offer.id %>/send<% } else { %>/messages/group/ride/<%= ride.id %>/send<% } %>" class="d-flex align-items-end gap-2">
             <textarea name="message" class="form-control" rows="2" placeholder="Type your message..." required style="resize:none;"></textarea>
             <button type="submit" class="btn btn-primary">
               <i class="fas fa-paper-plane me-1"></i>Send

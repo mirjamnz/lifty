@@ -291,11 +291,6 @@
                   </td>
                   <td><%= a.notes || '—' %></td>
                   <td>
-                    <% if (a.group_assignment || a.is_consolidated || a.user_id === session.userId) { %>
-                      <a href="/recurring-event-groups/<%= a.event_id %>" class="btn btn-sm btn-outline-info">
-                        <i class="fas fa-users me-1"></i>Group
-                      </a>
-                    <% } %>
                     <% if (a.user_id === session.userId || a.child_parent_id === session.userId) { %>
                       <button class="btn btn-sm btn-outline-danger" 
                               onclick="showCancelAssignmentModal('<%= a.id %>', '<%= a.child_name %>', '<%= a.event_date %>')">
