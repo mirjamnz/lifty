@@ -28,6 +28,7 @@
                     <th>Name</th>
                     <th>Type</th>
                     <th>Address</th>
+                    <th>Affiliations</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -42,12 +43,24 @@
                       </td>
                       <td><%= org.address || 'Not specified' %></td>
                       <td>
+                        <div class="d-flex flex-column align-items-start">
+                          <small class="text-muted">
+                            <i class="fas fa-users me-1"></i>
+                            <span class="badge bg-primary"><%= org.parent_count || 0 %> parents</span>
+                          </small>
+                          <small class="text-muted mt-1">
+                            <i class="fas fa-child me-1"></i>
+                            <span class="badge bg-success"><%= org.child_count || 0 %> children</span>
+                          </small>
+                        </div>
+                      </td>
+                      <td>
                         <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#editForm<%= org.id %>">✏️</button>
                         <a href="/organizations/<%= org.id %>/delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete <%= org.name %>?')">🗑</a>
                       </td>
                     </tr>
                     <tr>
-                      <td colspan="4" class="p-0">
+                      <td colspan="5" class="p-0">
                         <div class="collapse" id="editForm<%= org.id %>">
                           <div class="p-3 bg-light">
                             <form action="/organizations/<%= org.id %>/edit" method="POST" class="row g-2">
@@ -136,6 +149,19 @@
             <div class="col-6">
               <h4 class="text-secondary"><%= organizations ? organizations.filter(o => o.type === 'other').length : 0 %></h4>
               <small class="text-muted">Other</small>
+            </div>
+          </div>
+          <hr>
+          <div class="row text-center">
+            <div class="col-6">
+              <div class="border-end">
+                <h4 class="text-warning"><%= organizations ? organizations.reduce((sum, org) => sum + (org.parent_count || 0), 0) : 0 %></h4>
+                <small class="text-muted">Total Parents</small>
+              </div>
+            </div>
+            <div class="col-6">
+              <h4 class="text-info"><%= organizations ? organizations.reduce((sum, org) => sum + (org.child_count || 0), 0) : 0 %></h4>
+              <small class="text-muted">Total Children</small>
             </div>
           </div>
         </div>

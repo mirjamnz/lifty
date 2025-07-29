@@ -8,10 +8,31 @@ router.get('/', async (req, res) => {
   if (!req.session.userId) return res.redirect('/login');
   
   try {
-    // Get all organizations
-    const [organizations] = await db.query(
-      'SELECT * FROM Organizations ORDER BY name'
-    );
+    // Get all organizations with affiliation counts
+    const [organizations] = await db.query(`
+      SELECT 
+        o.*,
+        COALESCE(parent_count.count, 0) as parent_count,
+        COALESCE(child_count.count, 0) as child_count
+      FROM Organizations o
+      LEFT JOIN (
+        SELECT 
+          organization_id, 
+          COUNT(DISTINCT user_id) as count
+        FROM UserAffiliations 
+        WHERE role = 'parent'
+        GROUP BY organization_id
+      ) parent_count ON o.id = parent_count.organization_id
+      LEFT JOIN (
+        SELECT 
+          organization_id, 
+          COUNT(DISTINCT child_id) as count
+        FROM UserAffiliations 
+        WHERE role = 'child' AND child_id IS NOT NULL
+        GROUP BY organization_id
+      ) child_count ON o.id = child_count.organization_id
+      ORDER BY o.name
+    `);
     
     // Get quick stats
     const [stats] = await db.query(`
