@@ -8,6 +8,21 @@ router.get('/', async (req, res) => {
   if (!req.session.userId) return res.redirect('/login');
   
   try {
+    // Get user's affiliations (grouped by organization)
+    const [userAffiliations] = await db.query(`
+      SELECT 
+        o.id,
+        o.name,
+        o.type,
+        o.address,
+        GROUP_CONCAT(DISTINCT ua.role ORDER BY ua.role SEPARATOR ',') as roles
+      FROM UserAffiliations ua
+      JOIN Organizations o ON ua.organization_id = o.id
+      WHERE ua.user_id = ?
+      GROUP BY o.id, o.name, o.type, o.address
+      ORDER BY o.name
+    `, [req.session.userId]);
+
     // Get all organizations with affiliation counts
     const [organizations] = await db.query(`
       SELECT 
@@ -47,6 +62,7 @@ router.get('/', async (req, res) => {
     res.render('organizations', { 
       session: req.session, 
       organizations,
+      userAffiliations,
       stats: stats[0]
     });
   } catch (err) {
