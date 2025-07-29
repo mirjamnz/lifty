@@ -216,6 +216,74 @@ router.post('/users/:id/delete', async (req, res) => {
   }
 });
 
+// GET /admin/organizations/:id/details - Show organization details with affiliations
+router.get('/organizations/:id/details', async (req, res) => {
+  console.log('🔍 DEBUG: Organization details route hit for ID:', req.params.id);
+  try {
+    const orgId = req.params.id;
+    console.log('🔍 DEBUG: Looking for organization with ID:', orgId);
+    
+    // Get organization details
+    const [[organization]] = await db.query(`
+      SELECT * FROM Organizations WHERE id = ?
+    `, [orgId]);
+    
+    console.log('🔍 DEBUG: Organization found:', organization);
+    
+    if (!organization) {
+      req.session.error = 'Organization not found.';
+      return res.redirect('/admin/organizations');
+    }
+    
+    // Get parent affiliations
+    const [parentAffiliations] = await db.query(`
+      SELECT 
+        ua.user_id,
+        u.name as parent_name,
+        u.email as parent_email,
+        COUNT(DISTINCT ua.child_id) as children_count,
+        GROUP_CONCAT(DISTINCT c.name ORDER BY c.name SEPARATOR ', ') as children_names
+      FROM UserAffiliations ua
+      JOIN Users u ON ua.user_id = u.id
+      LEFT JOIN Children c ON ua.child_id = c.id
+      WHERE ua.organization_id = ? AND ua.role = 'parent'
+      GROUP BY ua.user_id, u.name, u.email
+      ORDER BY u.name
+    `, [orgId]);
+    
+    console.log('🔍 DEBUG: Parent affiliations found:', parentAffiliations.length);
+    
+    // Get child affiliations (unique children only)
+    const [childAffiliations] = await db.query(`
+      SELECT DISTINCT
+        ua.child_id,
+        c.name as child_name,
+        u.name as parent_name,
+        u.email as parent_email
+      FROM UserAffiliations ua
+      JOIN Children c ON ua.child_id = c.id
+      JOIN Users u ON c.user_id = u.id
+      WHERE ua.organization_id = ? AND ua.role = 'child'
+      ORDER BY c.name
+    `, [orgId]);
+    
+    console.log('🔍 DEBUG: Child affiliations found:', childAffiliations.length);
+    console.log('🔍 DEBUG: Rendering admin/organization-details view');
+    
+    res.render('admin/organization-details', { 
+      session: req.session, 
+      organization,
+      parentAffiliations,
+      childAffiliations,
+      activePage: 'organizations'
+    });
+  } catch (err) {
+    console.error('❌ Admin organization details error:', err);
+    console.error('❌ Error stack:', err.stack);
+    res.status(500).send('Could not load organization details.');
+  }
+});
+
 // Edit Organization (GET)
 router.get('/organizations/:id/edit', async (req, res) => {
   try {
@@ -915,63 +983,7 @@ router.get('/organizations', async (req, res) => {
   }
 });
 
-// GET /admin/organizations/:id/details - Show organization details with affiliations
-router.get('/organizations/:id/details', async (req, res) => {
-  try {
-    const orgId = req.params.id;
-    
-    // Get organization details
-    const [[organization]] = await db.query(`
-      SELECT * FROM Organizations WHERE id = ?
-    `, [orgId]);
-    
-    if (!organization) {
-      req.session.error = 'Organization not found.';
-      return res.redirect('/admin/organizations');
-    }
-    
-    // Get parent affiliations
-    const [parentAffiliations] = await db.query(`
-      SELECT 
-        ua.user_id,
-        u.name as parent_name,
-        u.email as parent_email,
-        COUNT(DISTINCT ua.child_id) as children_count,
-        GROUP_CONCAT(DISTINCT c.name ORDER BY c.name SEPARATOR ', ') as children_names
-      FROM UserAffiliations ua
-      JOIN Users u ON ua.user_id = u.id
-      LEFT JOIN Children c ON ua.child_id = c.id
-      WHERE ua.organization_id = ? AND ua.role = 'parent'
-      GROUP BY ua.user_id, u.name, u.email
-      ORDER BY u.name
-    `, [orgId]);
-    
-    // Get child affiliations
-    const [childAffiliations] = await db.query(`
-      SELECT 
-        ua.child_id,
-        c.name as child_name,
-        u.name as parent_name,
-        u.email as parent_email
-      FROM UserAffiliations ua
-      JOIN Children c ON ua.child_id = c.id
-      JOIN Users u ON c.parent_id = u.id
-      WHERE ua.organization_id = ? AND ua.role = 'child'
-      ORDER BY c.name
-    `, [orgId]);
-    
-    res.render('admin/organization-details', { 
-      session: req.session, 
-      organization,
-      parentAffiliations,
-      childAffiliations,
-      activePage: 'organizations'
-    });
-  } catch (err) {
-    console.error('❌ Admin organization details error:', err);
-    res.status(500).send('Could not load organization details.');
-  }
-});
+
 
 // POST /admin/organizations/:id/delete - Delete organization
 router.post('/organizations/:id/delete', async (req, res) => {
