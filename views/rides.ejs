@@ -707,7 +707,11 @@
   </div>
 </div>
 
-<div id="rideCards" class="d-none flex-wrap gap-3 px-4"></div>
+<div id="rideCards" class="d-none">
+  <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+    <!-- Cards will be dynamically inserted here -->
+  </div>
+</div>
 
 <!-- Scripts -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -803,6 +807,9 @@ document.addEventListener('DOMContentLoaded', () => {
       cards.classList.remove('d-none');
       cards.innerHTML = '';
 
+      const cardRow = cards.querySelector('.row');
+      cardRow.innerHTML = ''; // Clear existing cards
+      
       document.querySelectorAll('.ride-table tbody tr').forEach(row => {
         const type = row.dataset.type;
         const isSeeking = type === 'request' && row.dataset.assigned === 'no';
@@ -810,23 +817,80 @@ document.addEventListener('DOMContentLoaded', () => {
         const hideExpired = document.getElementById('hideExpired').checked;
         
         if ((!hideExpired || !isExpired) && (!document.getElementById('seekingOnly').checked || (document.getElementById('seekingOnly').checked && isSeeking))) {
+          const cardCol = document.createElement('div');
+          cardCol.classList.add('col');
+          
           const card = document.createElement('div');
-          card.classList.add('card', 'mb-3', 'shadow-sm');
+          card.classList.add('card', 'h-100', 'shadow-sm');
+          card.style.borderRadius = '1rem';
           if (isExpired) card.classList.add('border-secondary', 'bg-light');
           
+          // Get status badge
+          let statusBadge = '';
+          if (isExpired) {
+            statusBadge = '<span class="badge bg-secondary">Expired</span>';
+          } else if (type === 'request' && row.dataset.assigned === 'yes') {
+            statusBadge = '<span class="badge bg-success">Assigned</span>';
+          } else if (type === 'request' && row.dataset.assigned === 'no') {
+            statusBadge = '<span class="badge bg-warning">Pending</span>';
+          } else if (type === 'offer') {
+            statusBadge = '<span class="badge bg-info">Available</span>';
+          }
+          
+          // Get time display
+          const timeCell = row.cells[type === 'offer' ? 2 : 4];
+          const timeDisplay = timeCell.textContent.trim();
+          
           card.innerHTML = `
-            <div class="card-body">
-              <h5 class="card-title">${type === 'offer' ? '🚘 Offer' : '📣 Request'} ${isExpired ? '<span class="badge bg-secondary">Expired</span>' : ''}</h5>
-              <p class="card-text">
-                ${type === 'offer' ? `Driver: ${row.cells[0].textContent}` : `Child: ${row.cells[0].textContent}`} <br>
-                ${type === 'offer' ? `School: ${row.cells[1].textContent}` : `Pickup: ${row.cells[1].textContent}, Dropoff: ${row.cells[2].textContent}`} <br>
-                ${row.cells[3].textContent !== '—' ? `Notes: ${row.cells[3].textContent}` : ''} <br>
-                Time: ${row.cells[type === 'offer' ? 2 : 4].textContent}
-              </p>
+            <div class="card-header text-center" style="background-color: #e3f2fd;">
+              <span class="badge bg-info text-dark me-2">
+                ${type === 'offer' ? 'Offer' : 'Request'}
+              </span>
+              <span class="badge bg-light text-dark me-2" style="font-weight: 500; font-size: 1rem;">
+                ${timeDisplay}
+              </span>
+              ${statusBadge}
+            </div>
+            <div class="card-body p-3">
+              <h5 class="card-title fw-bold text-info mb-3">${type === 'offer' ? '🚘 Ride Offer' : '📣 Ride Request'}</h5>
+              <ul class="list-group list-group-flush mb-2">
+                <li class="list-group-item bg-transparent py-1">
+                  <i class="fas fa-user me-2 text-info"></i>
+                  <strong>${type === 'offer' ? 'Driver' : 'Child'}:</strong> ${row.cells[0].textContent.trim()}
+                </li>
+                ${type === 'offer' ? `
+                <li class="list-group-item bg-transparent py-1">
+                  <i class="fas fa-school me-2 text-success"></i>
+                  <strong>School:</strong> ${row.cells[1].textContent.trim()}
+                </li>
+                <li class="list-group-item bg-transparent py-1">
+                  <i class="fas fa-users me-2 text-warning"></i>
+                  <strong>Seats:</strong> ${row.cells[3].textContent.trim()}
+                </li>
+                ` : `
+                <li class="list-group-item bg-transparent py-1">
+                  <i class="fas fa-map-marker-alt me-2 text-warning"></i>
+                  <strong>Pickup:</strong> ${row.cells[1].textContent.trim()}
+                </li>
+                <li class="list-group-item bg-transparent py-1">
+                  <i class="fas fa-flag-checkered me-2 text-success"></i>
+                  <strong>Dropoff:</strong> ${row.cells[2].textContent.trim()}
+                </li>
+                `}
+                ${row.cells[3].textContent !== '—' ? `
+                <li class="list-group-item bg-transparent py-1">
+                  <i class="fas fa-sticky-note me-2 text-primary"></i>
+                  <strong>Notes:</strong> ${row.cells[3].textContent.trim()}
+                </li>
+                ` : ''}
+              </ul>
+            </div>
+            <div class="card-footer bg-transparent text-center">
               ${type === 'request' && row.dataset.assigned === 'no' && row.cells[6] && row.cells[6].querySelector('form') ? row.cells[6].innerHTML : ''}
             </div>
           `;
-          cards.appendChild(card);
+          cardCol.appendChild(card);
+          cardRow.appendChild(cardCol);
         }
       });
     } else {

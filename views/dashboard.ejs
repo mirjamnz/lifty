@@ -784,8 +784,30 @@ document.addEventListener('DOMContentLoaded', function() {
         // Add click handler for event details
         info.el.addEventListener('click', function(e) {
           e.preventDefault();
+          const isGroupRecurring = event.extendedProps.type === 'group_recurring';
           const isRideRequest = event.extendedProps.type === 'request' || event.extendedProps.type === 'child_request' || event.extendedProps.type === 'my_request';
+          const instanceId = event.extendedProps.instance_id || event.extendedProps.instanceId || event.id;
+          console.log('🔧 DASHBOARD DEBUG: Event ID:', event.id);
+          console.log('🔧 DASHBOARD DEBUG: Instance ID:', instanceId);
+          console.log('🔧 DASHBOARD DEBUG: Extended props:', event.extendedProps);
           
+          // Get assignment button labels for group recurring events
+          let dropoffBtnLabel = '';
+          let pickupBtnLabel = '';
+          let bothBtnLabel = '';
+          if (isGroupRecurring) {
+            dropoffBtnLabel = (event.extendedProps.dropoff_driver && event.extendedProps.dropoff_driver !== 'Unassigned')
+              ? `Take Over Drop Off at ${event.title}`
+              : `I can Drop Off at ${event.title}`;
+            pickupBtnLabel = (event.extendedProps.pickup_driver && event.extendedProps.pickup_driver !== 'Unassigned')
+              ? `Take Over Pick Up from ${event.title}`
+              : `I can Pick Up from ${event.title}`;
+            bothBtnLabel = ((event.extendedProps.dropoff_driver && event.extendedProps.dropoff_driver !== 'Unassigned') ||
+                            (event.extendedProps.pickup_driver && event.extendedProps.pickup_driver !== 'Unassigned'))
+              ? `Take Over Both`
+              : `I can Do Both`;
+          }
+
           // Get status badge HTML for ride requests
           let statusBadge = '';
           if (isRideRequest) {
@@ -847,6 +869,30 @@ document.addEventListener('DOMContentLoaded', function() {
                           <div class="alert alert-success mb-3">
                             <i class="fas fa-user me-2"></i>
                             <strong>Driver:</strong> ${event.extendedProps.driver_name}
+                          </div>
+                        ` : ''}
+                        ${isGroupRecurring ? `
+                          <div class="alert alert-secondary mb-3">
+                            <strong>Dropoff:</strong> <span class="${event.extendedProps.dropoff_driver === 'Unassigned' ? 'text-danger' : 'text-success'}">
+                              ${event.extendedProps.dropoff_driver || 'Unassigned'}
+                            </span><br>
+                            <strong>Pickup:</strong> <span class="${event.extendedProps.pickup_driver === 'Unassigned' ? 'text-danger' : 'text-success'}">
+                              ${event.extendedProps.pickup_driver || 'Unassigned'}
+                            </span>
+                          </div>
+                          <div class="mt-3">
+                            <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
+                              <input type="hidden" name="assignmentType" value="dropoff">
+                              <button type="submit" class="btn btn-primary btn-sm me-2">${dropoffBtnLabel}</button>
+                            </form>
+                            <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
+                              <input type="hidden" name="assignmentType" value="pickup">
+                              <button type="submit" class="btn btn-success btn-sm me-2">${pickupBtnLabel}</button>
+                            </form>
+                            <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
+                              <input type="hidden" name="assignmentType" value="both">
+                              <button type="submit" class="btn btn-info btn-sm">${bothBtnLabel}</button>
+                            </form>
                           </div>
                         ` : ''}
                         ${isRideRequest ? `
