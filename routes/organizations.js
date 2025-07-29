@@ -77,6 +77,65 @@ router.get('/add', (req, res) => {
   res.render('add-organizations', { session: req.session });
 });
 
+// GET /organizations/:id/details - Show organization details with affiliations
+router.get('/:id/details', async (req, res) => {
+  if (!req.session.userId) return res.redirect('/login');
+  
+  try {
+    const orgId = req.params.id;
+    
+    // Get organization details
+    const [[organization]] = await db.query(`
+      SELECT * FROM Organizations WHERE id = ?
+    `, [orgId]);
+    
+    if (!organization) {
+      req.session.error = 'Organization not found.';
+      return res.redirect('/organizations');
+    }
+    
+    // Get parent affiliations
+    const [parentAffiliations] = await db.query(`
+      SELECT 
+        ua.user_id,
+        u.name as parent_name,
+        u.email as parent_email,
+        COUNT(DISTINCT ua.child_id) as children_count,
+        GROUP_CONCAT(DISTINCT c.name ORDER BY c.name SEPARATOR ', ') as children_names
+      FROM UserAffiliations ua
+      JOIN Users u ON ua.user_id = u.id
+      LEFT JOIN Children c ON ua.child_id = c.id
+      WHERE ua.organization_id = ? AND ua.role = 'parent'
+      GROUP BY ua.user_id, u.name, u.email
+      ORDER BY u.name
+    `, [orgId]);
+    
+    // Get child affiliations
+    const [childAffiliations] = await db.query(`
+      SELECT 
+        ua.child_id,
+        c.name as child_name,
+        u.name as parent_name,
+        u.email as parent_email
+      FROM UserAffiliations ua
+      JOIN Children c ON ua.child_id = c.id
+      JOIN Users u ON c.parent_id = u.id
+      WHERE ua.organization_id = ? AND ua.role = 'child'
+      ORDER BY c.name
+    `, [orgId]);
+    
+    res.render('organization-details', { 
+      session: req.session, 
+      organization,
+      parentAffiliations,
+      childAffiliations
+    });
+  } catch (err) {
+    console.error('❌ Organization details error:', err);
+    res.status(500).send('Could not load organization details.');
+  }
+});
+
 // GET /organizations/autocomplete
 // routes/organizations.js
 router.get('/autocomplete', async (req, res) => {

@@ -1,0 +1,157 @@
+<%- include('partials/header1') %>
+
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="text-primary mb-0">
+      <i class="fas fa-building me-2"></i><%= organization.name %>
+    </h2>
+    <a href="/organizations" class="btn btn-outline-secondary">
+      <i class="fas fa-arrow-left me-2"></i>Back to Organizations
+    </a>
+  </div>
+
+  <!-- Organization Info Card -->
+  <div class="card mb-4 border-primary">
+    <div class="card-header bg-primary text-white">
+      <h5 class="mb-0">
+        <i class="fas fa-info-circle me-2"></i>Organization Details
+      </h5>
+    </div>
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-6">
+          <p><strong>Type:</strong> 
+            <span class="badge bg-<%= organization.type === 'school' ? 'success' : organization.type === 'club' ? 'info' : 'warning' %>">
+              <%= organization.type.charAt(0).toUpperCase() + organization.type.slice(1) %>
+            </span>
+          </p>
+          <% if (organization.address) { %>
+            <p><strong>Address:</strong> <i class="fas fa-map-marker-alt me-1"></i><%= organization.address %></p>
+          <% } %>
+        </div>
+        <div class="col-md-6">
+          <p><strong>Total Parents:</strong> <span class="badge bg-primary"><%= parentAffiliations.length %></span></p>
+          <p><strong>Total Children:</strong> <span class="badge bg-success"><%= childAffiliations.length %></span></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Parent Affiliations -->
+  <div class="card mb-4">
+    <div class="card-header bg-success text-white">
+      <h5 class="mb-0">
+        <i class="fas fa-users me-2"></i>Parent Affiliations (<%= parentAffiliations.length %>)
+      </h5>
+    </div>
+    <div class="card-body">
+      <% if (parentAffiliations.length > 0) { %>
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead class="table-light">
+              <tr>
+                <th>Parent Name</th>
+                <th>Email</th>
+                <th>Children Count</th>
+                <th>Children Names</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% parentAffiliations.forEach(function(parent) { %>
+                <tr>
+                  <td>
+                    <i class="fas fa-user me-2"></i>
+                    <strong><%= parent.parent_name %></strong>
+                  </td>
+                  <td>
+                    <i class="fas fa-envelope me-1"></i>
+                    <a href="mailto:<%= parent.parent_email %>" class="text-decoration-none">
+                      <%= parent.parent_email %>
+                    </a>
+                  </td>
+                  <td>
+                    <span class="badge bg-info"><%= parent.children_count %></span>
+                  </td>
+                  <td>
+                    <small class="text-muted">
+                      <% if (parent.children_names) { %>
+                        <%= parent.children_names %>
+                      <% } else { %>
+                        <em>No children linked</em>
+                      <% } %>
+                    </small>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } else { %>
+        <div class="text-center text-muted py-4">
+          <i class="fas fa-users fa-3x mb-3"></i>
+          <p>No parent affiliations found for this organization.</p>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Child Affiliations -->
+  <div class="card mb-4">
+    <div class="card-header bg-info text-white">
+      <h5 class="mb-0">
+        <i class="fas fa-child me-2"></i>Child Affiliations (<%= childAffiliations.length %>)
+      </h5>
+    </div>
+    <div class="card-body">
+      <% if (childAffiliations.length > 0) { %>
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead class="table-light">
+              <tr>
+                <th>Child Name</th>
+                <th>Parent Name</th>
+                <th>Parent Email</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% childAffiliations.forEach(function(child) { %>
+                <tr>
+                  <td>
+                    <i class="fas fa-child me-2"></i>
+                    <strong><%= child.child_name %></strong>
+                  </td>
+                  <td>
+                    <i class="fas fa-user me-1"></i>
+                    <%= child.parent_name %>
+                  </td>
+                  <td>
+                    <i class="fas fa-envelope me-1"></i>
+                    <a href="mailto:<%= child.parent_email %>" class="text-decoration-none">
+                      <%= child.parent_email %>
+                    </a>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } else { %>
+        <div class="text-center text-muted py-4">
+          <i class="fas fa-child fa-3x mb-3"></i>
+          <p>No child affiliations found for this organization.</p>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<style>
+.hover-bg-primary-dark:hover {
+  background-color: #0056b3 !important;
+}
+.hover-bg-success-dark:hover {
+  background-color: #1e7e34 !important;
+}
+</style>
+
+<%- include('partials/footer1') %> 

@@ -851,7 +851,32 @@ router.post('/groups/:id/invites/:inviteId/decline', async (req, res) => {
 // GET /admin/organizations - List all organizations
 router.get('/organizations', async (req, res) => {
   try {
-    const [organizations] = await db.query('SELECT * FROM Organizations ORDER BY name ASC');
+    // Get all organizations with affiliation counts
+    const [organizations] = await db.query(`
+      SELECT 
+        o.*,
+        COALESCE(parent_count.count, 0) as parent_count,
+        COALESCE(child_count.count, 0) as child_count
+      FROM Organizations o
+      LEFT JOIN (
+        SELECT 
+          organization_id, 
+          COUNT(DISTINCT user_id) as count
+        FROM UserAffiliations 
+        WHERE role = 'parent'
+        GROUP BY organization_id
+      ) parent_count ON o.id = parent_count.organization_id
+      LEFT JOIN (
+        SELECT 
+          organization_id, 
+          COUNT(DISTINCT child_id) as count
+        FROM UserAffiliations 
+        WHERE role = 'child' AND child_id IS NOT NULL
+        GROUP BY organization_id
+      ) child_count ON o.id = child_count.organization_id
+      ORDER BY o.name
+    `);
+    
     // Get popularity data: count children linked to each organization (by school)
     const [orgPopularity] = await db.query(`
       SELECT o.name, COUNT(c.id) as count
@@ -861,10 +886,90 @@ router.get('/organizations', async (req, res) => {
       ORDER BY count DESC, o.name ASC
       LIMIT 10
     `);
-    res.render('admin/organizations', { organizations, orgPopularityData: orgPopularity, session: req.session, activePage: 'organizations' });
+    
+    // Get user's affiliations (grouped by organization) for the admin
+    const [userAffiliations] = await db.query(`
+      SELECT 
+        o.id,
+        o.name,
+        o.type,
+        o.address,
+        GROUP_CONCAT(DISTINCT ua.role ORDER BY ua.role SEPARATOR ',') as roles
+      FROM UserAffiliations ua
+      JOIN Organizations o ON ua.organization_id = o.id
+      WHERE ua.user_id = ?
+      GROUP BY o.id, o.name, o.type, o.address
+      ORDER BY o.name
+    `, [req.session.userId]);
+    
+    res.render('admin/organizations', { 
+      organizations, 
+      orgPopularityData: orgPopularity, 
+      userAffiliations,
+      session: req.session, 
+      activePage: 'organizations' 
+    });
   } catch (err) {
     console.error('Admin organizations error:', err);
     res.status(500).send('Failed to load organizations');
+  }
+});
+
+// GET /admin/organizations/:id/details - Show organization details with affiliations
+router.get('/organizations/:id/details', async (req, res) => {
+  try {
+    const orgId = req.params.id;
+    
+    // Get organization details
+    const [[organization]] = await db.query(`
+      SELECT * FROM Organizations WHERE id = ?
+    `, [orgId]);
+    
+    if (!organization) {
+      req.session.error = 'Organization not found.';
+      return res.redirect('/admin/organizations');
+    }
+    
+    // Get parent affiliations
+    const [parentAffiliations] = await db.query(`
+      SELECT 
+        ua.user_id,
+        u.name as parent_name,
+        u.email as parent_email,
+        COUNT(DISTINCT ua.child_id) as children_count,
+        GROUP_CONCAT(DISTINCT c.name ORDER BY c.name SEPARATOR ', ') as children_names
+      FROM UserAffiliations ua
+      JOIN Users u ON ua.user_id = u.id
+      LEFT JOIN Children c ON ua.child_id = c.id
+      WHERE ua.organization_id = ? AND ua.role = 'parent'
+      GROUP BY ua.user_id, u.name, u.email
+      ORDER BY u.name
+    `, [orgId]);
+    
+    // Get child affiliations
+    const [childAffiliations] = await db.query(`
+      SELECT 
+        ua.child_id,
+        c.name as child_name,
+        u.name as parent_name,
+        u.email as parent_email
+      FROM UserAffiliations ua
+      JOIN Children c ON ua.child_id = c.id
+      JOIN Users u ON c.parent_id = u.id
+      WHERE ua.organization_id = ? AND ua.role = 'child'
+      ORDER BY c.name
+    `, [orgId]);
+    
+    res.render('admin/organization-details', { 
+      session: req.session, 
+      organization,
+      parentAffiliations,
+      childAffiliations,
+      activePage: 'organizations'
+    });
+  } catch (err) {
+    console.error('❌ Admin organization details error:', err);
+    res.status(500).send('Could not load organization details.');
   }
 });
 
