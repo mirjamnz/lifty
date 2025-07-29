@@ -91,6 +91,19 @@
 
   <div class="results-count" id="resultsCount"></div>
   
+  <!-- Search Bar -->
+  <div class="mb-3">
+    <div class="input-group">
+      <span class="input-group-text">
+        <i class="fas fa-search"></i>
+      </span>
+      <input type="text" id="organizationSearch" class="form-control" placeholder="Search organizations by name, type, or address...">
+      <button class="btn btn-outline-secondary" type="button" id="clearSearch">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+  </div>
+  
   <div class="table-responsive">
     
     <table class="table table-bordered table-sm table-striped rounded shadow-sm" id="organizationsTable">
@@ -127,6 +140,17 @@
                 </div>
               </td>
               <td>
+                <% 
+                  // Check if user is already affiliated with this organization
+                  const isAffiliated = userAffiliations && userAffiliations.some(aff => aff.id === org.id);
+                %>
+                <% if (!isAffiliated) { %>
+                  <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#joinModal<%= org.id %>" title="Join Organization">
+                    <i class="fas fa-user-plus"></i>
+                  </button>
+                <% } else { %>
+                  <span class="badge bg-success">Member</span>
+                <% } %>
                 <form action="/admin/organizations/<%= org.id %>/edit" method="GET" style="display:inline;">
                   <button type="submit" class="btn btn-sm btn-outline-success" title="Edit Organization">✏️</button>
                 </form>
@@ -144,11 +168,117 @@
   </div>
 </div>
 
+<!-- Join Organization Modals -->
+<% if (organizations && organizations.length > 0) { %>
+  <% organizations.forEach(function(org) { %>
+    <% 
+      // Check if user is already affiliated with this organization
+      const isAffiliated = userAffiliations && userAffiliations.some(aff => aff.id === org.id);
+    %>
+    <% if (!isAffiliated) { %>
+      <div class="modal fade" id="joinModal<%= org.id %>" tabindex="-1" aria-labelledby="joinModalLabel<%= org.id %>" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="joinModalLabel<%= org.id %>">
+                <i class="fas fa-user-plus me-2"></i>Join <%= org.name %>
+              </h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="/admin/organizations/<%= org.id %>/join" method="POST">
+              <div class="modal-body">
+                <p class="mb-3">
+                  <strong><%= org.name %></strong> is a <%= org.type.charAt(0).toUpperCase() + org.type.slice(1) %>.
+                  <% if (org.address) { %>
+                    <br><small class="text-muted"><i class="fas fa-map-marker-alt me-1"></i><%= org.address %></small>
+                  <% } %>
+                </p>
+                
+                <div class="mb-3">
+                  <label for="role<%= org.id %>" class="form-label">Join as:</label>
+                  <select name="role" id="role<%= org.id %>" class="form-select" required>
+                    <option value="parent">Parent</option>
+                    <option value="child">Child</option>
+                  </select>
+                </div>
+                
+                <div class="mb-3" id="childSelect<%= org.id %>" style="display: none;">
+                  <label for="child_id<%= org.id %>" class="form-label">Select Child:</label>
+                  <select name="child_id" id="child_id<%= org.id %>" class="form-select">
+                    <option value="">No child (join as individual)</option>
+                    <!-- This will be populated with user's children if available -->
+                  </select>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-success">
+                  <i class="fas fa-user-plus me-1"></i>Join Organization
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    <% } %>
+  <% }); %>
+<% } %>
+
 <%- include('../partials/footer1') %>
 
 <!-- Chart.js CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script>
+// Handle role selection in join modals
+document.addEventListener('DOMContentLoaded', function() {
+  // Get all role select elements
+  const roleSelects = document.querySelectorAll('select[name="role"]');
+  
+  roleSelects.forEach(function(select) {
+    select.addEventListener('change', function() {
+      const orgId = this.id.replace('role', '');
+      const childSelect = document.getElementById('childSelect' + orgId);
+      
+      if (this.value === 'child') {
+        childSelect.style.display = 'block';
+      } else {
+        childSelect.style.display = 'none';
+      }
+    });
+  });
+  
+  // Search functionality
+  const searchInput = document.getElementById('organizationSearch');
+  const clearSearchBtn = document.getElementById('clearSearch');
+  const tableBody = document.getElementById('organizationsTable');
+  
+  if (searchInput && tableBody) {
+    searchInput.addEventListener('input', function() {
+      const searchTerm = this.value.toLowerCase();
+      const rows = tableBody.querySelectorAll('tbody tr');
+      
+      rows.forEach(function(row) {
+        const text = row.textContent.toLowerCase();
+        if (text.includes(searchTerm)) {
+          row.style.display = '';
+        } else {
+          row.style.display = 'none';
+        }
+      });
+    });
+    
+    clearSearchBtn.addEventListener('click', function() {
+      searchInput.value = '';
+      const rows = tableBody.querySelectorAll('tbody tr');
+      rows.forEach(function(row) {
+        row.style.display = '';
+      });
+    });
+  }
+});
+</script>
 <script>
   document.addEventListener('DOMContentLoaded', function() {
     // Chart functionality

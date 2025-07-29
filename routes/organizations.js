@@ -77,6 +77,52 @@ router.get('/add', (req, res) => {
   res.render('add-organizations', { session: req.session });
 });
 
+// POST /organizations/:id/join - Join an organization
+router.post('/:id/join', async (req, res) => {
+  if (!req.session.userId) return res.redirect('/login');
+  
+  try {
+    const orgId = req.params.id;
+    const userId = req.session.userId;
+    const role = req.body.role || 'parent'; // 'parent' or 'child'
+    const childId = req.body.child_id || null;
+    
+    // Check if organization exists
+    const [[organization]] = await db.query(`
+      SELECT * FROM Organizations WHERE id = ?
+    `, [orgId]);
+    
+    if (!organization) {
+      req.session.error = 'Organization not found.';
+      return res.redirect('/organizations');
+    }
+    
+    // Check if user is already affiliated with this organization
+    const [existingAffiliation] = await db.query(`
+      SELECT * FROM UserAffiliations 
+      WHERE user_id = ? AND organization_id = ? AND role = ?
+    `, [userId, orgId, role]);
+    
+    if (existingAffiliation.length > 0) {
+      req.session.error = `You are already affiliated with ${organization.name} as a ${role}.`;
+      return res.redirect('/organizations');
+    }
+    
+    // Add affiliation
+    await db.query(`
+      INSERT INTO UserAffiliations (user_id, organization_id, role, child_id)
+      VALUES (?, ?, ?, ?)
+    `, [userId, orgId, role, childId]);
+    
+    req.session.success = `Successfully joined ${organization.name} as a ${role}!`;
+    res.redirect('/organizations');
+  } catch (err) {
+    console.error('❌ Join organization error:', err);
+    req.session.error = 'Could not join organization.';
+    res.redirect('/organizations');
+  }
+});
+
 // GET /organizations/:id/details - Show organization details with affiliations
 router.get('/:id/details', async (req, res) => {
   if (!req.session.userId) return res.redirect('/login');
@@ -245,6 +291,39 @@ router.post('/delete/:id', async (req, res) => {
   } catch (err) {
     console.error('❌ Delete Organization Error:', err);
     res.status(500).send('Could not delete organization.');
+  }
+});
+
+// POST /organizations/:id/leave - Leave an organization
+router.post('/:id/leave', async (req, res) => {
+  if (!req.session.userId) return res.redirect('/login');
+  
+  try {
+    const orgId = req.params.id;
+    const userId = req.session.userId;
+    
+    // Check if organization exists
+    const [[organization]] = await db.query(`
+      SELECT * FROM Organizations WHERE id = ?
+    `, [orgId]);
+    
+    if (!organization) {
+      req.session.error = 'Organization not found.';
+      return res.redirect('/organizations');
+    }
+    
+    // Remove all affiliations for this user and organization
+    await db.query(`
+      DELETE FROM UserAffiliations 
+      WHERE user_id = ? AND organization_id = ?
+    `, [userId, orgId]);
+    
+    req.session.success = `Successfully left ${organization.name}!`;
+    res.redirect('/organizations');
+  } catch (err) {
+    console.error('❌ Leave organization error:', err);
+    req.session.error = 'Could not leave organization.';
+    res.redirect('/organizations');
   }
 });
 

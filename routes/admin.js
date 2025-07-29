@@ -216,6 +216,52 @@ router.post('/users/:id/delete', async (req, res) => {
   }
 });
 
+// POST /admin/organizations/:id/join - Join an organization (admin can join any organization)
+router.post('/organizations/:id/join', async (req, res) => {
+  if (!req.session.userId) return res.redirect('/login');
+  
+  try {
+    const orgId = req.params.id;
+    const userId = req.session.userId;
+    const role = req.body.role || 'parent'; // 'parent' or 'child'
+    const childId = req.body.child_id || null;
+    
+    // Check if organization exists
+    const [[organization]] = await db.query(`
+      SELECT * FROM Organizations WHERE id = ?
+    `, [orgId]);
+    
+    if (!organization) {
+      req.session.error = 'Organization not found.';
+      return res.redirect('/admin/organizations');
+    }
+    
+    // Check if user is already affiliated with this organization
+    const [existingAffiliation] = await db.query(`
+      SELECT * FROM UserAffiliations 
+      WHERE user_id = ? AND organization_id = ? AND role = ?
+    `, [userId, orgId, role]);
+    
+    if (existingAffiliation.length > 0) {
+      req.session.error = `You are already affiliated with ${organization.name} as a ${role}.`;
+      return res.redirect('/admin/organizations');
+    }
+    
+    // Add affiliation
+    await db.query(`
+      INSERT INTO UserAffiliations (user_id, organization_id, role, child_id)
+      VALUES (?, ?, ?, ?)
+    `, [userId, orgId, role, childId]);
+    
+    req.session.success = `Successfully joined ${organization.name} as a ${role}!`;
+    res.redirect('/admin/organizations');
+  } catch (err) {
+    console.error('❌ Join organization error:', err);
+    req.session.error = 'Could not join organization.';
+    res.redirect('/admin/organizations');
+  }
+});
+
 // GET /admin/organizations/:id/details - Show organization details with affiliations
 router.get('/organizations/:id/details', async (req, res) => {
   console.log('🔍 DEBUG: Organization details route hit for ID:', req.params.id);

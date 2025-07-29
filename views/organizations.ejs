@@ -43,6 +43,11 @@
                     <br><small class="text-muted"><i class="fas fa-map-marker-alt me-1"></i><%= affiliation.address %></small>
                   <% } %>
                 </div>
+                <div class="flex-shrink-0 ms-2">
+                  <button class="btn btn-sm btn-outline-danger" onclick="removeAffiliation('<%= affiliation.id %>', '<%= affiliation.name %>')" title="Leave Organization">
+                    <i class="fas fa-times"></i>
+                  </button>
+                </div>
               </div>
             </div>
           <% }); %>
@@ -56,11 +61,29 @@
     <div class="col-md-8">
       <div class="card shadow-sm h-100">
         <div class="card-body">
-          <h5 class="card-title mb-3">🏫 Your Organizations</h5>
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="card-title mb-0">🏫 Your Organizations</h5>
+            <button class="btn btn-primary btn-sm" onclick="openAddModal()">
+              <i class="fas fa-plus me-1"></i>Add Organization
+            </button>
+          </div>
+          
+          <!-- Search Bar -->
+          <div class="mb-3">
+            <div class="input-group">
+              <span class="input-group-text">
+                <i class="fas fa-search"></i>
+              </span>
+              <input type="text" id="organizationSearch" class="form-control" placeholder="Search organizations by name, type, or address...">
+              <button class="btn btn-outline-secondary" type="button" id="clearSearch">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+          </div>
 
           <% if (organizations && organizations.length > 0) { %>
             <div class="table-responsive">
-              <table class="table table-hover">
+                              <table class="table">
                 <thead class="table-light">
                   <tr>
                     <th>Name</th>
@@ -70,7 +93,7 @@
                     <th>Actions</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody id="organizationsTableBody">
                   <% organizations.forEach(org => { %>
                     <tr>
                       <td><strong><%= org.name %></strong></td>
@@ -97,37 +120,21 @@
                                   </div>
                                 </td>
                       <td>
-                        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#editForm<%= org.id %>">✏️</button>
-                        <a href="/organizations/<%= org.id %>/delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete <%= org.name %>?')">🗑</a>
+                        <% 
+                          // Check if user is already affiliated with this organization
+                          const isAffiliated = userAffiliations && userAffiliations.some(aff => aff.id === org.id);
+                        %>
+                        <% if (!isAffiliated) { %>
+                                          <button class="btn btn-sm btn-success" onclick="openModal('<%= org.id %>')">
+                  <i class="fas fa-user-plus me-1"></i>Join
+                </button>
+                        <% } else { %>
+                          <span class="badge bg-success">Already Member</span>
+                        <% } %>
+
                       </td>
                     </tr>
-                    <tr>
-                      <td colspan="5" class="p-0">
-                        <div class="collapse" id="editForm<%= org.id %>">
-                          <div class="p-3 bg-light">
-                            <form action="/organizations/<%= org.id %>/edit" method="POST" class="row g-2">
-                              <div class="col-md-4">
-                                <input type="text" name="name" value="<%= org.name %>" class="form-control" required>
-                              </div>
-                              <div class="col-md-3">
-                                <select name="type" class="form-select">
-                                  <option value="school" <%= org.type === 'school' ? 'selected' : '' %>>School</option>
-                                  <option value="club" <%= org.type === 'club' ? 'selected' : '' %>>Club</option>
-                                  <option value="event" <%= org.type === 'event' ? 'selected' : '' %>>Event</option>
-                                  <option value="other" <%= org.type === 'other' ? 'selected' : '' %>>Other</option>
-                                </select>
-                              </div>
-                              <div class="col-md-3">
-                                <input type="text" name="address" value="<%= org.address %>" class="form-control" placeholder="Address">
-                              </div>
-                              <div class="col-md-2">
-                                <button type="submit" class="btn btn-primary w-100">💾</button>
-                              </div>
-                            </form>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
+
                   <% }) %>
                 </tbody>
               </table>
@@ -136,29 +143,118 @@
             <p class="text-muted">No organizations registered yet.</p>
           <% } %>
 
-          <hr class="my-4">
+          <!-- Join Organization Modals -->
+          <% if (organizations && organizations.length > 0) { %>
+            <% organizations.forEach(function(org) { %>
+              <% 
+                // Check if user is already affiliated with this organization
+                const isAffiliated = userAffiliations && userAffiliations.some(aff => aff.id === org.id);
+              %>
+              <% if (!isAffiliated) { %>
+                <div class="custom-modal" id="joinModal<%= org.id %>" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1050;">
+                  <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 8px; padding: 0; min-width: 400px; max-width: 500px;">
+                    <div style="padding: 1rem; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center;">
+                      <h5 style="margin: 0;">
+                        <i class="fas fa-user-plus me-2"></i>Join <%= org.name %>
+                      </h5>
+                      <button type="button" class="btn-close" onclick="closeModal('<%= org.id %>')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+                    </div>
+                    <form action="/organizations/<%= org.id %>/join" method="POST" id="joinForm<%= org.id %>">
+                      <div style="padding: 1rem;">
+                        <p class="mb-3">
+                          <strong><%= org.name %></strong> is a <%= org.type.charAt(0).toUpperCase() + org.type.slice(1) %>.
+                          <% if (org.address) { %>
+                            <br><small class="text-muted"><i class="fas fa-map-marker-alt me-1"></i><%= org.address %></small>
+                          <% } %>
+                        </p>
+                        
+                        <div class="mb-3">
+                          <label for="role<%= org.id %>" class="form-label">Join as:</label>
+                          <select name="role" id="role<%= org.id %>" class="form-select" required>
+                            <option value="parent">Parent</option>
+                            <option value="child">Child</option>
+                          </select>
+                        </div>
+                        
+                        <div class="mb-3" id="childSelect<%= org.id %>" style="display: none;">
+                          <label for="child_id<%= org.id %>" class="form-label">Select Child:</label>
+                          <select name="child_id" id="child_id<%= org.id %>" class="form-select">
+                            <option value="">No child (join as individual)</option>
+                            <!-- This will be populated with user's children if available -->
+                          </select>
+                        </div>
+                      </div>
+                      <div style="padding: 1rem; border-top: 1px solid #dee2e6; display: flex; justify-content: flex-end; gap: 0.5rem;">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('<%= org.id %>')">Cancel</button>
+                        <button type="submit" class="btn btn-success" id="submitBtn<%= org.id %>">
+                          <i class="fas fa-user-plus me-1"></i>Join Organization
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              <% } %>
+            <% }); %>
+          <% } %>
 
-          <h6>➕ Add New Organization</h6>
-          <form action="/organizations/add" method="POST" class="row g-2">
-            <div class="col-md-4">
-              <input type="text" name="name" class="form-control" placeholder="Organization name" required>
+          <!-- Add Organization Modal -->
+          <div class="custom-modal" id="addOrganizationModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1050;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 8px; padding: 0; min-width: 500px; max-width: 600px;">
+              <div style="padding: 1rem; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center;">
+                <h5 style="margin: 0;">
+                  <i class="fas fa-plus me-2"></i>Add New Organization
+                </h5>
+                <button type="button" class="btn-close" onclick="closeAddModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+              </div>
+              <form action="/organizations/add" method="POST" id="addOrganizationForm">
+                <div style="padding: 1rem;">
+                  <div class="mb-3">
+                    <label for="name" class="form-label">Organization Name *</label>
+                    <input type="text" class="form-control" id="name" name="name" required>
+                  </div>
+                  
+                  <div class="mb-3">
+                    <label for="type" class="form-label">Type *</label>
+                    <select class="form-select" id="type" name="type" required>
+                      <option value="">Select type...</option>
+                      <option value="school">School</option>
+                      <option value="club">Club</option>
+                      <option value="event">Event</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  
+                  <div class="mb-3">
+                    <label for="address" class="form-label">Address *</label>
+                    <input type="text" class="form-control" id="address" name="address" required>
+                  </div>
+                  
+                  <div class="row">
+                    <div class="col-md-6">
+                      <div class="mb-3">
+                        <label for="lat" class="form-label">Latitude</label>
+                        <input type="number" step="any" class="form-control" id="lat" name="lat">
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="mb-3">
+                        <label for="lng" class="form-label">Longitude</label>
+                        <input type="number" step="any" class="form-control" id="lng" name="lng">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div style="padding: 1rem; border-top: 1px solid #dee2e6; display: flex; justify-content: flex-end; gap: 0.5rem;">
+                  <button type="button" class="btn btn-secondary" onclick="closeAddModal()">Cancel</button>
+                  <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-plus me-1"></i>Add Organization
+                  </button>
+                </div>
+              </form>
             </div>
-            <div class="col-md-3">
-              <select name="type" class="form-select" required>
-                <option value="" disabled selected>Type</option>
-                <option value="school">School</option>
-                <option value="club">Club</option>
-                <option value="event">Event</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-            <div class="col-md-3">
-              <input type="text" name="address" class="form-control" placeholder="Address (optional)">
-            </div>
-            <div class="col-md-2">
-              <button type="submit" class="btn btn-success w-100">Add</button>
-            </div>
-          </form>
+          </div>
+
+
         </div>
       </div>
     </div>
@@ -224,5 +320,110 @@
     </div>
   </div>
 </div>
+
+<script>
+// Custom modal functions
+function openModal(orgId) {
+  const modal = document.getElementById('joinModal' + orgId);
+  if (modal) {
+    modal.style.display = 'block';
+    document.body.style.overflow = 'hidden'; // Prevent background scrolling
+  }
+}
+
+function closeModal(orgId) {
+  const modal = document.getElementById('joinModal' + orgId);
+  if (modal) {
+    modal.style.display = 'none';
+    document.body.style.overflow = ''; // Restore scrolling
+  }
+}
+
+// Close modal when clicking outside
+document.addEventListener('click', function(event) {
+  if (event.target.classList.contains('custom-modal')) {
+    event.target.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+});
+
+// Remove affiliation function
+function removeAffiliation(orgId, orgName) {
+  if (confirm(`Are you sure you want to leave ${orgName}?`)) {
+    // Create a form and submit it
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/organizations/${orgId}/leave`;
+    
+    document.body.appendChild(form);
+    form.submit();
+  }
+}
+
+// Add organization function
+function openAddModal() {
+  const modal = document.getElementById('addOrganizationModal');
+  if (modal) {
+    modal.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+  }
+}
+
+function closeAddModal() {
+  const modal = document.getElementById('addOrganizationModal');
+  if (modal) {
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+}
+
+// Handle role selection in join modals
+document.addEventListener('DOMContentLoaded', function() {
+  // Get all role select elements
+  const roleSelects = document.querySelectorAll('select[name="role"]');
+  
+  roleSelects.forEach(function(select) {
+    select.addEventListener('change', function() {
+      const orgId = this.id.replace('role', '');
+      const childSelect = document.getElementById('childSelect' + orgId);
+      
+      if (this.value === 'child') {
+        childSelect.style.display = 'block';
+      } else {
+        childSelect.style.display = 'none';
+      }
+    });
+  });
+  
+  // Search functionality
+  const searchInput = document.getElementById('organizationSearch');
+  const clearSearchBtn = document.getElementById('clearSearch');
+  const tableBody = document.getElementById('organizationsTableBody');
+  
+  if (searchInput && tableBody) {
+    searchInput.addEventListener('input', function() {
+      const searchTerm = this.value.toLowerCase();
+      const rows = tableBody.querySelectorAll('tr');
+      
+      rows.forEach(function(row) {
+        const text = row.textContent.toLowerCase();
+        if (text.includes(searchTerm)) {
+          row.style.display = '';
+        } else {
+          row.style.display = 'none';
+        }
+      });
+    });
+    
+    clearSearchBtn.addEventListener('click', function() {
+      searchInput.value = '';
+      const rows = tableBody.querySelectorAll('tr');
+      rows.forEach(function(row) {
+        row.style.display = '';
+      });
+    });
+  }
+});
+</script>
 
 <%- include('partials/footer1') %> 
