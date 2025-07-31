@@ -17,96 +17,293 @@ router.use((req, res, next) => {
 
 router.use(isAdmin);
 
-// Admin Dashboard
-router.get('/dashboard', async (req, res) => {
+// GET /admin - Redirect to admin dashboard
+router.get('/', async (req, res) => {
+  res.redirect('/admin/dashboard');
+});
+
+// GET /admin/trusted-groups - Dedicated trusted groups management page
+router.get('/trusted-groups', async (req, res) => {
   try {
-    const [organizations] = await db.query('SELECT * FROM Organizations ORDER BY name ASC');
-    const [users] = await db.query('SELECT * FROM Users ORDER BY id DESC');
-    const [children] = await db.query('SELECT * FROM Children');
-    // Fetch all ParentChild links
-    const [parentChildLinks] = await db.query('SELECT * FROM ParentChild');
-    // Build whānau groups: group by unique set of parents for each set of children
-    // Map: child_id -> [parent_id]
-    const childToParents = {};
-    parentChildLinks.forEach(link => {
-      if (!childToParents[link.child_id]) childToParents[link.child_id] = [];
-      childToParents[link.child_id].push(link.parent_id);
-    });
-    // Map: parent_id -> [child_id]
-    const parentToChildren = {};
-    parentChildLinks.forEach(link => {
-      if (!parentToChildren[link.parent_id]) parentToChildren[link.parent_id] = [];
-      parentToChildren[link.parent_id].push(link.child_id);
-    });
-    // Group children by their set of parents (sorted for uniqueness)
-    const whanauMap = {};
-    Object.entries(childToParents).forEach(([childId, parentIds]) => {
-      const key = parentIds.sort((a,b)=>a-b).join('-');
-      if (!whanauMap[key]) whanauMap[key] = { parentIds: parentIds.slice(), childIds: [] };
-      whanauMap[key].childIds.push(Number(childId));
-    });
-    // Build whanauGroups: [{parents: [user], children: [child]}]
-    const whanauGroups = Object.values(whanauMap).map(group => {
-      const parents = users.filter(u => group.parentIds.includes(u.id));
-      const kids = children.filter(c => group.childIds.includes(c.id));
-      return { parents, children: kids };
-    });
-    // Fetch all groups/events
-    const [groups] = await db.query(`
-      SELECT re.*, u.name AS created_by_name,
-        (SELECT COUNT(*) FROM EventGroupMembers WHERE event_id = re.id AND is_active = TRUE) AS group_member_count
-      FROM RecurringEvents re
-      JOIN Users u ON re.created_by = u.id
-      ORDER BY re.day_of_week, re.start_time
+    // Get all trusted groups with creator and member information
+    const [trustedGroups] = await db.query(`
+      SELECT 
+        tg.*,
+        u.name as creator_name,
+        COUNT(tgm.user_id) as member_count
+      FROM TrustedGroups tg
+      LEFT JOIN Users u ON tg.creator_id = u.id
+      LEFT JOIN TrustedGroupMembers tgm ON tg.id = tgm.group_id
+      GROUP BY tg.id
+      ORDER BY tg.created_at DESC
     `);
-    // --- Statistics ---
-    const [[userStats]] = await db.query(`
-      SELECT COUNT(*) AS total_users,
-        SUM(role = 'parent') AS total_parents,
-        SUM(role = 'child') AS total_children,
-        SUM(is_admin = 1) AS total_admins
+
+    // Get all users for adding to groups
+    const [allUsers] = await db.query(`
+      SELECT id, name, email, role
       FROM Users
+      WHERE role = 'parent'
+      ORDER BY name
     `);
-    const [[groupStats]] = await db.query('SELECT COUNT(*) AS total_groups FROM RecurringEvents');
-    const [[childStats]] = await db.query('SELECT COUNT(*) AS total_children FROM Children');
-    const [[activeMembersStats]] = await db.query('SELECT COUNT(*) AS total_active_group_members FROM EventGroupMembers WHERE is_active = TRUE');
-    const [[pendingInvitesStats]] = await db.query('SELECT COUNT(*) AS total_pending_invitations FROM EventGroupInvitations WHERE status = "pending"');
-    const [[recentSignupsStats]] = await db.query('SELECT COUNT(*) AS recent_signups FROM Users WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)');
-    const [[mostActiveGroup]] = await db.query(`
-      SELECT re.name, COUNT(egm.id) AS member_count
-      FROM RecurringEvents re
-      JOIN EventGroupMembers egm ON egm.event_id = re.id AND egm.is_active = TRUE
-      GROUP BY re.id
-      ORDER BY member_count DESC
-      LIMIT 1
-    `);
-    const stats = {
-      total_users: userStats.total_users,
-      total_parents: userStats.total_parents,
-      total_children: userStats.total_children,
-      total_admins: userStats.total_admins,
-      total_groups: groupStats.total_groups,
-      total_children_table: childStats.total_children,
-      total_active_group_members: activeMembersStats.total_active_group_members,
-      total_pending_invitations: pendingInvitesStats.total_pending_invitations,
-      recent_signups: recentSignupsStats.recent_signups,
-      most_active_group: mostActiveGroup ? mostActiveGroup.name : null,
-      most_active_group_count: mostActiveGroup ? mostActiveGroup.member_count : 0
-    };
-    // --- End Statistics ---
-    res.render('admin/dashboard', {
-      organizations,
-      users,
-      children,
-      groups,
-      stats,
+
+    res.render('admin/trusted-groups', {
       session: req.session,
-      activePage: 'dashboard',
-      whanauGroups // <-- pass to view
+      trustedGroups,
+      allUsers
     });
   } catch (err) {
-    console.error('Admin dashboard error:', err);
-    res.status(500).send('Failed to load admin dashboard');
+    console.error('❌ Admin trusted groups error:', err);
+    req.session.error = 'Could not load trusted groups.';
+    res.redirect('/admin/dashboard');
+  }
+});
+
+// POST /admin/trusted-groups/:id/edit - Edit trusted group
+router.post('/trusted-groups/:id/edit', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description } = req.body;
+
+    await db.query(`
+      UPDATE TrustedGroups 
+      SET name = ?, description = ?
+      WHERE id = ?
+    `, [name, description, id]);
+
+    req.session.success = 'Trusted group updated successfully.';
+    res.redirect('/admin/trusted-groups');
+  } catch (err) {
+    console.error('❌ Edit trusted group error:', err);
+    req.session.error = 'Could not update trusted group.';
+    res.redirect('/admin/trusted-groups');
+  }
+});
+
+// POST /admin/trusted-groups/:id/delete - Delete trusted group
+router.post('/trusted-groups/:id/delete', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await db.query('DELETE FROM TrustedGroups WHERE id = ?', [id]);
+
+    req.session.success = 'Trusted group deleted successfully.';
+    res.redirect('/admin/trusted-groups');
+  } catch (err) {
+    console.error('❌ Delete trusted group error:', err);
+    req.session.error = 'Could not delete trusted group.';
+    res.redirect('/admin/trusted-groups');
+  }
+});
+
+// GET /admin/trusted-groups/:id/members - Get group members for editing
+router.get('/trusted-groups/:id/members', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [members] = await db.query(`
+      SELECT 
+        tgm.*,
+        u.name as user_name,
+        u.email as user_email
+      FROM TrustedGroupMembers tgm
+      JOIN Users u ON tgm.user_id = u.id
+      WHERE tgm.group_id = ?
+      ORDER BY u.name
+    `, [id]);
+
+    res.json(members);
+  } catch (err) {
+    console.error('❌ Get group members error:', err);
+    res.status(500).json({ error: 'Could not load group members.' });
+  }
+});
+
+// GET /admin/dashboard - Admin dashboard with comprehensive overview
+router.get('/dashboard', async (req, res) => {
+  try {
+    // Get system statistics
+    const [[userStats]] = await db.query(`
+      SELECT 
+        COUNT(*) as total_users,
+        COUNT(CASE WHEN role = 'parent' THEN 1 END) as total_parents,
+        COUNT(CASE WHEN role = 'child' THEN 1 END) as total_children,
+        COUNT(CASE WHEN is_blocked = 1 THEN 1 END) as blocked_users
+      FROM Users
+    `);
+
+    const [[childStats]] = await db.query(`
+      SELECT 
+        COUNT(*) as total_children,
+        COUNT(CASE WHEN is_blocked = 1 THEN 1 END) as blocked_children
+      FROM Children
+    `);
+
+    const [[orgStats]] = await db.query(`
+      SELECT COUNT(*) as total_organizations
+      FROM Organizations
+    `);
+
+    // Get user/child relationships
+    const [userChildRelationships] = await db.query(`
+      SELECT 
+        u.id as user_id,
+        u.name as user_name,
+        u.email as user_email,
+        u.role as user_role,
+        u.is_blocked as user_blocked,
+        c.id as child_id,
+        c.name as child_name,
+        c.is_blocked as child_blocked
+      FROM Users u
+      LEFT JOIN Children c ON u.id = c.user_id
+      WHERE u.role = 'parent'
+      ORDER BY u.name, c.name
+    `);
+
+    // Get all trusted groups with creator and member information
+    const [trustedGroups] = await db.query(`
+      SELECT 
+        tg.*,
+        u.name as creator_name,
+        COUNT(tgm.user_id) as member_count
+      FROM TrustedGroups tg
+      LEFT JOIN Users u ON tg.creator_id = u.id
+      LEFT JOIN TrustedGroupMembers tgm ON tg.id = tgm.group_id
+      GROUP BY tg.id
+      ORDER BY tg.created_at DESC
+    `);
+
+    // Get all users for editing groups
+    const [allUsers] = await db.query(`
+      SELECT id, name, email, role
+      FROM Users
+      WHERE role = 'parent'
+      ORDER BY name
+    `);
+
+    // Get recent activity
+    const [recentRides] = await db.query(`
+      SELECT 
+        r.*,
+        u.name as requester_name,
+        c.name as child_name
+      FROM RideRequests r
+      JOIN Users u ON r.user_id = u.id
+      JOIN Children c ON r.child_id = c.id
+      ORDER BY r.created_at DESC
+      LIMIT 5
+    `);
+
+    const [recentMessages] = await db.query(`
+      SELECT 
+        m.*,
+        u.name as sender_name
+      FROM Messages m
+      JOIN Users u ON m.sender_id = u.id
+      ORDER BY m.sent_at DESC
+      LIMIT 5
+    `);
+
+    res.render('admin/dashboard', {
+      session: req.session,
+      userStats,
+      childStats,
+      orgStats,
+      userChildRelationships,
+      trustedGroups,
+      allUsers,
+      recentRides,
+      recentMessages
+    });
+  } catch (err) {
+    console.error('❌ Admin dashboard error:', err);
+    req.session.error = 'Could not load admin dashboard.';
+    res.redirect('/admin');
+  }
+});
+
+// POST /admin/dashboard/trusted-groups/:id/edit - Edit trusted group
+router.post('/dashboard/trusted-groups/:id/edit', async (req, res) => {
+  if (!req.session.userId || !req.session.is_admin) {
+    return res.redirect('/login');
+  }
+
+  try {
+    const { id } = req.params;
+    const { name, description, members } = req.body;
+
+    // Update group details
+    await db.query(`
+      UPDATE TrustedGroups 
+      SET name = ?, description = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `, [name, description, id]);
+
+    // Remove all existing members
+    await db.query('DELETE FROM TrustedGroupMembers WHERE group_id = ?', [id]);
+
+    // Add new members if provided
+    if (members && Array.isArray(members)) {
+      for (const memberId of members) {
+        await db.query(`
+          INSERT INTO TrustedGroupMembers (group_id, user_id)
+          VALUES (?, ?)
+        `, [id, memberId]);
+      }
+    }
+
+    req.session.success = 'Trusted group updated successfully!';
+    res.redirect('/admin/dashboard');
+  } catch (err) {
+    console.error('❌ Edit trusted group error:', err);
+    req.session.error = 'Could not update trusted group.';
+    res.redirect('/admin/dashboard');
+  }
+});
+
+// POST /admin/dashboard/trusted-groups/:id/delete - Delete trusted group
+router.post('/dashboard/trusted-groups/:id/delete', async (req, res) => {
+  if (!req.session.userId || !req.session.is_admin) {
+    return res.redirect('/login');
+  }
+
+  try {
+    const { id } = req.params;
+
+    // Delete the group (cascade will handle members)
+    await db.query('DELETE FROM TrustedGroups WHERE id = ?', [id]);
+
+    req.session.success = 'Trusted group deleted successfully!';
+    res.redirect('/admin/dashboard');
+  } catch (err) {
+    console.error('❌ Delete trusted group error:', err);
+    req.session.error = 'Could not delete trusted group.';
+    res.redirect('/admin/dashboard');
+  }
+});
+
+// GET /admin/dashboard/trusted-groups/:id/members - Get group members for editing
+router.get('/dashboard/trusted-groups/:id/members', async (req, res) => {
+  if (!req.session.userId || !req.session.is_admin) {
+    return res.status(403).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const { id } = req.params;
+
+    // Get group members
+    const [members] = await db.query(`
+      SELECT u.id, u.name, u.email
+      FROM TrustedGroupMembers tgm
+      JOIN Users u ON tgm.user_id = u.id
+      WHERE tgm.group_id = ?
+      ORDER BY u.name
+    `, [id]);
+
+    res.json({ members });
+  } catch (err) {
+    console.error('❌ Get group members error:', err);
+    res.status(500).json({ error: 'Could not fetch group members' });
   }
 });
 

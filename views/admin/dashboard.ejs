@@ -1,483 +1,501 @@
 <!--views/admin/dashboard.ejs -->
 <%- include('../partials/header1') %>
-<%- include(session && session.is_admin ? '../partials/navbar2' : '../partials/navbar1') %>
+<%- include('../partials/navbar2') %>
 
-<div class="container py-5">
-  <h2 class="mb-4 fw-bold text-primary">🛠 Admin Dashboard</h2>
+<div class="container mt-4">
+  <!-- Page Header -->
+  <div class="row mb-4">
+    <div class="col">
+      <h2 class="mb-0">
+        <i class="fas fa-tachometer-alt me-2"></i>Admin Dashboard
+      </h2>
+      <p class="text-muted">System overview and management</p>
+    </div>
+  </div>
 
+  <!-- Flash Messages -->
   <% if (session.success) { %>
     <div class="alert alert-success alert-dismissible fade show" role="alert">
-      <%= session.success %>
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      <i class="fas fa-check-circle me-2"></i><%= session.success %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
-    <% session.success = null; %>
   <% } %>
+  
   <% if (session.error) { %>
     <div class="alert alert-danger alert-dismissible fade show" role="alert">
-      <%= session.error %>
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-    <% session.error = null; %>
-  <% } %>
-
-  <% if (typeof stats !== 'undefined') { %>
-    <div class="row mb-4 g-3">
-      <div class="col-md-2">
-        <a href="/admin/users" style="text-decoration: none; color: inherit;">
-        <div class="card shadow-sm border-primary">
-          <div class="card-body text-center">
-            <h6 class="text-primary">Total Users</h6>
-            <div class="fw-bold fs-4"><%= stats.total_users %></div>
-            <small>Parents: <%= stats.total_parents %> | Children: <%= stats.total_children %> | Admins: <%= stats.total_admins %></small>
-          </div>
-        </div>
-        </a>
-      </div>
-      <div class="col-md-2">
-        <div class="card shadow-sm border-success">
-          <div class="card-body text-center">
-            <h6 class="text-success">Groups/Events</h6>
-            <div class="fw-bold fs-4"><%= stats.total_groups %></div>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-2">
-        <div class="card shadow-sm border-info">
-          <div class="card-body text-center">
-            <h6 class="text-info">Children</h6>
-            <div class="fw-bold fs-4"><%= stats.total_children_table %></div>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-2">
-        <div class="card shadow-sm border-warning">
-          <div class="card-body text-center">
-            <h6 class="text-warning">Active Group Members</h6>
-            <div class="fw-bold fs-4"><%= stats.total_active_group_members %></div>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-2">
-        <div class="card shadow-sm border-danger">
-          <div class="card-body text-center">
-            <h6 class="text-danger">Pending Invitations</h6>
-            <div class="fw-bold fs-4"><%= stats.total_pending_invitations %></div>
-            <small>Recent Signups (7d): <%= stats.recent_signups %></small>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="row mb-3">
-      <div class="col-md-6 col-lg-4 col-xl-3">
-        <div class="card shadow-sm border-secondary">
-          <div class="card-body text-center">
-            <h6 class="text-secondary mb-0">Most Active Group</h6>
-            <% if (stats.most_active_group) { %>
-              <span class="fw-bold"><%= stats.most_active_group %></span> (<%= stats.most_active_group_count %> members)
-            <% } else { %>
-              <span class="text-muted">No group data</span>
-            <% } %>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-6 col-lg-8 col-xl-9 d-flex align-items-center">
-        <div class="d-flex flex-wrap gap-2 w-100 justify-content-md-end justify-content-center mt-3 mt-md-0">
-          <a href="/admin/organizations" class="btn btn-outline-success">🏫 Manage Organizations</a>
-          <a href="/admin/groups" class="btn btn-outline-primary">👥 Manage Groups/Events</a>
-          <a href="/admin/messages" class="btn btn-outline-info">📊 Messages Overview</a>
-           <!--  <a href="/admin/users/add" class="btn btn-outline-success">➕ Add Parent</a> -->
-          <!--  <a href="/admin/children/add" class="btn btn-outline-success">➕ Add Child</a> -->
-        </div>
-      </div>
+      <i class="fas fa-exclamation-circle me-2"></i><%= session.error %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
   <% } %>
 
-  <div class="row g-4">
-    <!-- Parents -->
-    <div class="col-lg-6">
-      <h4 class="text-success">👤 Parents</h4>
-      <a href="/admin/users/add" class="btn btn-success mb-3">➕ Add New Parent</a>
-      <div class="table-responsive">
-        <table class="table table-bordered table-sm table-striped rounded shadow-sm" id="parentsTable">
-          <thead class="table-light">
-            <tr>
-              <th>Name <a href="#" class="sort text-dark" data-sort="name">🔽</a></th>
-              <th>Email <a href="#" class="sort text-dark" data-sort="email">🔽</a></th>
-              <th>Blocked? <a href="#" class="sort text-dark" data-sort="is_blocked">🔽</a></th>
-              <th>Address Privacy</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% if (users && users.length > 0) { %>
-              <% users.filter(user => user.role === 'parent').forEach(user => { %>
-                <tr>
-                  <td class="<%= user.is_blocked ? 'blocked-user' : '' %>">
-                    <%= user.name %> <%- user.is_blocked ? '<i class="fas fa-lock text-danger ms-1"></i>' : '' %>
-                  </td>
-                  <td class="<%= user.is_blocked ? 'blocked-user' : '' %>"><%= user.email %></td>
-                  <td class="<%= user.is_blocked ? 'blocked-user' : '' %>"><%= user.is_blocked ? "Yes" : "No" %></td>
-                  <td>
-                    <form method="POST" action="/admin/users/<%= user.id %>/privacy" class="d-inline privacy-form" data-user-id="<%= user.id %>">
-                      <input type="hidden" name="user_id" value="<%= user.id %>">
-                      <div class="form-check form-switch">
-                        <input class="form-check-input privacy-checkbox" type="checkbox" name="is_address_private" id="privacy_<%= user.id %>" data-user-id="<%= user.id %>" <%= (user.is_address_private == 1 || user.is_address_private === true || user.is_address_private === '1' || user.is_address_private === 'true') ? 'checked' : '' %>>
-                        <label class="form-check-label" for="privacy_<%= user.id %>">
-                          <i class="fas fa-eye-slash me-1"></i> Private
-                        </label>
-                      </div>
-                      <button type="submit" class="btn btn-sm btn-outline-secondary ms-2" onclick="console.log('🔍 Submit button clicked for user', '<%= user.id %>')">Update</button>
-                    </form>
-                  </td>
-                  <td>
-                    <button class="btn btn-sm btn-warning manage-block" data-user-id="<%= user.id %>" data-blocked="<%= user.is_blocked %>" title="<%= user.is_blocked ? 'Unblock' : 'Block' %>">
-                      <%= user.is_blocked ? '🔓' : '🔒' %>
-                    </button>
-                    <form action="/admin/users/<%= user.id %>/delete" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete <%= user.name %>?');">
-                      <button type="submit" class="btn btn-sm btn-danger" title="Delete User">🗑️</button>
-                    </form>
-                  </td>
-                </tr>
-              <% }); %>
-            <% } else { %>
-              <tr><td colspan="4" class="text-center text-muted">No parents found.</td></tr>
-            <% } %>
-          </tbody>
-        </table>
+  <!-- System Statistics -->
+  <div class="row mb-4">
+    <div class="col-md-3 mb-3">
+      <div class="card border-primary">
+        <div class="card-body text-center">
+          <h3 class="text-primary mb-1"><%= userStats.total_users %></h3>
+          <p class="text-muted mb-0">Total Users</p>
+          <i class="fas fa-users fa-2x text-muted mt-2"></i>
+        </div>
       </div>
     </div>
+    <div class="col-md-3 mb-3">
+      <div class="card border-success">
+        <div class="card-body text-center">
+          <h3 class="text-success mb-1"><%= userStats.total_parents %></h3>
+          <p class="text-muted mb-0">Parents</p>
+          <i class="fas fa-user-friends fa-2x text-muted mt-2"></i>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 mb-3">
+      <div class="card border-info">
+        <div class="card-body text-center">
+          <h3 class="text-info mb-1"><%= childStats.total_children %></h3>
+          <p class="text-muted mb-0">Children</p>
+          <i class="fas fa-child fa-2x text-muted mt-2"></i>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 mb-3">
+      <div class="card border-warning">
+        <div class="card-body text-center">
+          <h3 class="text-warning mb-1"><%= orgStats.total_organizations %></h3>
+          <p class="text-muted mb-0">Organizations</p>
+          <i class="fas fa-building fa-2x text-muted mt-2"></i>
+        </div>
+      </div>
+    </div>
+  </div>
 
-    <!-- Family / Whānau -->
-    <div class="col-lg-6">
-      <h4 class="text-success">👨‍👩‍👧‍👦 Family / Whānau</h4>
-      <a href="/admin/children/add" class="btn btn-success mb-3">➕ Add New Child</a>
-      <div class="table-responsive">
-        <table class="table table-bordered table-sm table-striped rounded shadow-sm" id="childrenTable">
-          <thead class="table-light">
-            <tr>
-              <th>Parents</th>
-              <th>Children</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% if (whanauGroups && whanauGroups.length > 0) { %>
-              <% whanauGroups.forEach(group => { %>
-                <tr class="<%= group.parents.some(p => p.is_blocked) || group.children.some(c => c.is_blocked) ? 'table-danger' : '' %>">
-                  <td>
-                    <% group.parents.forEach(parent => { %>
-                      <div class="<%= parent.is_blocked ? 'blocked-user' : '' %> mb-2">
-                        <div class="fw-bold fs-5 mb-1">
-                          <i class="fas fa-user me-1"></i> 
-                          <%= parent.name %> 
-                          <% if (parent.is_blocked) { %>
-                            <i class="fas fa-lock text-danger ms-1" title="Blocked"></i>
+  <!-- Quick Actions -->
+  <div class="row mb-4">
+    <div class="col">
+      <div class="card">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-bolt me-2"></i>Quick Actions
+          </h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-3 mb-3">
+              <a href="/admin/users" class="btn btn-outline-primary w-100">
+                <i class="fas fa-users me-2"></i>Manage Users
+              </a>
+            </div>
+            <div class="col-md-3 mb-3">
+              <a href="/admin/organizations" class="btn btn-outline-success w-100">
+                <i class="fas fa-building me-2"></i>Organizations
+              </a>
+            </div>
+            <div class="col-md-3 mb-3">
+              <a href="/admin/messages" class="btn btn-outline-info w-100">
+                <i class="fas fa-envelope me-2"></i>Messages
+              </a>
+            </div>
+            <div class="col-md-3 mb-3">
+              <a href="/admin/groups" class="btn btn-outline-warning w-100">
+                <i class="fas fa-layer-group me-2"></i>Groups
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- User/Child Relationships -->
+  <div class="row mb-4">
+    <div class="col">
+      <div class="card">
+        <div class="card-header bg-info text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-users me-2"></i>User/Child Relationships
+          </h5>
+        </div>
+        <div class="card-body">
+          <% if (userChildRelationships.length === 0) { %>
+            <div class="text-center py-4">
+              <i class="fas fa-users fa-3x text-muted mb-3"></i>
+              <p class="text-muted">No user/child relationships found.</p>
+            </div>
+          <% } else { %>
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Parent</th>
+                    <th>Email</th>
+                    <th>Children</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% 
+                  let currentUserId = null;
+                  let currentUserRow = null;
+                  %>
+                  <% userChildRelationships.forEach(relationship => { %>
+                    <% if (currentUserId !== relationship.user_id) { %>
+                      <% if (currentUserRow) { %>
+                        </td>
+                        <td>
+                          <% if (currentUserRow.user_blocked) { %>
+                            <span class="badge bg-danger">Blocked</span>
+                          <% } else { %>
+                            <span class="badge bg-success">Active</span>
                           <% } %>
-                          <% if (group.children.some(c => c.user_id == parent.id)) { %>
-                            <span class="badge bg-primary ms-1" title="Primary Parent">Primary</span>
+                        </td>
+                        <td>
+                          <div class="btn-group btn-group-sm">
+                            <a href="/admin/users/<%= currentUserRow.user_id %>/edit" class="btn btn-outline-primary">
+                              <i class="fas fa-edit"></i>
+                            </a>
+                            <a href="/admin/users/<%= currentUserRow.user_id %>/manage-block" class="btn btn-outline-warning">
+                              <i class="fas fa-ban"></i>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                      <% } %>
+                      <tr>
+                        <td>
+                          <strong><%= relationship.user_name %></strong>
+                        </td>
+                        <td><%= relationship.user_email %></td>
+                        <td>
+                          <% if (relationship.child_name) { %>
+                            <span class="badge bg-info">
+                              <%= relationship.child_name %>
+                              <% if (relationship.child_blocked) { %>
+                                <i class="fas fa-ban text-danger"></i>
+                              <% } %>
+                            </span>
+                          <% } else { %>
+                            <span class="text-muted">No children</span>
                           <% } %>
-                        </div>
-                        <div class="text-muted small mb-1">(<%= parent.email %>)</div>
-                      </div>
-                    <% }) %>
-                  </td>
-                  <td>
-                    <% group.children.forEach(child => { %>
-                      <div class="mb-2 <%= child.is_blocked ? 'blocked-user' : '' %>">
-                        <span class="fw-bold fs-5">
-                          <i class="fas fa-child me-1"></i> 
-                          <%= child.name %>
-                          <% if (child.is_blocked) { %>
-                            <i class="fas fa-lock text-danger ms-1" title="Blocked"></i>
+                        <% 
+                        currentUserId = relationship.user_id;
+                        currentUserRow = relationship;
+                        %>
+                    <% } else { %>
+                      <% if (relationship.child_name) { %>
+                        <br><span class="badge bg-info">
+                          <%= relationship.child_name %>
+                          <% if (relationship.child_blocked) { %>
+                            <i class="fas fa-ban text-danger"></i>
                           <% } %>
                         </span>
-                        <span class="text-muted small ms-2">School: <%= child.school || 'N/A' %> <% if (child.club) { %>- Club: <%= child.club %> <% } %></span>
-                        <!-- Admin: Edit Child -->
-                        <a href="/admin/children/<%= child.id %>/edit" class="btn btn-outline-warning btn-sm ms-1" title="Edit Child">✏️</a>
-                        <!-- Admin: Delete Child -->
-                        <form method="POST" action="/admin/children/<%= child.id %>/delete" class="d-inline ms-1" onsubmit="return confirm('Are you sure you want to delete <%= child.name %>? This will also delete their user account.');">
-                          <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete Child">🗑️</button>
-                        </form>
-                        <!-- Admin: Add Parent to Child -->
-                        <button class="btn btn-outline-primary btn-sm ms-1 add-parent-btn" 
-                                data-child-id="<%= child.id %>" 
-                                data-child-name="<%= child.name %>"
-                                title="Add Parent to Child">
-                          👥 Add Parent
-                        </button>
-                        <!-- Admin: Remove Secondary Parents -->
-                        <% if (group.parents.length > 1) { %>
-                          <button class="btn btn-outline-secondary btn-sm ms-1 remove-parent-btn" 
-                                  data-child-id="<%= child.id %>" 
-                                  data-child-name="<%= child.name %>"
-                                  data-parents='<%- JSON.stringify(group.parents.filter(p => p.id != child.user_id).map(p => ({id: p.id, name: p.name, email: p.email}))) %>'
-                                  title="Remove Secondary Parent">
-                            🚫 Remove Parent
-                          </button>
-                        <% } %>
+                      <% } %>
+                    <% } %>
+                  <% }); %>
+                  <% if (currentUserRow) { %>
+                    </td>
+                    <td>
+                      <% if (currentUserRow.user_blocked) { %>
+                        <span class="badge bg-danger">Blocked</span>
+                      <% } else { %>
+                        <span class="badge bg-success">Active</span>
+                      <% } %>
+                    </td>
+                    <td>
+                      <div class="btn-group btn-group-sm">
+                        <a href="/admin/users/<%= currentUserRow.user_id %>/edit" class="btn btn-outline-primary">
+                          <i class="fas fa-edit"></i>
+                        </a>
+                        <a href="/admin/users/<%= currentUserRow.user_id %>/manage-block" class="btn btn-outline-warning">
+                          <i class="fas fa-ban"></i>
+                        </a>
                       </div>
-                    <% }) %>
-                  </td>
-                </tr>
-              <% }) %>
-            <% } else { %>
-              <tr><td colspan="2" class="text-center text-muted">No whānau groups found.</td></tr>
-            <% } %>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal for Block/Unblock Management -->
-<div class="modal fade" id="blockModal" tabindex="-1" aria-labelledby="blockModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="blockModalLabel">Manage Block Status</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <p>Are you sure you want to <strong><span id="actionText"></span></strong> <span id="userName"></span>?</p>
-        <p>This will also affect associated children.</p>
-        <div id="confirmationAnimation" class="text-center" style="display:none;">
-          <div class="spinner-border text-warning" role="status">
-            <span class="visually-hidden">Loading...</span>
-          </div>
+                    </td>
+                  </tr>
+                  <% } %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
         </div>
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <form id="blockForm" method="POST" action="">
-          <input type="hidden" name="userId" id="blockUserId">
-          <input type="hidden" name="action" id="blockAction">
-          <button type="submit" class="btn btn-warning" id="confirmBlock">Confirm</button>
-        </form>
+    </div>
+  </div>
+
+  <!-- Recent Activity -->
+  <div class="row mb-4">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header bg-success text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-car me-2"></i>Recent Ride Requests
+          </h5>
+        </div>
+        <div class="card-body">
+          <% if (recentRides.length === 0) { %>
+            <p class="text-muted">No recent ride requests.</p>
+          <% } else { %>
+            <% recentRides.forEach(ride => { %>
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>
+                  <strong><%= ride.requester_name %></strong>
+                  <br><small class="text-muted"><%= ride.child_name %></small>
+                </div>
+                <small class="text-muted">
+                  <%= new Date(ride.created_at).toLocaleDateString() %>
+                </small>
+              </div>
+            <% }); %>
+          <% } %>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header bg-info text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-envelope me-2"></i>Recent Messages
+          </h5>
+        </div>
+        <div class="card-body">
+          <% if (recentMessages.length === 0) { %>
+            <p class="text-muted">No recent messages.</p>
+          <% } else { %>
+            <% recentMessages.forEach(message => { %>
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>
+                  <strong><%= message.sender_name %></strong>
+                  <br><small class="text-muted"><%= message.content.substring(0, 50) %>...</small>
+                </div>
+                <small class="text-muted">
+                  <%= new Date(message.sent_at).toLocaleDateString() %>
+                </small>
+              </div>
+            <% }); %>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Trusted Groups Section -->
+  <div class="row mb-4">
+    <div class="col">
+      <div class="card">
+        <div class="card-header bg-warning text-dark">
+          <h5 class="mb-0">
+            <i class="fas fa-users me-2"></i>Trusted Groups (<%= trustedGroups.length %>)
+          </h5>
+        </div>
+        <div class="card-body">
+          <% if (trustedGroups.length === 0) { %>
+            <div class="text-center py-4">
+              <i class="fas fa-users fa-3x text-muted mb-3"></i>
+              <p class="text-muted">No trusted groups found.</p>
+            </div>
+          <% } else { %>
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Group Name</th>
+                    <th>Description</th>
+                    <th>Creator</th>
+                    <th>Members</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% trustedGroups.forEach(group => { %>
+                    <tr>
+                      <td>
+                        <strong><%= group.name %></strong>
+                      </td>
+                      <td>
+                        <% if (group.description) { %>
+                          <%= group.description %>
+                        <% } else { %>
+                          <span class="text-muted">No description</span>
+                        <% } %>
+                      </td>
+                      <td>
+                        <span class="badge bg-info">
+                          <i class="fas fa-user me-1"></i><%= group.creator_name %>
+                        </span>
+                      </td>
+                      <td>
+                        <span class="badge bg-secondary">
+                          <i class="fas fa-users me-1"></i><%= group.member_count %> members
+                        </span>
+                      </td>
+                      <td>
+                        <small class="text-muted">
+                          <%= new Date(group.created_at).toLocaleDateString() %>
+                        </small>
+                      </td>
+                      <td>
+                        <div class="btn-group btn-group-sm">
+                          <button class="btn btn-outline-primary edit-group-btn" 
+                                  data-group-id="<%= group.id %>" 
+                                  data-group-name="<%= group.name %>" 
+                                  data-group-description="<%= group.description || '' %>">
+                            <i class="fas fa-edit"></i>
+                          </button>
+                          <button class="btn btn-outline-danger delete-group-btn" 
+                                  data-group-id="<%= group.id %>" 
+                                  data-group-name="<%= group.name %>">
+                            <i class="fas fa-trash"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+        </div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Modal for Add Parent to Child -->
-<div class="modal fade" id="addParentModal" tabindex="-1" aria-labelledby="addParentModalLabel" aria-hidden="true">
+<!-- Edit Group Modal -->
+<div class="modal fade" id="editGroupModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-edit me-2"></i>Edit Trusted Group
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="editGroupForm" method="POST">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="groupName" class="form-label">Group Name</label>
+            <input type="text" class="form-control" id="groupName" name="name" required>
+          </div>
+          <div class="mb-3">
+            <label for="groupDescription" class="form-label">Description</label>
+            <textarea class="form-control" id="groupDescription" name="description" rows="3"></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Members</label>
+            <div class="row">
+              <% allUsers.forEach(user => { %>
+                <div class="col-md-6 mb-2">
+                  <div class="form-check">
+                    <input class="form-check-input member-checkbox" type="checkbox" 
+                           name="members" value="<%= user.id %>" 
+                           id="member<%= user.id %>">
+                    <label class="form-check-label" for="member<%= user.id %>">
+                      <%= user.name %> (<%= user.email %>)
+                    </label>
+                  </div>
+                </div>
+              <% }); %>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-save me-1"></i>Update Group
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Group Modal -->
+<div class="modal fade" id="deleteGroupModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="addParentModalLabel">Add Parent to Child</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <h5 class="modal-title text-danger">
+          <i class="fas fa-exclamation-triangle me-2"></i>Delete Trusted Group
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body">
-        <p>Add a parent to <strong><span id="childName"></span></strong></p>
-        <form id="addParentForm" method="POST">
-          <div class="mb-3">
-            <label for="parentEmailOrUsername" class="form-label">Parent Email or Username</label>
-            <input type="text" class="form-control" id="parentEmailOrUsername" name="parent_email_or_username" 
-                   placeholder="Enter parent's email or username" required>
-            <div class="form-text">Enter the email address or username of the parent you want to add.</div>
-          </div>
-          <div class="alert alert-info">
-            <i class="fas fa-info-circle me-2"></i>
-            <strong>Note:</strong> The parent must already exist in the system and have the 'parent' role.
-          </div>
-        </form>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="submit" form="addParentForm" class="btn btn-primary">Add Parent</button>
-      </div>
+      <form id="deleteGroupForm" method="POST">
+        <div class="modal-body">
+          <p>Are you sure you want to delete the group "<span id="deleteGroupName"></span>"?</p>
+          <p class="text-muted">This action cannot be undone.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger">
+            <i class="fas fa-trash me-1"></i>Delete Group
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 </div>
-
-<!-- Modal for Remove Parent from Child -->
-<div class="modal fade" id="removeParentModal" tabindex="-1" aria-labelledby="removeParentModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="removeParentModalLabel">Remove Parent from Child</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <p>Remove a parent from <strong><span id="removeChildName"></span></strong></p>
-        <form id="removeParentForm" method="POST">
-          <div class="mb-3">
-            <label for="parentToRemove" class="form-label">Select Parent to Remove</label>
-            <select class="form-select" id="parentToRemove" name="parent_id" required>
-              <option value="">Choose a parent...</option>
-            </select>
-            <div class="form-text">Select the secondary parent you want to remove from this child.</div>
-          </div>
-          <div class="alert alert-warning">
-            <i class="fas fa-exclamation-triangle me-2"></i>
-            <strong>Warning:</strong> This will remove the parent's access to this child. The primary parent cannot be removed.
-          </div>
-        </form>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="submit" form="removeParentForm" class="btn btn-danger">Remove Parent</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
-<link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-<link rel="stylesheet" href="/css/style.css">
 
 <script>
-  $(document).ready(function() {
-    // Initialize DataTables for Organizations
-    $('#organizationsTable').DataTable({
-      "order": [[0, "asc"]],
-      "pageLength": 10,
-      "lengthMenu": [5, 10, 25, 50]
-    });
+let currentGroupId = null;
 
-    // Initialize DataTables for Parents
-    $('#parentsTable').DataTable({
-      "order": [[0, "asc"]],
-      "pageLength": 10,
-      "lengthMenu": [5, 10, 25, 50]
-    });
-
-    // Initialize DataTables for Children
-    var childrenTable = $('#childrenTable').DataTable({
-      "order": [[0, "asc"]], // Sort by Parent Name by default
-      "pageLength": 10,
-      "lengthMenu": [5, 10, 25, 50]
-    });
-
-    // Sorting functionality
-    $('.sort').on('click', function(e) {
-      e.preventDefault();
-      const tableId = $(this).closest('table').attr('id');
-      const column = $(this).data('sort');
-      const table = $(`#${tableId}`).DataTable();
-      const order = table.order()[0][1] === 'asc' ? 'desc' : 'asc';
-      table.order([parseInt($(this).closest('th').index()), order]).draw();
-      $(this).text(order === 'asc' ? '🔽' : '🔼');
-    });
-
-    // Modal for Block/Unblock
-    $('.manage-block').on('click', function() {
-      const userId = $(this).data('user-id');
-      const blocked = $(this).data('blocked');
-      const userName = $(this).closest('tr').find('td:first').text().trim().replace(/<[^>]+>/g, '');
-      const action = blocked ? 'unblock' : 'block';
-      $('#blockUserId').val(userId);
-      $('#blockAction').val(action);
-      $('#actionText').text(action);
-      $('#userName').text(userName);
-      $('#blockForm').attr('action', `/admin/users/${userId}/${action}`);
-      $('#blockModal').modal('show');
-    });
-
-    $('#confirmBlock').on('click', function() {
-      const animation = $('#confirmationAnimation');
-      animation.show();
-      setTimeout(() => {
-        animation.hide();
-      }, 1000);
-    });
-
-    // Modal for Add Parent to Child
-    $('.add-parent-btn').on('click', function() {
-      const childId = $(this).data('child-id');
-      const childName = $(this).data('child-name');
+// Edit group functionality
+document.addEventListener('DOMContentLoaded', function() {
+  // Edit group buttons
+  document.querySelectorAll('.edit-group-btn').forEach(button => {
+    button.addEventListener('click', function() {
+      const groupId = this.getAttribute('data-group-id');
+      const groupName = this.getAttribute('data-group-name');
+      const groupDescription = this.getAttribute('data-group-description');
       
-      $('#childName').text(childName);
-      $('#addParentForm').attr('action', `/admin/children/${childId}/add-parent`);
-      $('#addParentModal').modal('show');
-    });
-
-    // Modal for Remove Parent from Child
-    $('.remove-parent-btn').on('click', function() {
-      const childId = $(this).data('child-id');
-      const childName = $(this).data('child-name');
-      const parents = $(this).data('parents');
+      currentGroupId = groupId;
       
-      $('#removeChildName').text(childName);
-      $('#removeParentForm').attr('action', `/admin/children/${childId}/remove-parent`);
+      // Set form action
+      document.getElementById('editGroupForm').action = `/admin/dashboard/trusted-groups/${groupId}/edit`;
       
-      // Populate the select dropdown with secondary parents
-      const select = $('#parentToRemove');
-      select.empty();
-      select.append('<option value="">Choose a parent...</option>');
+      // Set form values
+      document.getElementById('groupName').value = groupName;
+      document.getElementById('groupDescription').value = groupDescription;
       
-      parents.forEach(parent => {
-        select.append(`<option value="${parent.id}">${parent.name} (${parent.email})</option>`);
+      // Clear all checkboxes
+      document.querySelectorAll('.member-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
       });
       
-      $('#removeParentModal').modal('show');
-    });
-
-    // Clear forms when modals are closed
-    $('#addParentModal').on('hidden.bs.modal', function() {
-      $('#addParentForm')[0].reset();
-      $('#addParentForm').attr('action', '');
-    });
-    
-    $('#removeParentModal').on('hidden.bs.modal', function() {
-      $('#removeParentForm')[0].reset();
-      $('#removeParentForm').attr('action', '');
-    });
-
-    // Handle privacy form submission
-    /*
-    $(document).on('submit', '.privacy-form', function(e) {
-      console.log('🔍 Privacy form submit event triggered');
-      
-      try {
-        const form = $(this);
-        const userId = form.data('user-id');
-        const checkbox = form.find('.privacy-checkbox');
-        const isPrivate = checkbox.is(':checked');
-        
-        console.log('🔍 Privacy form submitted:', {
-          userId: userId,
-          isPrivate: isPrivate,
-          formAction: form.attr('action'),
-          formData: form.serialize(),
-          formElement: form[0],
-          checkboxElement: checkbox[0]
+      // Load and check current members
+      fetch(`/admin/dashboard/trusted-groups/${groupId}/members`)
+        .then(response => response.json())
+        .then(data => {
+          data.members.forEach(member => {
+            const checkbox = document.getElementById(`member${member.id}`);
+            if (checkbox) {
+              checkbox.checked = true;
+            }
+          });
+        })
+        .catch(error => {
+          console.error('Error loading group members:', error);
         });
-        
-        // Show loading state on the submit button
-        const submitButton = form.find('button[type="submit"]');
-        submitButton.html('<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Updating...').prop('disabled', true);
-        
-        console.log('🔍 Form submission proceeding...');
-      } catch (error) {
-        console.error('🔍 Error in privacy form submission:', error);
-      }
-    });
-    */
-    
-    // Debug: Log when document is ready
-    console.log('🔍 Document ready, privacy forms found:', $('.privacy-form').length);
-    
-    // Debug: Check if forms are properly bound
-    $('.privacy-form').each(function(index) {
-      console.log('🔍 Privacy form', index, ':', {
-        action: $(this).attr('action'),
-        userId: $(this).data('user-id'),
-        checkbox: $(this).find('.privacy-checkbox').length
-      });
-    });
-    
-    // Debug: Test form submission manually
-    $('.privacy-form button[type="submit"]').on('click', function(e) {
-      console.log('🔍 Submit button clicked:', {
-        button: this,
-        form: $(this).closest('form')[0],
-        formAction: $(this).closest('form').attr('action')
-      });
+      
+      // Show modal
+      new bootstrap.Modal(document.getElementById('editGroupModal')).show();
     });
   });
+  
+  // Delete group buttons
+  document.querySelectorAll('.delete-group-btn').forEach(button => {
+    button.addEventListener('click', function() {
+      const groupId = this.getAttribute('data-group-id');
+      const groupName = this.getAttribute('data-group-name');
+      
+      // Set form action and group name
+      document.getElementById('deleteGroupForm').action = `/admin/dashboard/trusted-groups/${groupId}/delete`;
+      document.getElementById('deleteGroupName').textContent = groupName;
+      
+      // Show modal
+      new bootstrap.Modal(document.getElementById('deleteGroupModal')).show();
+    });
+  });
+});
 </script>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
 
 <%- include('../partials/footer1') %>

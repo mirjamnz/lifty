@@ -1,0 +1,273 @@
+<%- include('../partials/header1') %>
+<%- include('../partials/navbar2') %>
+
+<div class="container mt-4">
+  <!-- Page Header -->
+  <div class="row mb-4">
+    <div class="col">
+      <h2 class="mb-0">
+        <i class="fas fa-users me-2"></i>Trusted Groups Management
+      </h2>
+      <p class="text-muted">Manage all trusted parent groups in the system</p>
+    </div>
+    <div class="col-auto">
+      <span class="badge bg-primary fs-6">
+        Trusted Groups (<%= trustedGroups.length %>)
+      </span>
+    </div>
+  </div>
+
+  <!-- Flash Messages -->
+  <% if (session.success) { %>
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+      <i class="fas fa-check-circle me-2"></i><%= session.success %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  <% } %>
+  <% if (session.error) { %>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+      <i class="fas fa-exclamation-circle me-2"></i><%= session.error %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  <% } %>
+
+  <!-- Trusted Groups Table -->
+  <div class="card">
+    <div class="card-header bg-primary text-white">
+      <h5 class="mb-0">
+        <i class="fas fa-table me-2"></i>All Trusted Groups
+      </h5>
+    </div>
+    <div class="card-body">
+      <% if (trustedGroups.length === 0) { %>
+        <div class="text-center py-4">
+          <i class="fas fa-users fa-3x text-muted mb-3"></i>
+          <p class="text-muted">No trusted groups found in the system.</p>
+        </div>
+      <% } else { %>
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead class="table-dark">
+              <tr>
+                <th>Group Name</th>
+                <th>Description</th>
+                <th>Creator</th>
+                <th>Members</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% trustedGroups.forEach(group => { %>
+                <tr>
+                  <td>
+                    <strong><%= group.name %></strong>
+                  </td>
+                  <td>
+                    <% if (group.description) { %>
+                      <%= group.description %>
+                    <% } else { %>
+                      <span class="text-muted">No description</span>
+                    <% } %>
+                  </td>
+                  <td>
+                    <span class="badge bg-info">
+                      <i class="fas fa-user me-1"></i><%= group.creator_name %>
+                    </span>
+                  </td>
+                  <td>
+                    <span class="badge bg-success">
+                      <i class="fas fa-users me-1"></i><%= group.member_count %> members
+                    </span>
+                  </td>
+                  <td>
+                    <small class="text-muted">
+                      <%= new Date(group.created_at).toLocaleDateString() %>
+                    </small>
+                  </td>
+                  <td>
+                    <div class="btn-group btn-group-sm">
+                      <button class="btn btn-outline-primary" onclick="viewGroupMembers(<%= group.id %>)">
+                        <i class="fas fa-eye"></i> View
+                      </button>
+                      <button class="btn btn-outline-warning" onclick="editGroup(<%= group.id %>, '<%= group.name %>', '<%= group.description || '' %>')">
+                        <i class="fas fa-edit"></i> Edit
+                      </button>
+                      <button class="btn btn-outline-danger" onclick="deleteGroup(<%= group.id %>, '<%= group.name %>')">
+                        <i class="fas fa-trash"></i> Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Group Modal -->
+<div class="modal fade" id="editGroupModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-edit me-2"></i>Edit Trusted Group
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="editGroupForm" method="POST">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="editGroupName" class="form-label">Group Name</label>
+            <input type="text" class="form-control" id="editGroupName" name="name" required>
+          </div>
+          <div class="mb-3">
+            <label for="editGroupDescription" class="form-label">Description</label>
+            <textarea class="form-control" id="editGroupDescription" name="description" rows="3"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-save me-1"></i>Save Changes
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- View Members Modal -->
+<div class="modal fade" id="viewMembersModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-users me-2"></i>Group Members
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="membersList">
+          <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading members...</p>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteGroupModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title text-danger">
+          <i class="fas fa-exclamation-triangle me-2"></i>Delete Trusted Group
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to delete the trusted group "<strong id="deleteGroupName"></strong>"?</p>
+        <p class="text-danger"><small>This action cannot be undone. All group members will be removed.</small></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <form id="deleteGroupForm" method="POST" style="display: inline;">
+          <button type="submit" class="btn btn-danger">
+            <i class="fas fa-trash me-1"></i>Delete Group
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function editGroup(groupId, groupName, groupDescription) {
+  document.getElementById('editGroupName').value = groupName;
+  document.getElementById('editGroupDescription').value = groupDescription;
+  document.getElementById('editGroupForm').action = `/admin/trusted-groups/${groupId}/edit`;
+  
+  const modal = new bootstrap.Modal(document.getElementById('editGroupModal'));
+  modal.show();
+}
+
+function deleteGroup(groupId, groupName) {
+  document.getElementById('deleteGroupName').textContent = groupName;
+  document.getElementById('deleteGroupForm').action = `/admin/trusted-groups/${groupId}/delete`;
+  
+  const modal = new bootstrap.Modal(document.getElementById('deleteGroupModal'));
+  modal.show();
+}
+
+function viewGroupMembers(groupId) {
+  const membersList = document.getElementById('membersList');
+  membersList.innerHTML = `
+    <div class="text-center">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <p class="mt-2">Loading members...</p>
+    </div>
+  `;
+  
+  fetch(`/admin/trusted-groups/${groupId}/members`)
+    .then(response => response.json())
+    .then(members => {
+      if (members.length === 0) {
+        membersList.innerHTML = `
+          <div class="text-center py-4">
+            <i class="fas fa-users fa-3x text-muted mb-3"></i>
+            <p class="text-muted">No members in this group.</p>
+          </div>
+        `;
+      } else {
+                 let membersHtml = '<div class="table-responsive">' +
+           '<table class="table table-sm">' +
+             '<thead class="table-light">' +
+               '<tr>' +
+                 '<th>Name</th>' +
+                 '<th>Email</th>' +
+                 '<th>Added</th>' +
+               '</tr>' +
+             '</thead>' +
+             '<tbody>';
+         
+         members.forEach(function(member) {
+           membersHtml += '<tr>' +
+             '<td><strong>' + member.user_name + '</strong></td>' +
+             '<td>' + member.user_email + '</td>' +
+             '<td><small class="text-muted">' + new Date(member.added_at).toLocaleDateString() + '</small></td>' +
+           '</tr>';
+         });
+         
+         membersHtml += '</tbody></table></div>';
+         membersList.innerHTML = membersHtml;
+      }
+    })
+    .catch(error => {
+      console.error('Error loading members:', error);
+      membersList.innerHTML = `
+        <div class="alert alert-danger">
+          <i class="fas fa-exclamation-circle me-2"></i>Error loading group members.
+        </div>
+      `;
+    });
+  
+  const modal = new bootstrap.Modal(document.getElementById('viewMembersModal'));
+  modal.show();
+}
+</script>
+
+<%- include('../partials/footer1') %> 

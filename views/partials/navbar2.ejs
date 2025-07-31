@@ -9,6 +9,9 @@
       <ul class="navbar-nav ms-auto">
         <li class="nav-item"><a class="nav-link" href="/admin/dashboard">Dashboard</a></li>
         <li class="nav-item"><a class="nav-link<%= (typeof activePage !== 'undefined' && activePage === 'organizations') ? ' active' : '' %>" href="/admin/organizations">Organizations</a></li>
+        <li class="nav-item"><a class="nav-link" href="/admin/users">Users</a></li>
+        <li class="nav-item"><a class="nav-link" href="/admin/groups">Groups</a></li>
+        <li class="nav-item"><a class="nav-link" href="/admin/trusted-groups">Trusted Groups</a></li>
         <li class="nav-item">
           <a class="nav-link" href="/admin/messages">
             <i class="fas fa-chart-line"></i> Messages Overview
