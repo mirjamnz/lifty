@@ -118,6 +118,85 @@ router.get('/trusted-groups/:id/members', async (req, res) => {
   }
 });
 
+// POST /admin/trusted-groups/:id/add-member - Add member to trusted group
+router.post('/trusted-groups/:id/add-member', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ success: false, error: 'User ID is required.' });
+    }
+
+    // Check if user exists and is a parent
+    const [[user]] = await db.query(`
+      SELECT id, name, email, role 
+      FROM Users 
+      WHERE id = ? AND role = 'parent'
+    `, [userId]);
+
+    if (!user) {
+      return res.status(400).json({ success: false, error: 'User not found or not a parent.' });
+    }
+
+    // Check if user is already a member
+    const [[existingMember]] = await db.query(`
+      SELECT * FROM TrustedGroupMembers 
+      WHERE group_id = ? AND user_id = ?
+    `, [id, userId]);
+
+    if (existingMember) {
+      return res.status(400).json({ success: false, error: 'User is already a member of this group.' });
+    }
+
+    // Add user to group
+    await db.query(`
+      INSERT INTO TrustedGroupMembers (group_id, user_id, added_at) 
+      VALUES (?, ?, NOW())
+    `, [id, userId]);
+
+    res.json({ success: true, message: `User ${user.name} added to group successfully.` });
+  } catch (err) {
+    console.error('❌ Add member error:', err);
+    res.status(500).json({ success: false, error: 'Could not add member to group.' });
+  }
+});
+
+// POST /admin/trusted-groups/:id/remove-member - Remove member from trusted group
+router.post('/trusted-groups/:id/remove-member', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ success: false, error: 'User ID is required.' });
+    }
+
+    // Check if user is a member of this group
+    const [[member]] = await db.query(`
+      SELECT tgm.*, u.name as user_name
+      FROM TrustedGroupMembers tgm
+      JOIN Users u ON tgm.user_id = u.id
+      WHERE tgm.group_id = ? AND tgm.user_id = ?
+    `, [id, userId]);
+
+    if (!member) {
+      return res.status(400).json({ success: false, error: 'User is not a member of this group.' });
+    }
+
+    // Remove user from group
+    await db.query(`
+      DELETE FROM TrustedGroupMembers 
+      WHERE group_id = ? AND user_id = ?
+    `, [id, userId]);
+
+    res.json({ success: true, message: `User ${member.user_name} removed from group successfully.` });
+  } catch (err) {
+    console.error('❌ Remove member error:', err);
+    res.status(500).json({ success: false, error: 'Could not remove member from group.' });
+  }
+});
+
 // GET /admin/dashboard - Admin dashboard with comprehensive overview
 router.get('/dashboard', async (req, res) => {
   try {

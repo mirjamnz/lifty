@@ -110,7 +110,7 @@
 
 <!-- Edit Group Modal -->
 <div class="modal fade" id="editGroupModal" tabindex="-1">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title">
@@ -120,13 +120,54 @@
       </div>
       <form id="editGroupForm" method="POST">
         <div class="modal-body">
-          <div class="mb-3">
-            <label for="editGroupName" class="form-label">Group Name</label>
-            <input type="text" class="form-control" id="editGroupName" name="name" required>
-          </div>
-          <div class="mb-3">
-            <label for="editGroupDescription" class="form-label">Description</label>
-            <textarea class="form-control" id="editGroupDescription" name="description" rows="3"></textarea>
+          <!-- Group Details Section -->
+          <div class="row">
+            <div class="col-md-6">
+              <h6 class="mb-3">
+                <i class="fas fa-info-circle me-2"></i>Group Details
+              </h6>
+              <div class="mb-3">
+                <label for="editGroupName" class="form-label">Group Name</label>
+                <input type="text" class="form-control" id="editGroupName" name="name" required>
+              </div>
+              <div class="mb-3">
+                <label for="editGroupDescription" class="form-label">Description</label>
+                <textarea class="form-control" id="editGroupDescription" name="description" rows="3"></textarea>
+              </div>
+            </div>
+            
+            <!-- Member Management Section -->
+            <div class="col-md-6">
+              <h6 class="mb-3">
+                <i class="fas fa-users me-2"></i>Member Management
+              </h6>
+              
+              <!-- Current Members -->
+              <div class="mb-3">
+                <label class="form-label">Current Members</label>
+                <div id="currentMembersList" class="border rounded p-2" style="max-height: 150px; overflow-y: auto;">
+                  <div class="text-center text-muted">
+                    <small>Loading members...</small>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Add New Member -->
+              <div class="mb-3">
+                <label for="addMemberSelect" class="form-label">Add Member</label>
+                <div class="input-group">
+                  <select class="form-select" id="addMemberSelect">
+                    <option value="">Select a user...</option>
+                    <% allUsers.forEach(user => { %>
+                      <option value="<%= user.id %>"><%= user.name %> (<%= user.email %>)</option>
+                    <% }); %>
+                  </select>
+                  <button type="button" class="btn btn-outline-success" onclick="addMemberToGroup()">
+                    <i class="fas fa-plus"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         <div class="modal-footer">
@@ -194,13 +235,135 @@
 </div>
 
 <script>
+let currentGroupId = null;
+let currentMembers = [];
+
 function editGroup(groupId, groupName, groupDescription) {
+  currentGroupId = groupId;
   document.getElementById('editGroupName').value = groupName;
   document.getElementById('editGroupDescription').value = groupDescription;
   document.getElementById('editGroupForm').action = `/admin/trusted-groups/${groupId}/edit`;
   
+  // Load current members
+  loadCurrentMembers(groupId);
+  
   const modal = new bootstrap.Modal(document.getElementById('editGroupModal'));
   modal.show();
+}
+
+function loadCurrentMembers(groupId) {
+  const membersList = document.getElementById('currentMembersList');
+  membersList.innerHTML = `
+    <div class="text-center text-muted">
+      <small>Loading members...</small>
+    </div>
+  `;
+  
+  fetch(`/admin/trusted-groups/${groupId}/members`)
+    .then(response => response.json())
+    .then(members => {
+      currentMembers = members;
+      if (members.length === 0) {
+        membersList.innerHTML = `
+          <div class="text-center text-muted">
+            <small>No members in this group.</small>
+          </div>
+        `;
+      } else {
+        let membersHtml = '';
+        members.forEach(function(member) {
+          membersHtml += `
+            <div class="d-flex justify-content-between align-items-center mb-1 p-1 border-bottom">
+              <div>
+                <strong>${member.user_name}</strong><br>
+                <small class="text-muted">${member.user_email}</small>
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeMemberFromGroup(${member.user_id}, '${member.user_name}')">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+          `;
+        });
+        membersList.innerHTML = membersHtml;
+      }
+    })
+    .catch(error => {
+      console.error('Error loading members:', error);
+      membersList.innerHTML = `
+        <div class="text-danger">
+          <small>Error loading members.</small>
+        </div>
+      `;
+    });
+}
+
+function addMemberToGroup() {
+  const select = document.getElementById('addMemberSelect');
+  const userId = select.value;
+  const userName = select.options[select.selectedIndex].text;
+  
+  if (!userId) {
+    alert('Please select a user to add.');
+    return;
+  }
+  
+  // Check if user is already a member
+  if (currentMembers.some(member => member.user_id == userId)) {
+    alert('This user is already a member of this group.');
+    return;
+  }
+  
+  fetch(`/admin/trusted-groups/${currentGroupId}/add-member`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ userId: userId })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      // Reload members list
+      loadCurrentMembers(currentGroupId);
+      // Reset select
+      select.value = '';
+      alert('Member added successfully!');
+    } else {
+      alert('Error adding member: ' + (data.error || 'Unknown error'));
+    }
+  })
+  .catch(error => {
+    console.error('Error adding member:', error);
+    alert('Error adding member. Please try again.');
+  });
+}
+
+function removeMemberFromGroup(userId, userName) {
+  if (!confirm(`Are you sure you want to remove ${userName} from this group?`)) {
+    return;
+  }
+  
+  fetch(`/admin/trusted-groups/${currentGroupId}/remove-member`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ userId: userId })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      // Reload members list
+      loadCurrentMembers(currentGroupId);
+      alert('Member removed successfully!');
+    } else {
+      alert('Error removing member: ' + (data.error || 'Unknown error'));
+    }
+  })
+  .catch(error => {
+    console.error('Error removing member:', error);
+    alert('Error removing member. Please try again.');
+  });
 }
 
 function deleteGroup(groupId, groupName) {
@@ -233,27 +396,27 @@ function viewGroupMembers(groupId) {
           </div>
         `;
       } else {
-                 let membersHtml = '<div class="table-responsive">' +
-           '<table class="table table-sm">' +
-             '<thead class="table-light">' +
-               '<tr>' +
-                 '<th>Name</th>' +
-                 '<th>Email</th>' +
-                 '<th>Added</th>' +
-               '</tr>' +
-             '</thead>' +
-             '<tbody>';
-         
-         members.forEach(function(member) {
-           membersHtml += '<tr>' +
-             '<td><strong>' + member.user_name + '</strong></td>' +
-             '<td>' + member.user_email + '</td>' +
-             '<td><small class="text-muted">' + new Date(member.added_at).toLocaleDateString() + '</small></td>' +
-           '</tr>';
-         });
-         
-         membersHtml += '</tbody></table></div>';
-         membersList.innerHTML = membersHtml;
+        let membersHtml = '<div class="table-responsive">' +
+          '<table class="table table-sm">' +
+            '<thead class="table-light">' +
+              '<tr>' +
+                '<th>Name</th>' +
+                '<th>Email</th>' +
+                '<th>Added</th>' +
+              '</tr>' +
+            '</thead>' +
+            '<tbody>';
+        
+        members.forEach(function(member) {
+          membersHtml += '<tr>' +
+            '<td><strong>' + member.user_name + '</strong></td>' +
+            '<td>' + member.user_email + '</td>' +
+            '<td><small class="text-muted">' + new Date(member.added_at).toLocaleDateString() + '</small></td>' +
+          '</tr>';
+        });
+        
+        membersHtml += '</tbody></table></div>';
+        membersList.innerHTML = membersHtml;
       }
     })
     .catch(error => {
