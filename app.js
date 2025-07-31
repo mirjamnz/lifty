@@ -234,6 +234,8 @@ const childDashboardRoutes = require('./routes/childDashboard');
 const messagesRouter = require('./routes/messages');
 const recurringEventsRouter = require('./routes/recurringEvents');
 const recurringEventGroupsRouter = require('./routes/recurringEventGroups');
+const trustedGroupsRouter = require('./routes/trustedGroups');
+const shortNoticeRouter = require('./routes/shortNotice');
 
 app.use('/', authRoutes);
 app.use('/', dashboardRoutes);
@@ -244,6 +246,8 @@ app.use('/', childDashboardRoutes);
 app.use('/messages', messagesRouter);
 app.use('/recurring-events', recurringEventsRouter);
 app.use('/recurring-event-groups', recurringEventGroupsRouter);
+app.use('/trusted-groups', trustedGroupsRouter);
+app.use('/short-notice', shortNoticeRouter);
 
 const db = require('./db');
 

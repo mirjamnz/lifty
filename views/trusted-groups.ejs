@@ -1,0 +1,229 @@
+<!--views/trusted-groups.ejs -->
+<%- include('partials/header1') %>
+<%- include('partials/navbar1') %>
+
+<div class="container mt-4">
+  <!-- Page Header -->
+  <div class="row mb-4">
+    <div class="col">
+      <h2 class="mb-0">
+        <i class="fas fa-users me-2"></i>Trusted Parent Groups
+      </h2>
+      <p class="text-muted">Manage your trusted parent groups for quick ride coordination</p>
+    </div>
+    <div class="col-auto">
+      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createGroupModal">
+        <i class="fas fa-plus me-1"></i>Create New Group
+      </button>
+    </div>
+  </div>
+
+  <!-- My Groups Section -->
+  <div class="row mb-4">
+    <div class="col">
+      <div class="card">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-crown me-2"></i>Groups I Created (<%= myGroups.length %>)
+          </h5>
+        </div>
+        <div class="card-body">
+          <% if (myGroups.length === 0) { %>
+            <div class="text-center py-4">
+              <i class="fas fa-users fa-3x text-muted mb-3"></i>
+              <p class="text-muted">You haven't created any groups yet.</p>
+              <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createGroupModal">
+                <i class="fas fa-plus me-1"></i>Create Your First Group
+              </button>
+            </div>
+          <% } else { %>
+            <div class="row">
+              <% myGroups.forEach(group => { %>
+                <div class="col-md-6 col-lg-4 mb-3">
+                  <div class="card h-100">
+                    <div class="card-body">
+                      <h6 class="card-title">
+                        <i class="fas fa-users me-1"></i><%= group.name %>
+                      </h6>
+                      <% if (group.description) { %>
+                        <p class="card-text text-muted small"><%= group.description %></p>
+                      <% } %>
+                      <div class="d-flex justify-content-between align-items-center">
+                        <span class="badge bg-info">
+                          <i class="fas fa-user me-1"></i><%= group.member_count %> members
+                        </span>
+                        <div class="btn-group btn-group-sm">
+                          <button class="btn btn-outline-primary" onclick="viewGroupMembers(<%= group.id %>)">
+                            <i class="fas fa-eye"></i>
+                          </button>
+                          <button class="btn btn-outline-danger" onclick="deleteGroup(<%= group.id %>, '<%= group.name %>')">
+                            <i class="fas fa-trash"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              <% }); %>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Member Groups Section -->
+  <div class="row mb-4">
+    <div class="col">
+      <div class="card">
+        <div class="card-header bg-success text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-user-friends me-2"></i>Groups I'm In (<%= memberGroups.length %>)
+          </h5>
+        </div>
+        <div class="card-body">
+          <% if (memberGroups.length === 0) { %>
+            <div class="text-center py-4">
+              <i class="fas fa-user-friends fa-3x text-muted mb-3"></i>
+              <p class="text-muted">You're not a member of any groups yet.</p>
+              <p class="text-muted small">Ask other parents to add you to their trusted groups.</p>
+            </div>
+          <% } else { %>
+            <div class="row">
+              <% memberGroups.forEach(group => { %>
+                <div class="col-md-6 col-lg-4 mb-3">
+                  <div class="card h-100">
+                    <div class="card-body">
+                      <h6 class="card-title">
+                        <i class="fas fa-users me-1"></i><%= group.name %>
+                      </h6>
+                      <p class="card-text text-muted small">
+                        Created by <strong><%= group.creator_name %></strong>
+                      </p>
+                      <% if (group.description) { %>
+                        <p class="card-text text-muted small"><%= group.description %></p>
+                      <% } %>
+                      <div class="d-flex justify-content-between align-items-center">
+                        <span class="badge bg-success">
+                          <i class="fas fa-user me-1"></i><%= group.member_count %> members
+                        </span>
+                        <button class="btn btn-outline-warning btn-sm" onclick="leaveGroup(<%= group.id %>, '<%= group.name %>')">
+                          <i class="fas fa-sign-out-alt"></i> Leave
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              <% }); %>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Create Group Modal -->
+<div class="modal fade" id="createGroupModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-plus me-2"></i>Create New Trusted Group
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form action="/trusted-groups" method="POST">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="groupName" class="form-label">Group Name</label>
+            <input type="text" class="form-control" id="groupName" name="name" required>
+          </div>
+          <div class="mb-3">
+            <label for="groupDescription" class="form-label">Description (Optional)</label>
+            <textarea class="form-control" id="groupDescription" name="description" rows="3"></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Add Members</label>
+            <div class="row">
+              <% allUsers.forEach(user => { %>
+                <div class="col-md-6">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="member_ids" value="<%= user.id %>" id="user<%= user.id %>">
+                    <label class="form-check-label" for="user<%= user.id %>">
+                      <%= user.name %> (<%= user.email %>)
+                    </label>
+                  </div>
+                </div>
+              <% }); %>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Group</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Group Members Modal -->
+<div class="modal fade" id="groupMembersModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-users me-2"></i>Group Members
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="groupMembersContent">
+        <!-- Content will be loaded dynamically -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function viewGroupMembers(groupId) {
+  // This would load group members via AJAX
+  // For now, just show a placeholder
+  document.getElementById('groupMembersContent').innerHTML = `
+    <div class="text-center py-4">
+      <i class="fas fa-spinner fa-spin fa-2x text-muted mb-3"></i>
+      <p>Loading group members...</p>
+    </div>
+  `;
+  new bootstrap.Modal(document.getElementById('groupMembersModal')).show();
+}
+
+function deleteGroup(groupId, groupName) {
+  if (confirm(`Are you sure you want to delete the group "${groupName}"? This action cannot be undone.`)) {
+    fetch(`/trusted-groups/${groupId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }).then(response => {
+      if (response.ok) {
+        location.reload();
+      } else {
+        alert('Error deleting group');
+      }
+    });
+  }
+}
+
+function leaveGroup(groupId, groupName) {
+  if (confirm(`Are you sure you want to leave the group "${groupName}"?`)) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/trusted-groups/${groupId}/leave`;
+    document.body.appendChild(form);
+    form.submit();
+  }
+}
+</script>
+
+<%- include('partials/footer1') %> 
