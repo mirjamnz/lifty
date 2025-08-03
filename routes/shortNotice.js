@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const notifications = require('../utils/notifications');
 
 // GET /short-notice - Show short-notice requests page
 router.get('/', async (req, res) => {
@@ -74,15 +75,11 @@ router.post('/', async (req, res) => {
   try {
     const { 
       group_id, 
-      pickup_time, 
-      dropoff_time, 
-      pickup_location, 
-      dropoff_location, 
       message 
     } = req.body;
     
-    if (!group_id || !pickup_time || !dropoff_time || !pickup_location || !dropoff_location) {
-      req.session.error = 'All fields are required.';
+    if (!group_id) {
+      req.session.error = 'Please select a target group.';
       return res.redirect('/short-notice');
     }
     
@@ -97,14 +94,35 @@ router.post('/', async (req, res) => {
       return res.redirect('/short-notice');
     }
     
-    // Create the request
-    await db.query(`
+    // Set default times (current time + 1 hour for pickup, + 2 hours for dropoff)
+    const now = new Date();
+    const pickupTime = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
+    const dropoffTime = new Date(now.getTime() + 2 * 60 * 60 * 1000); // 2 hours from now
+    
+    // Create the request with default values
+    const [result] = await db.query(`
       INSERT INTO ShortNoticeRequests (
         requester_id, group_id, pickup_time, dropoff_time, 
         pickup_location, dropoff_location, message
       ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, [req.session.userId, group_id, pickup_time, dropoff_time, 
-        pickup_location, dropoff_location, message]);
+    `, [req.session.userId, group_id, pickupTime, dropoffTime, 
+        'To be arranged', 'To be arranged', message || '']);
+    
+    const requestId = result.insertId;
+    
+    // Get requester name and group name for notification
+    const [[requester]] = await db.query('SELECT name FROM Users WHERE id = ?', [req.session.userId]);
+    const [[group]] = await db.query('SELECT name FROM TrustedGroups WHERE id = ?', [group_id]);
+    
+    // Notify group members about the new ride request
+    await notifications.notifyGroupAboutRideRequest(
+      group_id, 
+      requestId, 
+      requester.name, 
+      pickupTime, 
+      'To be arranged', 
+      'To be arranged'
+    );
     
     req.session.success = 'Short-notice request sent successfully!';
     res.redirect('/short-notice');
@@ -125,9 +143,10 @@ router.post('/:id/respond', async (req, res) => {
     
     // Check if user is a member of the group
     const [[request]] = await db.query(`
-      SELECT snr.*, tgm.user_id as member_id
+      SELECT snr.*, tgm.user_id as member_id, tg.name as group_name
       FROM ShortNoticeRequests snr
       JOIN TrustedGroupMembers tgm ON snr.group_id = tgm.group_id
+      JOIN TrustedGroups tg ON snr.group_id = tg.id
       WHERE snr.id = ? AND tgm.user_id = ?
     `, [requestId, req.session.userId]);
     
@@ -153,6 +172,9 @@ router.post('/:id/respond', async (req, res) => {
       VALUES (?, ?, ?, ?)
     `, [requestId, req.session.userId, response_type, message]);
     
+    // Get responder name for notification
+    const [[responder]] = await db.query('SELECT name FROM Users WHERE id = ?', [req.session.userId]);
+    
     // If someone accepted, update the request status
     if (response_type === 'ok' || response_type === 'ok_with_message') {
       await db.query(`
@@ -161,6 +183,14 @@ router.post('/:id/respond', async (req, res) => {
         WHERE id = ?
       `, [req.session.userId, requestId]);
     }
+    
+    // Notify the requester about the response
+    await notifications.notifyRideRequestResponse(
+      requestId, 
+      responder.name, 
+      response_type, 
+      request.group_name
+    );
     
     req.session.success = 'Response sent successfully!';
     res.redirect('/short-notice');
@@ -225,7 +255,7 @@ router.get('/:id', async (req, res) => {
     `, [requestId, req.session.userId]);
     
     res.render('short-notice-detail', {
-      user: req.session,
+      session: req.session,
       request,
       responses,
       userResponse

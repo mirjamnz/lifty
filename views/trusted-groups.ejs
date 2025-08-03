@@ -18,6 +18,33 @@
     </div>
   </div>
 
+  <!-- Quick Actions -->
+  <div class="row mb-4">
+    <div class="col">
+      <div class="card border-info">
+        <div class="card-header bg-info text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-bolt me-2"></i>Quick Actions
+          </h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6">
+              <a href="/short-notice" class="btn btn-success btn-lg w-100 mb-2">
+                <i class="fas fa-clock me-2"></i>Send Short-Notice Request
+              </a>
+            </div>
+            <div class="col-md-6">
+              <a href="/notifications" class="btn btn-warning btn-lg w-100 mb-2">
+                <i class="fas fa-bell me-2"></i>View Notifications
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- My Groups Section -->
   <div class="row mb-4">
     <div class="col">
@@ -40,26 +67,34 @@
             <div class="row">
               <% myGroups.forEach(group => { %>
                 <div class="col-md-6 col-lg-4 mb-3">
-                  <div class="card h-100">
-                    <div class="card-body">
-                      <h6 class="card-title">
+                  <div class="card h-100 border-primary">
+                    <div class="card-header bg-primary text-white">
+                      <h6 class="mb-0">
                         <i class="fas fa-users me-1"></i><%= group.name %>
                       </h6>
+                    </div>
+                    <div class="card-body">
                       <% if (group.description) { %>
                         <p class="card-text text-muted small"><%= group.description %></p>
                       <% } %>
-                      <div class="d-flex justify-content-between align-items-center">
+                      <div class="d-flex justify-content-between align-items-center mb-3">
                         <span class="badge bg-info">
                           <i class="fas fa-user me-1"></i><%= group.member_count %> members
                         </span>
-                        <div class="btn-group btn-group-sm">
-                          <button class="btn btn-outline-primary" onclick="viewGroupMembers(<%= group.id %>)">
-                            <i class="fas fa-eye"></i>
-                          </button>
-                          <button class="btn btn-outline-danger" onclick="deleteGroup(<%= group.id %>, '<%= group.name %>')">
-                            <i class="fas fa-trash"></i>
-                          </button>
-                        </div>
+                        <small class="text-muted">
+                          Created <%= new Date(group.created_at).toLocaleDateString() %>
+                        </small>
+                      </div>
+                      <div class="btn-group btn-group-sm w-100">
+                        <button class="btn btn-outline-primary" data-group-id="<%= group.id %>" onclick="viewGroupMembers(this.dataset.groupId)">
+                          <i class="fas fa-eye me-1"></i>Members
+                        </button>
+                        <button class="btn btn-outline-success" data-group-id="<%= group.id %>" onclick="window.location.href='/short-notice?group=' + this.dataset.groupId">
+                          <i class="fas fa-clock me-1"></i>Request Ride
+                        </button>
+                        <button class="btn btn-outline-danger" data-group-id="<%= group.id %>" data-group-name="<%= group.name %>" onclick="deleteGroup(this.dataset.groupId, this.dataset.groupName)">
+                          <i class="fas fa-trash"></i>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -92,23 +127,36 @@
             <div class="row">
               <% memberGroups.forEach(group => { %>
                 <div class="col-md-6 col-lg-4 mb-3">
-                  <div class="card h-100">
-                    <div class="card-body">
-                      <h6 class="card-title">
+                  <div class="card h-100 border-success">
+                    <div class="card-header bg-success text-white">
+                      <h6 class="mb-0">
                         <i class="fas fa-users me-1"></i><%= group.name %>
                       </h6>
-                      <p class="card-text text-muted small">
-                        Created by <strong><%= group.creator_name %></strong>
-                      </p>
+                    </div>
+                    <div class="card-body">
                       <% if (group.description) { %>
                         <p class="card-text text-muted small"><%= group.description %></p>
                       <% } %>
-                      <div class="d-flex justify-content-between align-items-center">
-                        <span class="badge bg-success">
+                      <p class="card-text text-muted small">
+                        <i class="fas fa-crown me-1"></i>Created by <%= group.creator_name %>
+                      </p>
+                      <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="badge bg-info">
                           <i class="fas fa-user me-1"></i><%= group.member_count %> members
                         </span>
-                        <button class="btn btn-outline-warning btn-sm" onclick="leaveGroup(<%= group.id %>, '<%= group.name %>')">
-                          <i class="fas fa-sign-out-alt"></i> Leave
+                        <small class="text-muted">
+                          Joined <%= new Date(group.created_at).toLocaleDateString() %>
+                        </small>
+                      </div>
+                      <div class="btn-group btn-group-sm w-100">
+                        <button class="btn btn-outline-primary" data-group-id="<%= group.id %>" onclick="viewGroupMembers(this.dataset.groupId)">
+                          <i class="fas fa-eye me-1"></i>Members
+                        </button>
+                        <button class="btn btn-outline-success" data-group-id="<%= group.id %>" onclick="window.location.href='/short-notice?group=' + this.dataset.groupId">
+                          <i class="fas fa-clock me-1"></i>Request Ride
+                        </button>
+                        <button class="btn btn-outline-warning" data-group-id="<%= group.id %>" data-group-name="<%= group.name %>" onclick="leaveGroup(this.dataset.groupId, this.dataset.groupName)">
+                          <i class="fas fa-sign-out-alt"></i>Leave
                         </button>
                       </div>
                     </div>
@@ -117,6 +165,27 @@
               <% }); %>
             </div>
           <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Ride Requests Section -->
+  <div class="row mb-4">
+    <div class="col">
+      <div class="card">
+        <div class="card-header bg-warning text-dark">
+          <h5 class="mb-0">
+            <i class="fas fa-car me-2"></i>Recent Ride Requests
+          </h5>
+        </div>
+        <div class="card-body">
+          <div id="recentRequests">
+            <div class="text-center py-4">
+              <i class="fas fa-spinner fa-spin fa-2x text-muted mb-3"></i>
+              <p class="text-muted">Loading recent requests...</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -186,6 +255,75 @@
 </div>
 
 <script>
+// Load recent ride requests on page load
+document.addEventListener('DOMContentLoaded', function() {
+  loadRecentRequests();
+});
+
+function loadRecentRequests() {
+  fetch('/trusted-groups/recent-requests')
+    .then(response => response.json())
+    .then(data => {
+      const container = document.getElementById('recentRequests');
+      
+      if (data.requests.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-4">
+            <i class="fas fa-car fa-3x text-muted mb-3"></i>
+            <p class="text-muted">No recent ride requests found.</p>
+            <a href="/short-notice" class="btn btn-primary">
+              <i class="fas fa-plus me-1"></i>Send Your First Request
+            </a>
+          </div>
+        `;
+      } else {
+        let html = '<div class="list-group">';
+        data.requests.forEach(request => {
+          const statusClass = request.status === 'pending' ? 'list-group-item-warning' : 
+                             request.status === 'accepted' ? 'list-group-item-success' : 
+                             'list-group-item-secondary';
+          const statusText = request.status === 'pending' ? 'Pending' : 
+                           request.status === 'accepted' ? 'Accepted' : 
+                           request.status === 'declined' ? 'Declined' : 'Cancelled';
+          
+          html += `
+            <div class="list-group-item ${statusClass}">
+              <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">
+                  <i class="fas fa-car me-1"></i>${request.requester_name} - ${request.group_name}
+                </h6>
+                <small class="text-muted">
+                  ${new Date(request.created_at).toLocaleDateString()}
+                  <span class="badge bg-${request.status === 'pending' ? 'warning' : request.status === 'accepted' ? 'success' : 'secondary'} ms-2">${statusText}</span>
+                </small>
+              </div>
+              <p class="mb-1">
+                <strong>From:</strong> ${request.pickup_location}<br>
+                <strong>To:</strong> ${request.dropoff_location}<br>
+                <strong>Time:</strong> ${new Date(request.pickup_time).toLocaleString()}
+              </p>
+              <small class="text-muted">
+                <i class="fas fa-comments me-1"></i>${request.response_count} responses
+                <a href="/short-notice/${request.id}" class="btn btn-sm btn-outline-primary ms-2">View Details</a>
+              </small>
+            </div>
+          `;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+      }
+    })
+    .catch(error => {
+      console.error('Error loading recent requests:', error);
+      document.getElementById('recentRequests').innerHTML = `
+        <div class="text-center py-4">
+          <i class="fas fa-exclamation-triangle fa-2x text-danger mb-3"></i>
+          <p class="text-danger">Error loading recent requests.</p>
+        </div>
+      `;
+    });
+}
+
 function viewGroupMembers(groupId) {
   // This would load group members via AJAX
   // For now, just show a placeholder

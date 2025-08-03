@@ -30,6 +30,13 @@
               <i class="fas fa-plus me-1"></i>Create New
             </button>
           </li>
+          <!-- Notifications -->
+          <li class="nav-item me-2">
+            <a class="nav-link" href="/notifications" id="notificationsLink">
+              <i class="fas fa-bell"></i> Notifications
+              <span class="badge rounded-pill bg-warning ms-1" id="notificationBadge" style="display: none;">0</span>
+            </a>
+          </li>
           <!-- Messages -->
           <li class="nav-item">
             <a class="nav-link" href="/messages/all">
@@ -47,3 +54,27 @@
 </nav>
 
 <!-- DEBUG: unreadCount is <%= typeof unreadCount !== 'undefined' ? unreadCount : 'undefined' %> -->
+
+<script>
+// Load notification count on page load
+document.addEventListener('DOMContentLoaded', function() {
+  if (document.getElementById('notificationsLink')) {
+    loadNotificationCount();
+  }
+});
+
+function loadNotificationCount() {
+  fetch('/notifications/count')
+    .then(response => response.json())
+    .then(data => {
+      const badge = document.getElementById('notificationBadge');
+      if (data.total > 0) {
+        badge.textContent = data.total;
+        badge.style.display = 'inline';
+      } else {
+        badge.style.display = 'none';
+      }
+    })
+    .catch(error => console.error('Error loading notification count:', error));
+}
+</script>

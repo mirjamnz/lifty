@@ -28,25 +28,8 @@
               <p class="text-muted">From: <strong><%= request.requester_name %></strong></p>
             </div>
             <div class="col-md-6">
-              <h6><i class="fas fa-calendar me-1"></i>Date: <%= new Date(request.pickup_time).toLocaleDateString() %></h6>
+              <h6><i class="fas fa-clock me-1"></i>Created: <%= new Date(request.created_at).toLocaleString() %></h6>
               <p class="text-muted">Status: <span class="badge bg-<%= request.status === 'pending' ? 'warning' : request.status === 'accepted' ? 'success' : 'danger' %>"><%= request.status.charAt(0).toUpperCase() + request.status.slice(1) %></span></p>
-            </div>
-          </div>
-          
-          <div class="row mt-3">
-            <div class="col-md-6">
-              <h6><i class="fas fa-map-marker-alt me-1"></i>Pickup</h6>
-              <p class="text-muted">
-                <strong>Time:</strong> <%= new Date(request.pickup_time).toLocaleTimeString() %><br>
-                <strong>Location:</strong> <%= request.pickup_location %>
-              </p>
-            </div>
-            <div class="col-md-6">
-              <h6><i class="fas fa-map-marker-alt me-1"></i>Dropoff</h6>
-              <p class="text-muted">
-                <strong>Time:</strong> <%= new Date(request.dropoff_time).toLocaleTimeString() %><br>
-                <strong>Location:</strong> <%= request.dropoff_location %>
-              </p>
             </div>
           </div>
           

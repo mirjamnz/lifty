@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const notifications = require('../utils/notifications');
 
 // GET /trusted-groups - Show all trusted groups for the user
 router.get('/', async (req, res) => {
@@ -79,13 +80,21 @@ router.post('/', async (req, res) => {
     
     const groupId = result.insertId;
     
-    // Add members to the group
+    // Add members to the group and notify them
     if (member_ids && member_ids.length > 0) {
       const memberValues = member_ids.map(userId => [groupId, userId]);
       await db.query(`
         INSERT INTO TrustedGroupMembers (group_id, user_id)
         VALUES ?
       `, [memberValues]);
+      
+      // Get creator name for notifications
+      const [[creator]] = await db.query('SELECT name FROM Users WHERE id = ?', [creatorId]);
+      
+      // Notify each added member
+      for (const userId of member_ids) {
+        await notifications.notifyUserAddedToGroup(groupId, userId, name, creator.name);
+      }
     }
     
     req.session.success = `Trusted group "${name}" created successfully!`;
@@ -115,11 +124,27 @@ router.post('/:id/add-member', async (req, res) => {
       return res.redirect('/trusted-groups');
     }
     
+    // Check if user is already a member
+    const [[existingMember]] = await db.query(`
+      SELECT * FROM TrustedGroupMembers WHERE group_id = ? AND user_id = ?
+    `, [groupId, user_id]);
+    
+    if (existingMember) {
+      req.session.error = 'User is already a member of this group.';
+      return res.redirect('/trusted-groups');
+    }
+    
     // Add member
     await db.query(`
       INSERT INTO TrustedGroupMembers (group_id, user_id)
       VALUES (?, ?)
     `, [groupId, user_id]);
+    
+    // Get creator name for notification
+    const [[creator]] = await db.query('SELECT name FROM Users WHERE id = ?', [req.session.userId]);
+    
+    // Notify the added user
+    await notifications.notifyUserAddedToGroup(groupId, user_id, group.name, creator.name);
     
     req.session.success = 'Member added to group successfully!';
     res.redirect('/trusted-groups');
@@ -148,11 +173,20 @@ router.post('/:id/remove-member', async (req, res) => {
       return res.redirect('/trusted-groups');
     }
     
+    // Get member name for notification
+    const [[member]] = await db.query('SELECT name FROM Users WHERE id = ?', [user_id]);
+    const [[creator]] = await db.query('SELECT name FROM Users WHERE id = ?', [req.session.userId]);
+    
     // Remove member
     await db.query(`
       DELETE FROM TrustedGroupMembers 
       WHERE group_id = ? AND user_id = ?
     `, [groupId, user_id]);
+    
+    // Notify the removed user
+    if (member) {
+      await notifications.notifyUserRemovedFromGroup(groupId, user_id, group.name, creator.name);
+    }
     
     req.session.success = 'Member removed from group successfully!';
     res.redirect('/trusted-groups');
@@ -171,11 +205,28 @@ router.post('/:id/leave', async (req, res) => {
     const groupId = req.params.id;
     const userId = req.session.userId;
     
+    // Get group info for notification
+    const [[group]] = await db.query('SELECT name FROM TrustedGroups WHERE id = ?', [groupId]);
+    const [[user]] = await db.query('SELECT name FROM Users WHERE id = ?', [userId]);
+    
     // Remove user from group
     await db.query(`
       DELETE FROM TrustedGroupMembers 
       WHERE group_id = ? AND user_id = ?
     `, [groupId, userId]);
+    
+    // Notify group creator about the leave
+    const [[creator]] = await db.query('SELECT creator_id FROM TrustedGroups WHERE id = ?', [groupId]);
+    if (creator && creator.creator_id !== userId) {
+      await notifications.createNotification(
+        creator.creator_id,
+        'group_removal',
+        'Member Left Group',
+        `${user.name} has left the "${group.name}" group.`,
+        'trusted_group',
+        groupId
+      );
+    }
     
     req.session.success = 'You have left the group successfully!';
     res.redirect('/trusted-groups');
@@ -203,6 +254,25 @@ router.delete('/:id', async (req, res) => {
       return res.redirect('/trusted-groups');
     }
     
+    // Get all members to notify them
+    const [members] = await db.query(`
+      SELECT user_id FROM TrustedGroupMembers WHERE group_id = ?
+    `, [groupId]);
+    
+    const [[creator]] = await db.query('SELECT name FROM Users WHERE id = ?', [req.session.userId]);
+    
+    // Notify all members about group deletion
+    for (const member of members) {
+      await notifications.createNotification(
+        member.user_id,
+        'group_removal',
+        'Group Deleted',
+        `The trusted group "${group.name}" has been deleted by ${creator.name}.`,
+        'trusted_group',
+        groupId
+      );
+    }
+    
     // Delete the group (cascades to members and requests)
     await db.query('DELETE FROM TrustedGroups WHERE id = ?', [groupId]);
     
@@ -212,6 +282,38 @@ router.delete('/:id', async (req, res) => {
     console.error('❌ Delete group error:', err);
     req.session.error = 'Could not delete group.';
     res.redirect('/trusted-groups');
+  }
+});
+
+// GET /trusted-groups/recent-requests - Get recent ride requests for user's groups
+router.get('/recent-requests', async (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ error: 'Not logged in' });
+  
+  try {
+    const userId = req.session.userId;
+    
+    // Get recent ride requests from groups user is a member of
+    const [recentRequests] = await db.query(`
+      SELECT 
+        snr.*,
+        tg.name as group_name,
+        u.name as requester_name,
+        COUNT(snresp.id) as response_count
+      FROM ShortNoticeRequests snr
+      JOIN TrustedGroups tg ON snr.group_id = tg.id
+      JOIN TrustedGroupMembers tgm ON tg.id = tgm.group_id
+      JOIN Users u ON snr.requester_id = u.id
+      LEFT JOIN ShortNoticeResponses snresp ON snr.id = snresp.request_id
+      WHERE tgm.user_id = ?
+      GROUP BY snr.id
+      ORDER BY snr.created_at DESC
+      LIMIT 10
+    `, [userId]);
+    
+    res.json({ requests: recentRequests });
+  } catch (err) {
+    console.error('❌ Get recent requests error:', err);
+    res.status(500).json({ error: 'Could not load recent requests' });
   }
 });
 

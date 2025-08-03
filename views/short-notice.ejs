@@ -47,14 +47,8 @@
                       </p>
                       <div class="mb-2">
                         <small class="text-muted">
-                          <i class="fas fa-calendar me-1"></i>
-                          <%= new Date(request.pickup_time).toLocaleDateString() %>
-                        </small>
-                      </div>
-                      <div class="mb-2">
-                        <small class="text-muted">
-                          <i class="fas fa-map-marker-alt me-1"></i>
-                          <%= request.pickup_location %> → <%= request.dropoff_location %>
+                          <i class="fas fa-clock me-1"></i>
+                          <%= new Date(request.created_at).toLocaleString() %>
                         </small>
                       </div>
                       <% if (request.message) { %>
@@ -108,14 +102,8 @@
                       </h6>
                       <div class="mb-2">
                         <small class="text-muted">
-                          <i class="fas fa-calendar me-1"></i>
-                          <%= new Date(request.pickup_time).toLocaleDateString() %>
-                        </small>
-                      </div>
-                      <div class="mb-2">
-                        <small class="text-muted">
-                          <i class="fas fa-map-marker-alt me-1"></i>
-                          <%= request.pickup_location %> → <%= request.dropoff_location %>
+                          <i class="fas fa-clock me-1"></i>
+                          <%= new Date(request.created_at).toLocaleString() %>
                         </small>
                       </div>
                       <% if (request.message) { %>
@@ -146,7 +134,7 @@
 
 <!-- Create Request Modal -->
 <div class="modal fade" id="createRequestModal" tabindex="-1">
-  <div class="modal-dialog modal-lg">
+  <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title">
@@ -156,40 +144,18 @@
       </div>
       <form action="/short-notice" method="POST">
         <div class="modal-body">
-          <div class="row">
-            <div class="col-md-6 mb-3">
-              <label for="groupSelect" class="form-label">Target Group</label>
-              <select class="form-select" id="groupSelect" name="group_id" required>
-                <option value="">Select a trusted group</option>
-                <% trustedGroups.forEach(group => { %>
-                  <option value="<%= group.id %>"><%= group.name %> (<%= group.member_count %> members)</option>
-                <% }); %>
-              </select>
-            </div>
-            <div class="col-md-6 mb-3">
-              <label for="pickupTime" class="form-label">Pickup Time</label>
-              <input type="datetime-local" class="form-control" id="pickupTime" name="pickup_time" required>
-            </div>
+          <div class="mb-3">
+            <label for="groupSelect" class="form-label">Target Group</label>
+            <select class="form-select" id="groupSelect" name="group_id" required>
+              <option value="">Select a trusted group</option>
+              <% trustedGroups.forEach(group => { %>
+                <option value="<%= group.id %>"><%= group.name %> (<%= group.member_count %> members)</option>
+              <% }); %>
+            </select>
           </div>
-          <div class="row">
-            <div class="col-md-6 mb-3">
-              <label for="dropoffTime" class="form-label">Dropoff Time</label>
-              <input type="datetime-local" class="form-control" id="dropoffTime" name="dropoff_time" required>
-            </div>
-            <div class="col-md-6 mb-3">
-              <label for="pickupLocation" class="form-label">Pickup Location</label>
-              <input type="text" class="form-control" id="pickupLocation" name="pickup_location" required>
-            </div>
-          </div>
-          <div class="row">
-            <div class="col-md-6 mb-3">
-              <label for="dropoffLocation" class="form-label">Dropoff Location</label>
-              <input type="text" class="form-control" id="dropoffLocation" name="dropoff_location" required>
-            </div>
-            <div class="col-md-6 mb-3">
-              <label for="requestMessage" class="form-label">Message (Optional)</label>
-              <textarea class="form-control" id="requestMessage" name="message" rows="3" placeholder="Add any additional details..."></textarea>
-            </div>
+          <div class="mb-3">
+            <label for="requestMessage" class="form-label">Message (Optional)</label>
+            <textarea class="form-control" id="requestMessage" name="message" rows="4" placeholder="Quick message about your ride request..."></textarea>
           </div>
         </div>
         <div class="modal-footer">
@@ -200,23 +166,5 @@
     </div>
   </div>
 </div>
-
-<script>
-// Set default times (pickup 15 minutes before dropoff)
-document.getElementById('dropoffTime').addEventListener('change', function() {
-  const dropoffTime = new Date(this.value);
-  const pickupTime = new Date(dropoffTime.getTime() - 15 * 60 * 1000); // 15 minutes before
-  document.getElementById('pickupTime').value = pickupTime.toISOString().slice(0, 16);
-});
-
-// Auto-fill pickup location with user's address if available
-document.addEventListener('DOMContentLoaded', function() {
-  // This could be enhanced to auto-fill from user profile
-  const userAddress = '<%= session.home_address %>';
-  if (userAddress) {
-    document.getElementById('pickupLocation').value = userAddress;
-  }
-});
-</script>
 
 <%- include('partials/footer1') %> 
