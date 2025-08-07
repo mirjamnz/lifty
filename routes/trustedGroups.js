@@ -317,4 +317,62 @@ router.get('/recent-requests', async (req, res) => {
   }
 });
 
+// GET /trusted-groups/:id/members - Get group members
+router.get('/:id/members', async (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ error: 'Not logged in' });
+  
+  try {
+    const groupId = req.params.id;
+    const userId = req.session.userId;
+    
+    // Check if user is a member of this group
+    const [[membership]] = await db.query(`
+      SELECT * FROM TrustedGroupMembers WHERE group_id = ? AND user_id = ?
+    `, [groupId, userId]);
+    
+    if (!membership) {
+      return res.status(403).json({ error: 'You are not a member of this group' });
+    }
+    
+    // Get group details
+    const [[group]] = await db.query(`
+      SELECT * FROM TrustedGroups WHERE id = ?
+    `, [groupId]);
+    
+    if (!group) {
+      return res.status(404).json({ error: 'Group not found' });
+    }
+    
+    // Get all members with their details
+    const [members] = await db.query(`
+      SELECT 
+        u.id,
+        u.name,
+        u.email,
+        tgm.joined_at,
+        CASE WHEN tg.creator_id = u.id THEN 'Creator' ELSE 'Member' END as role
+      FROM TrustedGroupMembers tgm
+      JOIN Users u ON tgm.user_id = u.id
+      JOIN TrustedGroups tg ON tgm.group_id = tg.id
+      WHERE tgm.group_id = ?
+      ORDER BY 
+        CASE WHEN tg.creator_id = u.id THEN 0 ELSE 1 END,
+        u.name
+    `, [groupId]);
+    
+    res.json({
+      group: {
+        id: group.id,
+        name: group.name,
+        description: group.description,
+        creator_id: group.creator_id
+      },
+      members: members
+    });
+  } catch (err) {
+    console.error('❌ Get group members error:', err);
+    res.status(500).json({ error: 'Could not load group members' });
+  }
+});
+
 module.exports = router; 

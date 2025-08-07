@@ -2,6 +2,26 @@
 
 ## Completed Tasks
 
+### ✅ Added Messages Menu to Child Dashboard (2025-07-24)
+
+**Problem:** Children only had "My Dashboard" and "Logout" menu items. When they clicked on unread message toasts from group chats, they were taken to pages showing the full adult navbar instead of the child navbar.
+
+**Solution:**
+1. **Updated Child Navbar** - Added "Messages" menu item to `views/partials/navbar-child.ejs`
+2. **Created Child Messages Route** - Added `/messages/child/inbox` route in `routes/messages.js`
+3. **Created Child Messages Template** - New `views/messages-child-inbox.ejs` template that:
+   - Shows all ride-related conversations in a card layout
+   - Displays unread message counts with badges
+   - Shows ride details (pickup/dropoff locations, status, driver)
+   - Provides easy access to group chats
+   - Uses child navbar consistently
+
+**Impact:** 
+- Children now have easy access to their messages from the main navigation
+- Child users stay within the child interface when accessing messages
+- Better organization of ride-related conversations for children
+- Consistent UI experience for child users
+
 ### ✅ Fixed Notification Duplication Issue (2025-07-24)
 
 **Problem:** Users were seeing duplicate notifications - the same notification appeared in both "General Notifications" and "Trusted Group Notifications" sections.
@@ -13,24 +33,20 @@
 2. **Modified `notifyUserRemovedFromGroup` function** - Now only creates trusted group notifications  
 3. **Modified `notifyRideRequestResponse` function** - Now only creates trusted group notifications
 4. **Created cleanup script** - `scripts/cleanup_duplicate_notifications.js` to remove existing duplicates
-5. **Ran cleanup** - Removed 3 duplicate notifications from database
+5. **Fixed notifications page formatting** - Added proper HTML5 DOCTYPE and structure to `views/notifications.ejs`
 
-**Files Modified:**
-- `utils/notifications.js` - Fixed notification logic
-- `scripts/cleanup_duplicate_notifications.js` - Created cleanup script
+**Files Changed:**
+- `utils/notifications.js` - Updated notification logic
+- `scripts/cleanup_duplicate_notifications.js` - Database cleanup
+- `views/notifications.ejs` - Fixed HTML structure and null checks
+- `views/messages-group.ejs` - Added checks for undefined variables
 
-**Result:** Users now see notifications in the correct section only:
-- Group-related notifications → "Trusted Group Notifications" 
-- Other notifications → "General Notifications"
+**Impact:** 
+- No more duplicate notifications for users
+- Cleaner, more organized notification system
+- Proper categorization of notification types
+- Removed 3 existing duplicate notifications from database
 
-## Current Status
+## Pending Tasks
 
-✅ **Notifications page formatting fixed** - Added proper HTML5 DOCTYPE and structure
-✅ **Notification duplication fixed** - Group notifications only appear in trusted group section
-✅ **Server running** - All changes applied and tested
-
-## Next Steps
-
-- Test notifications page with different user accounts
-- Verify no new duplicates are created
-- Monitor notification system performance 
+**Note:** Continue testing all functionality to ensure stability and user experience. 

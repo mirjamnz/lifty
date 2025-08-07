@@ -569,4 +569,90 @@ router.get('/all', async (req, res) => {
   });
 });
 
+// CHILD-SPECIFIC MESSAGE ROUTES
+// GET /messages/child/inbox - Child inbox showing their ride-related messages
+router.get('/child/inbox', async (req, res) => {
+  const userId = req.session.userId;
+  if (!userId) return res.status(401).send('Not logged in');
+
+  // Verify this is a child user
+  const [[user]] = await db.query('SELECT * FROM Users WHERE id = ?', [userId]);
+  if (!user || user.role !== 'child') {
+    return res.status(403).send('Access denied');
+  }
+
+  // Get child profile
+  const [[childProfile]] = await db.query('SELECT * FROM Children WHERE id = ?', [user.child_profile_id]);
+  if (!childProfile) return res.status(404).send('Child profile not found');
+
+  // Get all ride requests for this child
+  const [childRides] = await db.query(`
+    SELECT DISTINCT rr.id as ride_id, rr.pickup_location, rr.dropoff_location, 
+           rr.pickup_time, rr.status, u.name as driver_name
+    FROM RideRequests rr
+    LEFT JOIN Users u ON rr.assigned_user_id = u.id
+    WHERE rr.child_id = ?
+    ORDER BY rr.pickup_time DESC
+  `, [childProfile.id]);
+
+  let groupThreads = [];
+  if (childRides.length > 0) {
+    const rideIds = childRides.map(r => r.ride_id);
+    
+    // Get all group messages for these rides
+    const [allGroupMessages] = await db.query(
+      `SELECT m.*, u.name AS sender_name, 'group' as message_type
+       FROM Messages m
+       JOIN Users u ON m.sender_id = u.id
+       WHERE m.related_type = "request" AND m.related_id IN (?)
+       ORDER BY m.sent_at ASC`,
+      [rideIds]
+    );
+
+    // Group messages by ride_id
+    const groupedByRide = {};
+    childRides.forEach(ride => {
+      groupedByRide[ride.ride_id] = {
+        ride_id: ride.ride_id,
+        pickup_location: ride.pickup_location,
+        dropoff_location: ride.dropoff_location,
+        pickup_time: ride.pickup_time,
+        status: ride.status || 'Pending',
+        driver_name: ride.driver_name,
+        messages: [],
+        unread_count: 0,
+        latest_message: null
+      };
+    });
+
+    allGroupMessages.forEach(msg => {
+      if (groupedByRide[msg.related_id]) {
+        groupedByRide[msg.related_id].messages.push(msg);
+        
+        // Count unread messages (excluding user's own messages)
+        if (!msg.read_at && msg.sender_id !== userId) {
+          groupedByRide[msg.related_id].unread_count++;
+        }
+        
+        // Track latest message
+        if (!groupedByRide[msg.related_id].latest_message || 
+            new Date(msg.sent_at) > new Date(groupedByRide[msg.related_id].latest_message.sent_at)) {
+          groupedByRide[msg.related_id].latest_message = msg;
+        }
+      }
+    });
+
+    // Convert to array and sort by pickup time (most recent first)
+    groupThreads = Object.values(groupedByRide)
+      .sort((a, b) => new Date(b.pickup_time) - new Date(a.pickup_time));
+  }
+
+  res.render('messages-child-inbox', { 
+    session: req.session, 
+    childProfile,
+    groupThreads,
+    totalUnread: groupThreads.reduce((sum, thread) => sum + thread.unread_count, 0)
+  });
+});
+
 module.exports = router; 

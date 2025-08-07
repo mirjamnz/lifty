@@ -737,7 +737,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Debug: Check if calendar container exists
   const calendarEl = document.getElementById('calendar');
   if (!calendarEl) {
-    console.error('Calendar container element not found!');
+    console.warn('Calendar container element not found - this is normal if not on dashboard page');
     return;
   }
   console.log('Calendar container found:', calendarEl);
@@ -1027,7 +1027,7 @@ document.addEventListener('DOMContentLoaded', function() {
           console.log(`Dashboard Event element ${index}:`, el.textContent, el);
         });
       } else {
-        console.error('Dashboard Calendar DOM structure not found after render');
+        console.warn('Dashboard Calendar DOM structure not found after render - calendar may not have loaded properly');
       }
     }, 100);
     

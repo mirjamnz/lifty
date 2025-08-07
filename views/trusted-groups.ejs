@@ -325,15 +325,89 @@ function loadRecentRequests() {
 }
 
 function viewGroupMembers(groupId) {
-  // This would load group members via AJAX
-  // For now, just show a placeholder
+  // Show loading state
   document.getElementById('groupMembersContent').innerHTML = `
     <div class="text-center py-4">
       <i class="fas fa-spinner fa-spin fa-2x text-muted mb-3"></i>
       <p>Loading group members...</p>
     </div>
   `;
+  
+  // Show the modal
   new bootstrap.Modal(document.getElementById('groupMembersModal')).show();
+  
+  // Fetch group members via AJAX
+  fetch(`/trusted-groups/${groupId}/members`)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('Failed to load group members');
+      }
+      return response.json();
+    })
+    .then(data => {
+      const container = document.getElementById('groupMembersContent');
+      
+      if (data.members.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-4">
+            <i class="fas fa-users fa-3x text-muted mb-3"></i>
+            <p class="text-muted">No members found in this group.</p>
+          </div>
+        `;
+      } else {
+        let html = `
+          <div class="mb-3">
+            <h6 class="text-muted">${data.group.name}</h6>
+            ${data.group.description ? `<p class="text-muted small">${data.group.description}</p>` : ''}
+          </div>
+          <div class="list-group">
+        `;
+        
+        data.members.forEach(member => {
+          const roleBadge = member.role === 'Creator' ? 
+            '<span class="badge bg-primary ms-2">Creator</span>' : 
+            '<span class="badge bg-secondary ms-2">Member</span>';
+          
+          const joinedDate = member.joined_at ? 
+            new Date(member.joined_at).toLocaleDateString() : 
+            'Unknown';
+          
+          html += `
+            <div class="list-group-item">
+              <div class="d-flex w-100 justify-content-between align-items-center">
+                <div>
+                  <h6 class="mb-1">
+                    <i class="fas fa-user me-2"></i>${member.name}
+                    ${roleBadge}
+                  </h6>
+                  <small class="text-muted">
+                    <i class="fas fa-envelope me-1"></i>${member.email}
+                  </small>
+                </div>
+                <small class="text-muted">
+                  <i class="fas fa-calendar me-1"></i>Joined ${joinedDate}
+                </small>
+              </div>
+            </div>
+          `;
+        });
+        
+        html += '</div>';
+        container.innerHTML = html;
+      }
+    })
+    .catch(error => {
+      console.error('Error loading group members:', error);
+      document.getElementById('groupMembersContent').innerHTML = `
+        <div class="text-center py-4">
+          <i class="fas fa-exclamation-triangle fa-2x text-danger mb-3"></i>
+          <p class="text-danger">Error loading group members.</p>
+          <button class="btn btn-primary" onclick="viewGroupMembers(${groupId})">
+            <i class="fas fa-redo me-1"></i>Try Again
+          </button>
+        </div>
+      `;
+    });
 }
 
 function deleteGroup(groupId, groupName) {
