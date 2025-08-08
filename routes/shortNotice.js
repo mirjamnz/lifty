@@ -133,73 +133,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// POST /short-notice/:id/respond - Respond to a short-notice request
-router.post('/:id/respond', async (req, res) => {
-  if (!req.session.userId) return res.redirect('/login');
-  
-  try {
-    const requestId = req.params.id;
-    const { response_type, message } = req.body;
-    
-    // Check if user is a member of the group
-    const [[request]] = await db.query(`
-      SELECT snr.*, tgm.user_id as member_id, tg.name as group_name
-      FROM ShortNoticeRequests snr
-      JOIN TrustedGroupMembers tgm ON snr.group_id = tgm.group_id
-      JOIN TrustedGroups tg ON snr.group_id = tg.id
-      WHERE snr.id = ? AND tgm.user_id = ?
-    `, [requestId, req.session.userId]);
-    
-    if (!request) {
-      req.session.error = 'You can only respond to requests from groups you are a member of.';
-      return res.redirect('/short-notice');
-    }
-    
-    // Check if user already responded
-    const [[existingResponse]] = await db.query(`
-      SELECT * FROM ShortNoticeResponses 
-      WHERE request_id = ? AND responder_id = ?
-    `, [requestId, req.session.userId]);
-    
-    if (existingResponse) {
-      req.session.error = 'You have already responded to this request.';
-      return res.redirect('/short-notice');
-    }
-    
-    // Add response
-    await db.query(`
-      INSERT INTO ShortNoticeResponses (request_id, responder_id, response_type, message)
-      VALUES (?, ?, ?, ?)
-    `, [requestId, req.session.userId, response_type, message]);
-    
-    // Get responder name for notification
-    const [[responder]] = await db.query('SELECT name FROM Users WHERE id = ?', [req.session.userId]);
-    
-    // If someone accepted, update the request status
-    if (response_type === 'ok' || response_type === 'ok_with_message') {
-      await db.query(`
-        UPDATE ShortNoticeRequests 
-        SET status = 'accepted', accepted_by = ?
-        WHERE id = ?
-      `, [req.session.userId, requestId]);
-    }
-    
-    // Notify the requester about the response
-    await notifications.notifyRideRequestResponse(
-      requestId, 
-      responder.name, 
-      response_type, 
-      request.group_name
-    );
-    
-    req.session.success = 'Response sent successfully!';
-    res.redirect('/short-notice');
-  } catch (err) {
-    console.error('❌ Respond to request error:', err);
-    req.session.error = 'Could not respond to request.';
-    res.redirect('/short-notice');
-  }
-});
+
 
 // GET /short-notice/:id - View details of a specific request
 router.get('/:id', async (req, res) => {
@@ -237,28 +171,9 @@ router.get('/:id', async (req, res) => {
       return res.redirect('/short-notice');
     }
     
-    // Get responses
-    const [responses] = await db.query(`
-      SELECT 
-        snresp.*,
-        u.name as responder_name
-      FROM ShortNoticeResponses snresp
-      JOIN Users u ON snresp.responder_id = u.id
-      WHERE snresp.request_id = ?
-      ORDER BY snresp.responded_at
-    `, [requestId]);
-    
-    // Check if user has already responded
-    const [[userResponse]] = await db.query(`
-      SELECT * FROM ShortNoticeResponses 
-      WHERE request_id = ? AND responder_id = ?
-    `, [requestId, req.session.userId]);
-    
     res.render('short-notice-detail', {
       session: req.session,
-      request,
-      responses,
-      userResponse
+      request
     });
   } catch (err) {
     console.error('❌ Short notice detail error:', err);

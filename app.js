@@ -106,8 +106,134 @@ app.post('/event-instances/:instanceId/assign-self-driver', requireAuth, async (
   console.log('🔧 ASSIGNMENT DEBUG: instanceId:', instanceId, 'assignmentType:', assignmentType, 'userId:', userId);
 
   try {
-    // Get the event instance and event ID
-    console.log('🔧 ASSIGNMENT DEBUG: Querying for instance with ID:', instanceId);
+    // Check if this is an ActivityGroup event (format: activity_group_X_YYYY-MM-DD)
+    if (instanceId.startsWith('activity_group_')) {
+      console.log('🔧 ASSIGNMENT DEBUG: Processing ActivityGroup assignment');
+      const parts = instanceId.split('_');
+      if (parts.length !== 4) {
+        req.session.error = 'Invalid activity group event format.';
+        return res.redirect('/dashboard');
+      }
+      
+      const groupId = parseInt(parts[2]);
+      const eventDate = parts[3];
+      
+      console.log('🔧 ASSIGNMENT DEBUG: GroupId:', groupId, 'EventDate:', eventDate);
+      
+      // Get the ActivityGroup details
+      const [[group]] = await db.query(`
+        SELECT * FROM ActivityGroups 
+        WHERE id = ? AND is_active = TRUE AND has_schedule = TRUE
+      `, [groupId]);
+      
+      if (!group) {
+        req.session.error = 'Activity group not found or not scheduled.';
+        return res.redirect('/dashboard');
+      }
+      
+      console.log('🔧 ASSIGNMENT DEBUG: ActivityGroup found:', group);
+      
+      // Check if user is a member of this group
+      const [membership] = await db.query(`
+        SELECT * FROM ActivityGroupMembers 
+        WHERE group_id = ? AND user_id = ? AND is_active = TRUE
+      `, [groupId, userId]);
+      
+      if (membership.length === 0) {
+        req.session.error = 'You are not a member of this activity group.';
+        return res.redirect('/dashboard');
+      }
+      
+      // Get user's children in this group (optional for ActivityGroups)
+      const [userChildren] = await db.query(`
+        SELECT DISTINCT c.id as child_id, c.name as child_name
+        FROM ActivityGroupMembers agm
+        JOIN Children c ON agm.child_id = c.id
+        WHERE agm.group_id = ? AND agm.user_id = ? AND agm.is_active = TRUE
+      `, [groupId, userId]);
+      
+      console.log('🔧 ASSIGNMENT DEBUG: User children found:', userChildren.length);
+      
+      // For ActivityGroups, allow parent-only assignments even without children
+      if (userChildren.length === 0) {
+        console.log('🔧 ASSIGNMENT DEBUG: No children assigned, but allowing parent-only assignment');
+      }
+      
+      console.log('🔧 ASSIGNMENT DEBUG: User children in group:', userChildren);
+      
+      // Determine assignment types based on request
+      const assignmentType = req.body.assignmentType || 'both';
+      const typesToAssign = assignmentType === 'both' ? ['dropoff', 'pickup'] : [assignmentType];
+      
+      // Create assignments for each child and type
+      if (userChildren.length > 0) {
+        // If children are assigned to the group, create assignments for each child
+        for (const child of userChildren) {
+          for (const type of typesToAssign) {
+            // Check if assignment already exists
+            const [existingAssignment] = await db.query(`
+              SELECT * FROM ActivityGroupAssignments 
+              WHERE group_id = ? AND assignment_date = ? AND child_id = ? AND assignment_type = ?
+            `, [groupId, eventDate, child.child_id, type]);
+            
+            if (existingAssignment.length === 0) {
+              // Create new assignment
+              await db.query(`
+                INSERT INTO ActivityGroupAssignments 
+                (group_id, assignment_date, user_id, child_id, assignment_type, status)
+                VALUES (?, ?, ?, ?, ?, 'confirmed')
+              `, [groupId, eventDate, userId, child.child_id, type]);
+              console.log(`🔧 ASSIGNMENT DEBUG: Created ${type} assignment for child ${child.child_name}`);
+            } else {
+              console.log(`🔧 ASSIGNMENT DEBUG: ${type} assignment already exists for child ${child.child_name}`);
+            }
+          }
+        }
+      } else {
+        // If no children assigned, create parent-only driver assignments
+        console.log('🔧 ASSIGNMENT DEBUG: Creating parent-only driver assignments');
+        for (const type of typesToAssign) {
+          // Check if parent-only assignment already exists
+          const [existingAssignment] = await db.query(`
+            SELECT * FROM ActivityGroupAssignments 
+            WHERE group_id = ? AND assignment_date = ? AND user_id = ? AND child_id IS NULL AND assignment_type = ?
+          `, [groupId, eventDate, userId, type]);
+          
+          if (existingAssignment.length === 0) {
+            // Create new parent-only assignment
+            await db.query(`
+              INSERT INTO ActivityGroupAssignments 
+              (group_id, assignment_date, user_id, child_id, assignment_type, status)
+              VALUES (?, ?, ?, NULL, ?, 'confirmed')
+            `, [groupId, eventDate, userId, type]);
+            console.log(`🔧 ASSIGNMENT DEBUG: Created parent-only ${type} assignment`);
+          } else {
+            console.log(`🔧 ASSIGNMENT DEBUG: Parent-only ${type} assignment already exists`);
+          }
+        }
+      }
+      
+      // Get user name for message
+      const [[user]] = await db.query('SELECT name FROM Users WHERE id = ?', [userId]);
+      
+      // Send group message about driver assignment
+      const childNames = userChildren.length > 0 ? userChildren.map(c => c.child_name).join(', ') : 'None assigned yet';
+      const message = userChildren.length > 0 
+        ? `${user.name} has assigned themselves as driver for ${eventDate} (${typesToAssign.join(' & ')}) - Children: ${childNames}`
+        : `${user.name} has assigned themselves as driver for ${eventDate} (${typesToAssign.join(' & ')}) - Ready to drive when children are assigned`;
+      
+      await db.query(`
+        INSERT INTO ActivityGroupMessages (group_id, sender_id, message, message_type)
+        VALUES (?, ?, ?, 'assignment')
+      `, [groupId, userId, message]);
+      
+      console.log('🔧 ASSIGNMENT DEBUG: ActivityGroup assignment completed successfully');
+      req.session.success = `You are now the driver for this activity group event (${typesToAssign.join(' & ')}).`;
+      return res.redirect('/dashboard');
+    }
+    
+    // Original logic for old EventInstances (legacy support)
+    console.log('🔧 ASSIGNMENT DEBUG: Processing legacy EventInstance assignment');
     const [[instance]] = await db.query(`
       SELECT ei.*, re.id as event_id
       FROM EventInstances ei
@@ -236,6 +362,7 @@ const recurringEventsRouter = require('./routes/recurringEvents');
 const recurringEventGroupsRouter = require('./routes/recurringEventGroups');
 const trustedGroupsRouter = require('./routes/trustedGroups');
 const shortNoticeRouter = require('./routes/shortNotice');
+const groupsRouter = require('./routes/groups');
 const notificationsRouter = require('./routes/notifications');
 
 app.use('/', authRoutes);
@@ -244,11 +371,12 @@ app.use('/requests', rideRequestRoutes);
 app.use('/rides', rideRoutes);
 app.use('/organizations', orgRoutes);
 app.use('/', childDashboardRoutes);
-app.use('/messages', messagesRouter);
+// app.use('/messages', messagesRouter);
 app.use('/recurring-events', recurringEventsRouter);
-app.use('/recurring-event-groups', recurringEventGroupsRouter);
-app.use('/trusted-groups', trustedGroupsRouter);
-app.use('/short-notice', shortNoticeRouter);
+// app.use('/recurring-event-groups', recurringEventGroupsRouter);
+// app.use('/trusted-groups', trustedGroupsRouter);
+// app.use('/short-notice', shortNoticeRouter);
+app.use('/groups', groupsRouter);
 app.use('/notifications', notificationsRouter);
 
 const db = require('./db');

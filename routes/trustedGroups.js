@@ -4,6 +4,41 @@ const router = express.Router();
 const db = require('../db');
 const notifications = require('../utils/notifications');
 
+// GET /trusted-groups/debug-session - Debug session info
+router.get('/debug-session', async (req, res) => {
+  try {
+    const sessionInfo = {
+      hasSession: !!req.session,
+      userId: req.session && req.session.userId,
+      userEmail: req.session && req.session.userEmail,
+      userName: req.session && req.session.userName,
+      role: req.session && req.session.role,
+      sessionId: req.sessionID
+    };
+    
+    if (req.session && req.session.userId) {
+      try {
+        const [[user]] = await db.query('SELECT * FROM Users WHERE id = ?', [req.session.userId]);
+        sessionInfo.userFromDB = user;
+        
+        const [memberships] = await db.query(`
+          SELECT tgm.*, tg.name as group_name
+          FROM TrustedGroupMembers tgm
+          JOIN TrustedGroups tg ON tgm.group_id = tg.id
+          WHERE tgm.user_id = ?
+        `, [req.session.userId]);
+        sessionInfo.groupMemberships = memberships;
+      } catch (err) {
+        sessionInfo.error = err.message;
+      }
+    }
+    
+    res.json(sessionInfo);
+  } catch (err) {
+    res.status(500).json({ error: 'Debug endpoint error: ' + err.message });
+  }
+});
+
 // GET /trusted-groups - Show all trusted groups for the user
 router.get('/', async (req, res) => {
   if (!req.session.userId) return res.redirect('/login');
@@ -319,19 +354,40 @@ router.get('/recent-requests', async (req, res) => {
 
 // GET /trusted-groups/:id/members - Get group members
 router.get('/:id/members', async (req, res) => {
-  if (!req.session.userId) return res.status(401).json({ error: 'Not logged in' });
+  if (!req.session.userId) {
+    console.log('❌ No session userId found');
+    return res.status(401).json({ error: 'Not logged in - no session found' });
+  }
   
   try {
     const groupId = req.params.id;
     const userId = req.session.userId;
     
-    // Check if user is a member of this group
+    // Check if user exists
+    const [[user]] = await db.query('SELECT * FROM Users WHERE id = ?', [userId]);
+    if (!user) {
+      return res.status(403).json({ error: `User ${userId} not found` });
+    }
+    
+    // Check if user is a member of this group OR is the creator
     const [[membership]] = await db.query(`
-      SELECT * FROM TrustedGroupMembers WHERE group_id = ? AND user_id = ?
+      SELECT tgm.*, tg.name as group_name, tg.creator_id
+      FROM TrustedGroupMembers tgm
+      JOIN TrustedGroups tg ON tgm.group_id = tg.id
+      WHERE tgm.group_id = ? AND tgm.user_id = ?
     `, [groupId, userId]);
     
-    if (!membership) {
-      return res.status(403).json({ error: 'You are not a member of this group' });
+    // Also check if user is the creator
+    const [[creatorCheck]] = await db.query(`
+      SELECT * FROM TrustedGroups WHERE id = ? AND creator_id = ?
+    `, [groupId, userId]);
+    
+    if (!membership && !creatorCheck) {
+      return res.status(403).json({ 
+        error: `You are not a member of this group`,
+        userId: userId,
+        groupId: groupId
+      });
     }
     
     // Get group details
@@ -349,7 +405,7 @@ router.get('/:id/members', async (req, res) => {
         u.id,
         u.name,
         u.email,
-        tgm.joined_at,
+        tgm.added_at as joined_at,
         CASE WHEN tg.creator_id = u.id THEN 'Creator' ELSE 'Member' END as role
       FROM TrustedGroupMembers tgm
       JOIN Users u ON tgm.user_id = u.id
@@ -359,6 +415,8 @@ router.get('/:id/members', async (req, res) => {
         CASE WHEN tg.creator_id = u.id THEN 0 ELSE 1 END,
         u.name
     `, [groupId]);
+    
+
     
     res.json({
       group: {

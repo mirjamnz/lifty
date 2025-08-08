@@ -11,6 +11,8 @@
           <h5 class="mb-0">
             <% if (typeof eventType !== 'undefined' && eventType === 'recurring') { %>
               Group Chat for <%= event.name %>
+            <% } else if (typeof eventType !== 'undefined' && eventType === 'short-notice') { %>
+              Group Discussion for Short-Notice Request
             <% } else if (typeof eventType !== 'undefined' && eventType === 'offer' && typeof offer !== 'undefined' && offer) { %>
               Group Chat for Ride Offer #<%= offer.id %>
             <% } else if (typeof ride !== 'undefined' && ride) { %>
@@ -19,8 +21,8 @@
               Group Chat
             <% } %>
           </h5>
-          <a href="<%= session.role === 'child' ? '/child-dashboard' : '/rides' %>" class="btn btn-light btn-sm ms-auto">
-            <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+          <a href="<% if (typeof eventType !== 'undefined' && eventType === 'short-notice') { %>/short-notice<% } else { %><%= session.role === 'child' ? '/child-dashboard' : '/rides' %><% } %>" class="btn btn-light btn-sm ms-auto">
+            <i class="fas fa-arrow-left me-1"></i>Back
           </a>
         </div>
         <div class="card-body" style="min-height: 300px; max-height: 500px; overflow-y: auto;">
@@ -44,7 +46,7 @@
           <% } %>
         </div>
         <div class="card-footer bg-light">
-          <form method="POST" action="<% if (typeof eventType !== 'undefined' && eventType === 'recurring') { %>/messages/group/recurring/<%= eventId %>/send<% } else if (typeof eventType !== 'undefined' && eventType === 'offer' && typeof offer !== 'undefined' && offer) { %>/messages/group/offer/<%= offer.id %>/send<% } else if (typeof ride !== 'undefined' && ride) { %>/messages/group/ride/<%= ride.id %>/send<% } else { %>#<% } %>" class="d-flex align-items-end gap-2">
+          <form method="POST" action="<% if (typeof eventType !== 'undefined' && eventType === 'recurring') { %>/messages/group/recurring/<%= eventId %>/send<% } else if (typeof eventType !== 'undefined' && eventType === 'short-notice') { %>/messages/group/short-notice/<%= request.id %>/send<% } else if (typeof eventType !== 'undefined' && eventType === 'offer' && typeof offer !== 'undefined' && offer) { %>/messages/group/offer/<%= offer.id %>/send<% } else if (typeof ride !== 'undefined' && ride) { %>/messages/group/ride/<%= ride.id %>/send<% } else { %>#<% } %>" class="d-flex align-items-end gap-2">
             <textarea name="message" class="form-control" rows="2" placeholder="Type your message..." required style="resize:none;"></textarea>
             <button type="submit" class="btn btn-primary">
               <i class="fas fa-paper-plane me-1"></i>Send

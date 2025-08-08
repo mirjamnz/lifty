@@ -1,0 +1,470 @@
+<%- include('partials/header1') %>
+<%- include('partials/navbar1') %>
+
+<div class="container mt-4">
+  <!-- Page Header -->
+  <div class="row mb-4">
+    <div class="col">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Groups</li>
+        </ol>
+      </nav>
+      <h2 class="mb-0">
+        <i class="fas fa-users me-2"></i>Activity Groups
+      </h2>
+      <p class="text-muted">Create chat groups or scheduled activity groups with trusted parents</p>
+    </div>
+    <div class="col-auto">
+      <a href="/dashboard" class="btn btn-outline-secondary me-2">
+        <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+      </a>
+      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createGroupModal">
+        <i class="fas fa-plus me-1"></i>Create Group
+      </button>
+    </div>
+  </div>
+
+  <!-- Alert Messages -->
+  <% if (session.success) { %>
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+      <%= session.success %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  <% } %>
+
+  <% if (session.error) { %>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+      <%= session.error %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  <% } %>
+
+  <% if (session.info) { %>
+    <div class="alert alert-info alert-dismissible fade show" role="alert">
+      <%= session.info %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  <% } %>
+
+  <!-- My Groups Section -->
+  <div class="row mb-4">
+    <div class="col">
+      <div class="card">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-crown me-2"></i>Groups I Created (<%= myGroups.length %>)
+          </h5>
+        </div>
+        <div class="card-body">
+          <% if (myGroups.length === 0) { %>
+            <div class="text-center py-4">
+              <i class="fas fa-users fa-3x text-muted mb-3"></i>
+              <p class="text-muted">You haven't created any groups yet.</p>
+              <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createGroupModal">
+                <i class="fas fa-plus me-1"></i>Create Your First Group
+              </button>
+            </div>
+          <% } else { %>
+            <div class="row">
+              <% myGroups.forEach(group => { %>
+                <div class="col-md-6 col-lg-4 mb-3">
+                  <div class="card h-100 <%= group.has_schedule ? 'border-info' : 'border-success' %>">
+                    <div class="card-header <%= group.has_schedule ? 'bg-info text-white' : 'bg-success text-white' %>">
+                      <h6 class="mb-0">
+                        <i class="fas fa-<%= group.has_schedule ? 'calendar-alt' : 'comments' %> me-1"></i>
+                        <%= group.name %>
+                        <% if (group.privacy === 'private') { %>
+                          <i class="fas fa-lock ms-2" title="Private Group"></i>
+                        <% } %>
+                      </h6>
+                    </div>
+                    <div class="card-body">
+                      <% if (group.description) { %>
+                        <p class="card-text text-muted small"><%= group.description %></p>
+                      <% } %>
+                      
+                      <% if (group.has_schedule) { %>
+                        <div class="mb-2">
+                          <small class="text-info">
+                            <i class="fas fa-clock me-1"></i>
+                            <%= group.day_of_week %>s, <%= group.start_time %> - <%= group.end_time %>
+                          </small>
+                        </div>
+                        <div class="mb-2">
+                          <small class="text-muted">
+                            <i class="fas fa-map-marker-alt me-1"></i>
+                            <%= group.location %>
+                          </small>
+                        </div>
+                      <% } else { %>
+                        <div class="mb-2">
+                          <small class="text-success">
+                            <i class="fas fa-comments me-1"></i>
+                            Chat Group
+                          </small>
+                        </div>
+                      <% } %>
+                      
+                      <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                          <span class="badge bg-secondary me-1">
+                            <i class="fas fa-users me-1"></i><%= group.member_count %> members
+                          </span>
+                          <% if (group.child_count > 0) { %>
+                            <span class="badge bg-info">
+                              <i class="fas fa-child me-1"></i><%= group.child_count %> children
+                            </span>
+                          <% } %>
+                        </div>
+                        <small class="text-muted">
+                          Created <%= new Date(group.created_at).toLocaleDateString() %>
+                        </small>
+                      </div>
+                      
+                      <div class="d-grid">
+                        <a href="/groups/<%= group.id %>" class="btn btn-primary btn-sm">
+                          <i class="fas fa-eye me-1"></i>View Group
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              <% }); %>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Groups I'm Member Of -->
+  <% if (memberGroups.length > 0) { %>
+    <div class="row mb-4">
+      <div class="col">
+        <div class="card">
+          <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0">
+              <i class="fas fa-user-friends me-2"></i>Groups I'm Member Of (<%= memberGroups.length %>)
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <% memberGroups.forEach(group => { %>
+                <div class="col-md-6 col-lg-4 mb-3">
+                  <div class="card h-100 <%= group.has_schedule ? 'border-info' : 'border-success' %>">
+                    <div class="card-header <%= group.has_schedule ? 'bg-light' : 'bg-light' %>">
+                      <h6 class="mb-0">
+                        <i class="fas fa-<%= group.has_schedule ? 'calendar-alt' : 'comments' %> me-1"></i>
+                        <%= group.name %>
+                        <% if (group.privacy === 'private') { %>
+                          <i class="fas fa-lock ms-2" title="Private Group"></i>
+                        <% } %>
+                      </h6>
+                    </div>
+                    <div class="card-body">
+                      <% if (group.description) { %>
+                        <p class="card-text text-muted small"><%= group.description %></p>
+                      <% } %>
+                      
+                      <div class="mb-2">
+                        <small class="text-muted">
+                          <i class="fas fa-user me-1"></i>
+                          Created by <%= group.creator_name %>
+                        </small>
+                      </div>
+                      
+                      <% if (group.has_schedule) { %>
+                        <div class="mb-2">
+                          <small class="text-info">
+                            <i class="fas fa-clock me-1"></i>
+                            <%= group.day_of_week %>s, <%= group.start_time %> - <%= group.end_time %>
+                          </small>
+                        </div>
+                        <div class="mb-2">
+                          <small class="text-muted">
+                            <i class="fas fa-map-marker-alt me-1"></i>
+                            <%= group.location %>
+                          </small>
+                        </div>
+                      <% } else { %>
+                        <div class="mb-2">
+                          <small class="text-success">
+                            <i class="fas fa-comments me-1"></i>
+                            Chat Group
+                          </small>
+                        </div>
+                      <% } %>
+                      
+                      <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                          <span class="badge bg-secondary me-1">
+                            <i class="fas fa-users me-1"></i><%= group.member_count %> members
+                          </span>
+                          <% if (group.child_count > 0) { %>
+                            <span class="badge bg-info">
+                              <i class="fas fa-child me-1"></i><%= group.child_count %> children
+                            </span>
+                          <% } %>
+                        </div>
+                      </div>
+                      
+                      <div class="d-grid">
+                        <a href="/groups/<%= group.id %>" class="btn btn-outline-primary btn-sm">
+                          <i class="fas fa-eye me-1"></i>View Group
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              <% }); %>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% } %>
+</div>
+
+<!-- Create Group Modal -->
+<div class="modal fade" id="createGroupModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-plus me-2"></i>Create Activity Group
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form action="/groups" method="POST">
+        <div class="modal-body">
+          <!-- Basic Information -->
+          <div class="row mb-3">
+            <div class="col-md-8">
+              <label for="groupName" class="form-label">Group Name *</label>
+              <input type="text" class="form-control" id="groupName" name="name" required placeholder="e.g., Westfield Football Parents">
+            </div>
+            <div class="col-md-4">
+              <label for="privacy" class="form-label">Privacy</label>
+              <select class="form-select" id="privacy" name="privacy">
+                <option value="public">Public</option>
+                <option value="private">Private</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <label for="groupDescription" class="form-label">Description</label>
+            <textarea class="form-control" id="groupDescription" name="description" rows="2" placeholder="What is this group for?"></textarea>
+          </div>
+          
+          <!-- Schedule Settings -->
+          <div class="mb-3">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="hasSchedule" name="has_schedule" onchange="toggleScheduleFields()">
+              <label class="form-check-label" for="hasSchedule">
+                <strong>This group has a recurring schedule</strong>
+                <small class="text-muted d-block">Check this if the group meets regularly (e.g., weekly football practice)</small>
+              </label>
+            </div>
+          </div>
+          
+          <!-- Schedule Fields (hidden by default) -->
+          <div id="scheduleFields" style="display: none;">
+            <div class="card border-info mb-3">
+              <div class="card-header bg-info text-white">
+                <h6 class="mb-0"><i class="fas fa-calendar-alt me-2"></i>Schedule Details</h6>
+              </div>
+              <div class="card-body">
+                <div class="row mb-3">
+                  <div class="col-md-4">
+                    <label for="dayOfWeek" class="form-label">Day of Week</label>
+                    <select class="form-select" id="dayOfWeek" name="day_of_week">
+                      <option value="">Select day...</option>
+                      <option value="Mon">Monday</option>
+                      <option value="Tue">Tuesday</option>
+                      <option value="Wed">Wednesday</option>
+                      <option value="Thu">Thursday</option>
+                      <option value="Fri">Friday</option>
+                      <option value="Sat">Saturday</option>
+                      <option value="Sun">Sunday</option>
+                    </select>
+                  </div>
+                  <div class="col-md-4">
+                    <label for="startTime" class="form-label">Start Time</label>
+                    <input type="time" class="form-control" id="startTime" name="start_time">
+                  </div>
+                  <div class="col-md-4">
+                    <label for="endTime" class="form-label">End Time</label>
+                    <input type="time" class="form-control" id="endTime" name="end_time">
+                  </div>
+                </div>
+                
+                <div class="row mb-3">
+                  <div class="col-md-8">
+                    <label for="location" class="form-label">Location</label>
+                    <div class="position-relative">
+                      <input type="text" class="form-control" id="location" name="location" placeholder="e.g., Westfield Sports Ground" autocomplete="off">
+                      <div id="locationSuggestions" class="position-absolute w-100 bg-white border border-top-0 rounded-bottom shadow-sm" style="display: none; z-index: 1000; max-height: 200px; overflow-y: auto;"></div>
+                    </div>
+                  </div>
+                  <div class="col-md-4">
+                    <label for="activityType" class="form-label">Activity Type</label>
+                    <select class="form-select" id="activityType" name="activity_type">
+                      <option value="Social">Social</option>
+                      <option value="Sport">Sport</option>
+                      <option value="Club">Club</option>
+                      <option value="School">School</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Member Selection -->
+          <div class="row">
+            <div class="col-md-6">
+              <label class="form-label">Add Members</label>
+              <div class="border rounded p-2" style="max-height: 150px; overflow-y: auto;">
+                <% allUsers.forEach(user => { %>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="member_ids" value="<%= user.id %>" id="member_<%= user.id %>">
+                    <label class="form-check-label" for="member_<%= user.id %>">
+                      <%= user.name %> (<%= user.email %>)
+                    </label>
+                  </div>
+                <% }); %>
+              </div>
+            </div>
+            
+            <div class="col-md-6" id="childrenSection" style="display: none;">
+              <label class="form-label">Add Children (for scheduled groups)</label>
+              <div class="border rounded p-2" style="max-height: 150px; overflow-y: auto;">
+                <% children.forEach(child => { %>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="child_ids" value="<%= child.id %>" id="child_<%= child.id %>">
+                    <label class="form-check-label" for="child_<%= child.id %>">
+                      <%= child.name %>
+                    </label>
+                  </div>
+                <% }); %>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i>Create Group
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleScheduleFields() {
+  const hasSchedule = document.getElementById('hasSchedule').checked;
+  const scheduleFields = document.getElementById('scheduleFields');
+  const childrenSection = document.getElementById('childrenSection');
+  
+  if (hasSchedule) {
+    scheduleFields.style.display = 'block';
+    childrenSection.style.display = 'block';
+    
+    // Make schedule fields required
+    document.getElementById('dayOfWeek').required = true;
+    document.getElementById('startTime').required = true;
+    document.getElementById('endTime').required = true;
+    document.getElementById('location').required = true;
+  } else {
+    scheduleFields.style.display = 'none';
+    childrenSection.style.display = 'none';
+    
+    // Remove required from schedule fields
+    document.getElementById('dayOfWeek').required = false;
+    document.getElementById('startTime').required = false;
+    document.getElementById('endTime').required = false;
+    document.getElementById('location').required = false;
+  }
+}
+
+// Location Autocomplete Functionality
+let locationTimeout;
+const locationInput = document.getElementById('location');
+const locationSuggestions = document.getElementById('locationSuggestions');
+
+locationInput.addEventListener('input', function() {
+  const query = this.value.trim();
+  
+  // Clear previous timeout
+  clearTimeout(locationTimeout);
+  
+  if (query.length < 2) {
+    locationSuggestions.style.display = 'none';
+    return;
+  }
+  
+  // Debounce the search
+  locationTimeout = setTimeout(() => {
+    fetchLocationSuggestions(query);
+  }, 300);
+});
+
+locationInput.addEventListener('blur', function() {
+  // Hide suggestions after a short delay to allow clicking
+  setTimeout(() => {
+    locationSuggestions.style.display = 'none';
+  }, 200);
+});
+
+locationInput.addEventListener('focus', function() {
+  if (this.value.trim().length >= 2) {
+    fetchLocationSuggestions(this.value.trim());
+  }
+});
+
+async function fetchLocationSuggestions(query) {
+  try {
+    const response = await fetch(`/groups/api/locations?q=${encodeURIComponent(query)}`);
+    if (!response.ok) throw new Error('Failed to fetch');
+    
+    const locations = await response.json();
+    displayLocationSuggestions(locations);
+  } catch (error) {
+    console.error('Location autocomplete error:', error);
+    locationSuggestions.style.display = 'none';
+  }
+}
+
+function displayLocationSuggestions(locations) {
+  if (locations.length === 0) {
+    locationSuggestions.style.display = 'none';
+    return;
+  }
+  
+  locationSuggestions.innerHTML = locations.map(location => `
+    <div class="suggestion-item px-3 py-2 border-bottom cursor-pointer" style="cursor: pointer;" 
+         onclick="selectLocation('${location.value.replace(/'/g, '\\\'')}')" 
+         onmouseover="this.style.backgroundColor='#f8f9fa'" 
+         onmouseout="this.style.backgroundColor='white'">
+      <div class="fw-medium">${location.name}</div>
+      ${location.address ? `<small class="text-muted">${location.address}</small>` : ''}
+      <span class="badge bg-secondary ms-2">${location.type}</span>
+    </div>
+  `).join('');
+  
+  locationSuggestions.style.display = 'block';
+}
+
+function selectLocation(value) {
+  locationInput.value = value;
+  locationSuggestions.style.display = 'none';
+}
+</script>
+
+<%- include('partials/footer1') %>

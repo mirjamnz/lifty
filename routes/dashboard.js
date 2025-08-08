@@ -244,6 +244,78 @@ router.get('/dashboard', async (req, res) => {
 
     console.log('Recurring assignments found:', recurringAssignments.length);
     console.log('Group recurring events found:', groupRecurringEvents.length);
+    
+    // Get ActivityGroups with schedules where user is a member (for the next 4 weeks)
+    let activityGroupEvents = [];
+    const [activityGroups] = await db.query(`
+      SELECT DISTINCT ag.id, ag.name, ag.day_of_week, ag.start_time, ag.end_time, ag.location, ag.activity_type
+      FROM ActivityGroups ag
+      JOIN ActivityGroupMembers agm ON ag.id = agm.group_id
+      WHERE agm.user_id = ? AND agm.is_active = TRUE AND ag.is_active = TRUE AND ag.has_schedule = TRUE
+      ORDER BY ag.day_of_week, ag.start_time
+    `, [userId]);
+
+    // Generate next 4 weeks of occurrences for activity groups
+    for (const group of activityGroups) {
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const groupDayIndex = dayNames.indexOf(group.day_of_week);
+      
+      for (let week = 0; week < 4; week++) {
+        const groupDate = new Date(today);
+        groupDate.setDate(today.getDate() + (week * 7));
+        
+        // Find the next occurrence of this day of the week
+        while (groupDate.getDay() !== groupDayIndex) {
+          groupDate.setDate(groupDate.getDate() + 1);
+        }
+        
+        // Only add if it's in the future
+        if (groupDate >= today) {
+          const group_date_str = groupDate.toISOString().split('T')[0];
+          
+          activityGroupEvents.push({
+            id: `activity_group_${group.id}_${group_date_str}`,
+            group_date: group_date_str,
+            group_name: group.name,
+            day_of_week: group.day_of_week,
+            start_time: group.start_time,
+            end_time: group.end_time,
+            location: group.location,
+            activity_type: group.activity_type,
+            type: 'activity_group'
+          });
+        }
+      }
+    }
+
+    // Get ActivityGroup assignments for each event (to show driver status)
+    for (const event of activityGroupEvents) {
+      const groupId = event.id.split('_')[2];
+      const eventDate = event.group_date;
+      
+      // Get current assignments for this event (including parent-only assignments)
+      const [assignments] = await db.query(`
+        SELECT aga.*, u.name as driver_name, c.name as child_name
+        FROM ActivityGroupAssignments aga
+        JOIN Users u ON aga.user_id = u.id
+        LEFT JOIN Children c ON aga.child_id = c.id
+        WHERE aga.group_id = ? AND aga.assignment_date = ? AND aga.status = 'confirmed'
+      `, [groupId, eventDate]);
+      
+      // Add assignment info to the event
+      event.assignments = assignments;
+      event.current_driver = assignments.length > 0 ? assignments[0].driver_name : 'Not assigned';
+      event.group_id = groupId;
+      
+      // Get dropoff and pickup drivers
+      const dropoffAssignment = assignments.find(a => a.assignment_type === 'dropoff');
+      const pickupAssignment = assignments.find(a => a.assignment_type === 'pickup');
+      
+      event.dropoff_driver = dropoffAssignment ? dropoffAssignment.driver_name : 'Unassigned';
+      event.pickup_driver = pickupAssignment ? pickupAssignment.driver_name : 'Unassigned';
+    }
+
+    console.log('Activity group events found:', activityGroupEvents.length);
     console.log('Subscribed recurring events found:', subscribedRecurringEvents.length);
 
     // Format events for FullCalendar
@@ -324,6 +396,24 @@ router.get('/dashboard', async (req, res) => {
       }))
     ];
 
+    // Add activity group events to calendar
+    calendarEvents = [
+      ...calendarEvents,
+      ...activityGroupEvents.map(event => ({
+        id: event.id,
+        title: `${event.group_name}`,
+        start: `${event.group_date}T${event.start_time}`,
+        end: event.end_time ? `${event.group_date}T${event.end_time}` : undefined,
+        description: `${event.location}`,
+        backgroundColor: '#17a2b8',
+        borderColor: '#138496',
+        type: event.type,
+        activity_type: event.activity_type,
+        dropoff_driver: event.dropoff_driver,
+        pickup_driver: event.pickup_driver
+      }))
+    ];
+
     console.log('Total calendar events:', calendarEvents.length);
     console.log('Calendar events:', calendarEvents);
 
@@ -331,6 +421,53 @@ router.get('/dashboard', async (req, res) => {
     const [affiliations] = await db.query('SELECT * FROM UserAffiliations WHERE user_id = ?', [userId]);
     // Load all organizations for the wizard
     const [organizations] = await db.query('SELECT * FROM Organizations ORDER BY name ASC');
+
+    // Get user's trusted groups for dashboard integration
+    const [trustedGroups] = await db.query(`
+      SELECT 
+        tg.*,
+        COUNT(tgm2.user_id) as member_count
+      FROM TrustedGroups tg
+      LEFT JOIN TrustedGroupMembers tgm ON tg.id = tgm.group_id
+      LEFT JOIN TrustedGroupMembers tgm2 ON tg.id = tgm2.group_id
+      WHERE tgm.user_id = ? OR tg.creator_id = ?
+      GROUP BY tg.id
+      ORDER BY tg.created_at DESC
+      LIMIT 3
+    `, [userId, userId]);
+
+    // Get recent short notice requests for dashboard
+    const [recentShortNoticeRequests] = await db.query(`
+      SELECT 
+        snr.*,
+        tg.name as group_name,
+        u.name as requester_name,
+        COUNT(snresp.id) as response_count
+      FROM ShortNoticeRequests snr
+      JOIN TrustedGroups tg ON snr.group_id = tg.id
+      JOIN TrustedGroupMembers tgm ON tg.id = tgm.group_id
+      JOIN Users u ON snr.requester_id = u.id
+      LEFT JOIN ShortNoticeResponses snresp ON snr.id = snresp.request_id
+      WHERE tgm.user_id = ? AND snr.status = 'pending'
+      GROUP BY snr.id
+      ORDER BY snr.created_at DESC
+      LIMIT 5
+    `, [userId]);
+
+    // Get my short notice requests for dashboard
+    const [myShortNoticeRequests] = await db.query(`
+      SELECT 
+        snr.*,
+        tg.name as group_name,
+        COUNT(snresp.id) as response_count
+      FROM ShortNoticeRequests snr
+      JOIN TrustedGroups tg ON snr.group_id = tg.id
+      LEFT JOIN ShortNoticeResponses snresp ON snr.id = snresp.request_id
+      WHERE snr.requester_id = ? AND snr.status = 'pending'
+      GROUP BY snr.id
+      ORDER BY snr.created_at DESC
+      LIMIT 3
+    `, [userId]);
 
     // Determine if profile is incomplete
     // const missingAddress = !user.home_address;
@@ -341,6 +478,9 @@ router.get('/dashboard', async (req, res) => {
 
     // DEBUG PRINT
     console.log('DEBUG: user.profile_completed =', user.profile_completed, 'showProfileWizard =', showProfileWizard);
+    console.log('DEBUG: trustedGroups =', trustedGroups.length, 'items');
+    console.log('DEBUG: recentShortNoticeRequests =', recentShortNoticeRequests.length, 'items');
+    console.log('DEBUG: myShortNoticeRequests =', myShortNoticeRequests.length, 'items');
 
     res.render('dashboard', {
       session: req.session,
@@ -350,6 +490,9 @@ router.get('/dashboard', async (req, res) => {
       privateCount,
       groupInvitations,
       calendarEvents,
+      trustedGroups,
+      recentShortNoticeRequests,
+      myShortNoticeRequests,
       success: req.session.success,
       error: req.session.error,
       organizations,

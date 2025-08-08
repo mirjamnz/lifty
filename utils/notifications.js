@@ -42,6 +42,15 @@ async function notifyUserAddedToGroup(groupId, userId, groupName, addedBy) {
   await createTrustedGroupNotification(groupId, userId, 'member_added', title, message);
 }
 
+// Notify user when added to an activity group
+async function notifyUserAddedToActivityGroup(groupId, userId, groupName, addedBy, hasSchedule = false) {
+  const title = `Added to Activity Group`;
+  const groupType = hasSchedule ? 'scheduled activity group' : 'chat group';
+  const message = `You have been added to the ${groupType} "${groupName}" by ${addedBy}. You can chat with group members and stay updated on activities.`;
+  
+  await createNotification(userId, 'group_added', title, message, 'activity_group', groupId);
+}
+
 // Notify user when removed from a trusted group
 async function notifyUserRemovedFromGroup(groupId, userId, groupName, removedBy) {
   const title = `Removed from Trusted Group`;
@@ -51,7 +60,7 @@ async function notifyUserRemovedFromGroup(groupId, userId, groupName, removedBy)
   await createTrustedGroupNotification(groupId, userId, 'member_removed', title, message);
 }
 
-// Notify group members about a new ride request
+// Notify group members about a new short-notice request
 async function notifyGroupAboutRideRequest(groupId, requestId, requesterName, pickupTime, pickupLocation, dropoffLocation) {
   try {
     // Get all group members
@@ -59,39 +68,42 @@ async function notifyGroupAboutRideRequest(groupId, requestId, requesterName, pi
       SELECT user_id FROM TrustedGroupMembers WHERE group_id = ?
     `, [groupId]);
     
-    const title = `New Ride Request`;
-    const message = `${requesterName} has requested a ride from ${pickupLocation} to ${dropoffLocation} at ${pickupTime}.`;
+    const title = `New Short-Notice Request`;
+    const message = `${requesterName} has sent a short-notice request. Join the discussion to coordinate.`;
     
     // Notify each member (except the requester)
     for (const member of members) {
-      await createTrustedGroupNotification(groupId, member.user_id, 'ride_request', title, message, requestId);
+      await createTrustedGroupNotification(groupId, member.user_id, 'short_notice_request', title, message, requestId);
     }
     
-    console.log(`✅ Notified ${members.length} group members about ride request`);
+    console.log(`✅ Notified ${members.length} group members about short-notice request`);
   } catch (err) {
-    console.error('❌ Error notifying group about ride request:', err);
+    console.error('❌ Error notifying group about short-notice request:', err);
   }
 }
 
-// Notify requester about ride request response
-async function notifyRideRequestResponse(requestId, responderName, response, groupName) {
+// Notify users about new messages in short-notice discussions
+async function notifyGroupAboutMessage(groupId, requestId, senderName, messagePreview) {
   try {
-    // Get the request details
-    const [[request]] = await db.query(`
-      SELECT requester_id, group_id FROM ShortNoticeRequests WHERE id = ?
-    `, [requestId]);
+    // Get all group members except the sender
+    const [members] = await db.query(`
+      SELECT tgm.user_id, u.name 
+      FROM TrustedGroupMembers tgm
+      JOIN Users u ON tgm.user_id = u.id
+      WHERE tgm.group_id = ? AND u.name != ?
+    `, [groupId, senderName]);
     
-    if (!request) return;
+    const title = `New Message in Discussion`;
+    const message = `${senderName} replied: ${messagePreview.substring(0, 100)}${messagePreview.length > 100 ? '...' : ''}`;
     
-    const title = `Ride Request Response`;
-    const message = `${responderName} has ${response} your ride request in the "${groupName}" group.`;
+    // Notify each member
+    for (const member of members) {
+      await createTrustedGroupNotification(groupId, member.user_id, 'message_reply', title, message, requestId);
+    }
     
-    // Only create trusted group notification (not both general and trusted group)
-    await createTrustedGroupNotification(request.group_id, request.requester_id, 'ride_response', title, message, requestId);
-    
-    console.log(`✅ Notified requester about ride response`);
+    console.log(`✅ Notified ${members.length} group members about new message`);
   } catch (err) {
-    console.error('❌ Error notifying about ride response:', err);
+    console.error('❌ Error notifying group about message:', err);
   }
 }
 
@@ -159,9 +171,10 @@ module.exports = {
   createNotification,
   createTrustedGroupNotification,
   notifyUserAddedToGroup,
+  notifyUserAddedToActivityGroup,
   notifyUserRemovedFromGroup,
   notifyGroupAboutRideRequest,
-  notifyRideRequestResponse,
+  notifyGroupAboutMessage,
   getUnreadNotificationsCount,
   getUnreadTrustedGroupNotificationsCount,
   markNotificationAsRead,

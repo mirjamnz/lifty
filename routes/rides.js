@@ -319,7 +319,8 @@ router.get('/', async (req, res) => {
     let days = 7;
     if (range === '30') days = 30;
     if (range === '60') days = 60;
-    const [unassignedGroupInstances] = await db.query(`
+    // Get legacy unassigned group instances 
+    const [legacyUnassignedInstances] = await db.query(`
       SELECT ei.*, re.name AS event_name, re.location, re.day_of_week, re.start_time, re.end_time, u.name AS driver_name
       FROM EventInstances ei
       JOIN RecurringEvents re ON ei.event_id = re.id
@@ -350,6 +351,58 @@ router.get('/', async (req, res) => {
       ORDER BY ei.event_date ASC, re.name
       LIMIT 20
     `, [userId, days]);
+
+    // Get ActivityGroup events that need driver assignments
+    const [activityGroupInstances] = await db.query(`
+      SELECT 
+        CONCAT('activity_group_', ag.id, '_', DATE_FORMAT(generated_date.event_date, '%Y-%m-%d')) as id,
+        ag.name AS event_name,
+        ag.location,
+        ag.day_of_week,
+        ag.start_time,
+        ag.end_time,
+        generated_date.event_date,
+        NULL as driver_name
+      FROM ActivityGroups ag
+      JOIN ActivityGroupMembers agm ON ag.id = agm.group_id
+      CROSS JOIN (
+        SELECT CURDATE() + INTERVAL n.number DAY AS event_date
+        FROM (
+          SELECT 0 as number UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 
+          UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION SELECT 10 UNION SELECT 11 UNION SELECT 12 UNION SELECT 13 
+          UNION SELECT 14 UNION SELECT 15 UNION SELECT 16 UNION SELECT 17 UNION SELECT 18 UNION SELECT 19 UNION SELECT 20
+          UNION SELECT 21 UNION SELECT 22 UNION SELECT 23 UNION SELECT 24 UNION SELECT 25 UNION SELECT 26 UNION SELECT 27
+          UNION SELECT 28 UNION SELECT 29 UNION SELECT 30
+        ) n
+      ) generated_date
+      WHERE agm.user_id = ? 
+        AND agm.is_active = TRUE 
+        AND ag.is_active = TRUE 
+        AND ag.has_schedule = TRUE
+        AND generated_date.event_date >= CURDATE()
+        AND generated_date.event_date <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
+        AND DAYNAME(generated_date.event_date) = CASE ag.day_of_week
+          WHEN 'Mon' THEN 'Monday'
+          WHEN 'Tue' THEN 'Tuesday' 
+          WHEN 'Wed' THEN 'Wednesday'
+          WHEN 'Thu' THEN 'Thursday'
+          WHEN 'Fri' THEN 'Friday'
+          WHEN 'Sat' THEN 'Saturday'
+          WHEN 'Sun' THEN 'Sunday'
+        END
+        AND NOT EXISTS (
+          -- Only show if no one is assigned yet (no assignments for this date)
+          SELECT 1 FROM ActivityGroupAssignments aga 
+          WHERE aga.group_id = ag.id 
+          AND aga.assignment_date = generated_date.event_date 
+          AND aga.status = 'confirmed'
+        )
+      ORDER BY generated_date.event_date ASC, ag.name
+      LIMIT 10
+    `, [userId, days]);
+
+    // Combine legacy and ActivityGroup instances
+    const unassignedGroupInstances = [...legacyUnassignedInstances, ...activityGroupInstances];
 
     // --- Admin Group Assignments ---
     let adminGroupAssignments = [];

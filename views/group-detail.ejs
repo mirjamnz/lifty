@@ -1,0 +1,305 @@
+<%- include('partials/header1') %>
+<% if (user && user.role === 'child') { %>
+  <%- include('partials/navbar-child') %>
+<% } else { %>
+  <%- include('partials/navbar1') %>
+<% } %>
+
+<div class="container mt-4">
+  <!-- Breadcrumb -->
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <% if (user && user.role === 'child') { %>
+        <li class="breadcrumb-item"><a href="/child-dashboard">Dashboard</a></li>
+      <% } else { %>
+        <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="/groups">Groups</a></li>
+      <% } %>
+      <li class="breadcrumb-item active" aria-current="page"><%= group.name %></li>
+    </ol>
+  </nav>
+
+  <!-- Group Header -->
+  <div class="row mb-4">
+    <div class="col">
+      <div class="card <%= group.has_schedule ? 'border-info' : 'border-success' %>">
+        <div class="card-header <%= group.has_schedule ? 'bg-info text-white' : 'bg-success text-white' %>">
+          <div class="row align-items-center">
+            <div class="col">
+              <h3 class="mb-0">
+                <i class="fas fa-<%= group.has_schedule ? 'calendar-alt' : 'comments' %> me-2"></i>
+                <%= group.name %>
+                <% if (group.privacy === 'private') { %>
+                  <i class="fas fa-lock ms-2" title="Private Group"></i>
+                <% } %>
+              </h3>
+              <% if (group.description) { %>
+                <p class="mb-1 opacity-75"><%= group.description %></p>
+              <% } %>
+              <small class="opacity-75">Created by <%= group.creator_name %> on <%= new Date(group.created_at).toLocaleDateString() %></small>
+            </div>
+            <div class="col-auto">
+              <a href="/groups" class="btn btn-outline-light">
+                <i class="fas fa-arrow-left me-1"></i>Back to Groups
+              </a>
+            </div>
+          </div>
+        </div>
+        
+        <% if (group.has_schedule) { %>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-3">
+                <h6 class="text-info">
+                  <i class="fas fa-clock me-1"></i>Schedule
+                </h6>
+                <p class="mb-0"><%= group.day_of_week %>s</p>
+                <p class="mb-0"><%= group.start_time %> - <%= group.end_time %></p>
+              </div>
+              <div class="col-md-6">
+                <h6 class="text-info">
+                  <i class="fas fa-map-marker-alt me-1"></i>Location
+                </h6>
+                <p class="mb-0"><%= group.location %></p>
+              </div>
+              <div class="col-md-3">
+                <h6 class="text-info">
+                  <i class="fas fa-tag me-1"></i>Activity Type
+                </h6>
+                <span class="badge bg-info"><%= group.activity_type %></span>
+              </div>
+            </div>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="row">
+    <!-- Left Column: Chat/Messages -->
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">
+            <i class="fas fa-comments me-2"></i>Group Chat
+          </h5>
+        </div>
+        <div class="card-body" style="height: 400px; overflow-y: auto;" id="messagesContainer">
+          <% if (messages.length === 0) { %>
+            <div class="text-center text-muted py-5">
+              <i class="fas fa-comments fa-3x mb-3"></i>
+              <p>No messages yet. Start the conversation!</p>
+            </div>
+          <% } else { %>
+            <% messages.forEach(message => { %>
+              <div class="mb-3">
+                <div class="d-flex justify-content-between align-items-start">
+                  <strong class="text-primary"><%= message.sender_name %></strong>
+                  <small class="text-muted"><%= new Date(message.sent_at).toLocaleString() %></small>
+                </div>
+                <p class="mb-0 mt-1"><%= message.message %></p>
+              </div>
+              <hr class="my-2">
+            <% }); %>
+          <% } %>
+        </div>
+        
+        <!-- Message Input -->
+        <div class="card-footer">
+          <form action="/groups/<%= group.id %>/message" method="POST">
+            <div class="input-group">
+              <input type="text" class="form-control" name="message" placeholder="Type your message..." required>
+              <button type="submit" class="btn btn-primary">
+                <i class="fas fa-paper-plane me-1"></i>Send
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Group Info -->
+    <div class="col-lg-4">
+      <!-- Members -->
+      <div class="card mb-3">
+        <div class="card-header">
+          <h6 class="mb-0">
+            <i class="fas fa-users me-2"></i>Members (<%= members.length %>)
+          </h6>
+        </div>
+        <div class="card-body">
+          <% members.forEach(member => { %>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div>
+                <strong><%= member.user_name %></strong>
+                <% if (member.role === 'admin') { %>
+                  <span class="badge bg-warning text-dark ms-1">Admin</span>
+                <% } %>
+                <% if (member.child_name) { %>
+                  <div class="small text-muted">
+                    <i class="fas fa-child me-1"></i><%= member.child_name %>
+                  </div>
+                <% } %>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+
+      <!-- Schedule & Assignments (for scheduled groups) -->
+      <% if (group.has_schedule) { %>
+        <div class="card mb-3">
+          <div class="card-header">
+            <h6 class="mb-0">
+              <i class="fas fa-calendar-check me-2"></i>Upcoming Assignments
+            </h6>
+          </div>
+          <div class="card-body">
+            <% if (assignments.length === 0) { %>
+              <p class="text-muted mb-0">No assignments yet.</p>
+            <% } else { %>
+              <% assignments.forEach(assignment => { %>
+                <div class="mb-2">
+                  <strong><%= new Date(assignment.assignment_date).toLocaleDateString() %></strong>
+                  <div class="small">
+                    <%= assignment.user_name %> - <%= assignment.child_name %>
+                    <span class="badge bg-secondary"><%= assignment.assignment_type %></span>
+                  </div>
+                </div>
+              <% }); %>
+            <% } %>
+          </div>
+        </div>
+
+        <!-- Schedule Overrides -->
+        <% if (overrides.length > 0) { %>
+          <div class="card mb-3">
+            <div class="card-header">
+              <h6 class="mb-0">
+                <i class="fas fa-calendar-times me-2"></i>Schedule Changes
+              </h6>
+            </div>
+            <div class="card-body">
+              <% overrides.forEach(override => { %>
+                <div class="mb-2">
+                  <strong><%= new Date(override.override_date).toLocaleDateString() %></strong>
+                  <div class="small text-warning">
+                    <% if (override.new_start_time) { %>
+                      Time: <%= override.new_start_time %> - <%= override.new_end_time %><br>
+                    <% } %>
+                    <% if (override.new_location) { %>
+                      Location: <%= override.new_location %><br>
+                    <% } %>
+                    <% if (override.is_cancelled) { %>
+                      <span class="text-danger">CANCELLED</span>
+                    <% } %>
+                  </div>
+                </div>
+              <% }); %>
+            </div>
+          </div>
+        <% } %>
+      <% } %>
+
+      <!-- Member Actions (hidden for child users) -->
+      <% if (userMembership && user.role !== 'child') { %>
+        <div class="card">
+          <div class="card-header">
+            <h6 class="mb-0">
+              <i class="fas fa-<%= userMembership.role === 'admin' ? 'cog' : 'user' %> me-2"></i><%= userMembership.role === 'admin' ? 'Admin' : 'Member' %> Actions
+            </h6>
+          </div>
+          <div class="card-body">
+            <div class="d-grid gap-2">
+              <% if (userMembership.role === 'admin') { %>
+                <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addMembersModal">
+                  <i class="fas fa-user-plus me-1"></i>Add Members
+                </button>
+              <% } %>
+              <% if (availableChildren && availableChildren.length > 0) { %>
+                <button class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#addChildrenModal">
+                  <i class="fas fa-child me-1"></i>Add <% if (userMembership.role === 'admin') { %>Children<% } else { %>My Children<% } %>
+                </button>
+              <% } %>
+              <% if (userMembership.role === 'admin') { %>
+                <button class="btn btn-outline-secondary btn-sm">
+                  <i class="fas fa-edit me-1"></i>Edit Group
+                </button>
+                <% if (group.has_schedule) { %>
+                  <button class="btn btn-outline-warning btn-sm">
+                    <i class="fas fa-calendar-alt me-1"></i>Manage Schedule
+                  </button>
+                <% } %>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<!-- Add Children Modal -->
+<div class="modal fade" id="addChildrenModal" tabindex="-1" aria-labelledby="addChildrenModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addChildrenModalLabel">
+          <i class="fas fa-child me-2"></i>Add Children to Group
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="/groups/<%= group.id %>/add-children" method="POST">
+        <div class="modal-body">
+          <p class="text-muted">
+            <% if (userMembership.role === 'admin') { %>
+              Select children from any group member to add to this group. They will receive notifications about driver assignments and group activities.
+            <% } else { %>
+              Select your children to add to this group. They will receive notifications about driver assignments and group activities.
+            <% } %>
+          </p>
+          
+          <% if (typeof availableChildren !== 'undefined' && availableChildren.length > 0) { %>
+            <div class="row">
+              <% availableChildren.forEach(child => { %>
+                <div class="col-md-6 mb-2">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" value="<%= child.id %>" name="child_ids[]" id="child_<%= child.id %>">
+                    <label class="form-check-label" for="child_<%= child.id %>">
+                      <strong><%= child.name %></strong>
+                      <div class="small text-muted">Parent: <%= child.parent_name %></div>
+                    </label>
+                  </div>
+                </div>
+              <% }); %>
+            </div>
+          <% } else { %>
+            <div class="text-center text-muted py-3">
+              <i class="fas fa-child fa-2x mb-2"></i>
+              <p>No children available to add. All group members' children are already assigned.</p>
+            </div>
+          <% } %>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <% if (typeof availableChildren !== 'undefined' && availableChildren.length > 0) { %>
+            <button type="submit" class="btn btn-success">
+              <i class="fas fa-plus me-1"></i>Add Selected Children
+            </button>
+          <% } %>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+// Auto-scroll to bottom of messages
+document.addEventListener('DOMContentLoaded', function() {
+  const messagesContainer = document.getElementById('messagesContainer');
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+});
+</script>
+
+<%- include('partials/footer1') %>

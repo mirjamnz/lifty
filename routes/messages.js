@@ -476,6 +476,122 @@ router.post('/group/recurring/:eventId/send', async (req, res) => {
   }
 });
 
+// GROUP CHAT FOR SHORT-NOTICE REQUESTS
+// GET /messages/group/short-notice/:requestId
+router.get('/group/short-notice/:requestId', async (req, res) => {
+  const userId = req.session.userId;
+  const requestId = req.params.requestId;
+  
+  if (!userId) return res.status(401).send('Not logged in');
+
+  try {
+    // Get short-notice request details
+    const [[request]] = await db.query(`
+      SELECT snr.*, tg.name AS group_name, u.name AS requester_name
+      FROM ShortNoticeRequests snr
+      JOIN TrustedGroups tg ON snr.group_id = tg.id
+      JOIN Users u ON snr.requester_id = u.id
+      WHERE snr.id = ?
+    `, [requestId]);
+
+    if (!request) {
+      return res.status(404).send('Request not found.');
+    }
+
+    // Check if user is a member of the trusted group
+    const [[membership]] = await db.query(`
+      SELECT * FROM TrustedGroupMembers 
+      WHERE group_id = ? AND user_id = ?
+    `, [request.group_id, userId]);
+
+    if (!membership && request.requester_id !== userId) {
+      return res.status(403).send('You do not have access to this group discussion.');
+    }
+
+    // Get group messages for this request
+    const [messages] = await db.query(`
+      SELECT m.*, u.name AS sender_name
+      FROM Messages m
+      JOIN Users u ON m.sender_id = u.id
+      WHERE m.related_type = 'short-notice' AND m.related_id = ? AND m.recipient_id IS NULL
+      ORDER BY m.sent_at ASC
+    `, [requestId]);
+
+    // Get group members
+    const [members] = await db.query(`
+      SELECT tgm.*, u.name AS user_name, u.email
+      FROM TrustedGroupMembers tgm
+      JOIN Users u ON tgm.user_id = u.id
+      WHERE tgm.group_id = ?
+      ORDER BY u.name
+    `, [request.group_id]);
+
+    res.render('messages-group', {
+      session: req.session,
+      request,
+      messages,
+      members,
+      eventType: 'short-notice'
+    });
+  } catch (err) {
+    console.error('GET /messages/group/short-notice/:requestId error:', err);
+    res.status(500).send('Error loading group messages.');
+  }
+});
+
+// POST /messages/group/short-notice/:requestId/send - Send message to short-notice group chat
+router.post('/group/short-notice/:requestId/send', async (req, res) => {
+  const senderId = req.session.userId;
+  const requestId = req.params.requestId;
+  const { message } = req.body;
+  
+  if (!senderId || !requestId || !message) {
+    return res.status(400).send('Missing required fields.');
+  }
+
+  try {
+    // Get short-notice request details
+    const [[request]] = await db.query(`
+      SELECT snr.*, tg.name AS group_name
+      FROM ShortNoticeRequests snr
+      JOIN TrustedGroups tg ON snr.group_id = tg.id
+      WHERE snr.id = ?
+    `, [requestId]);
+
+    if (!request) {
+      return res.status(404).send('Request not found.');
+    }
+
+    // Check if user is a member of the trusted group
+    const [[membership]] = await db.query(`
+      SELECT * FROM TrustedGroupMembers 
+      WHERE group_id = ? AND user_id = ?
+    `, [request.group_id, senderId]);
+
+    if (!membership && request.requester_id !== senderId) {
+      return res.status(403).send('You do not have access to this group discussion.');
+    }
+
+    // Send message to group (store as related_type='short-notice', related_id=requestId)
+    await db.query(
+      'INSERT INTO Messages (sender_id, recipient_id, content, related_type, related_id) VALUES (?, NULL, ?, ?, ?)',
+      [senderId, message, 'short-notice', requestId]
+    );
+
+    // Get sender name for notifications
+    const [[sender]] = await db.query('SELECT name FROM Users WHERE id = ?', [senderId]);
+    
+    // Notify group members about the new message
+    const notifications = require('../utils/notifications');
+    await notifications.notifyGroupAboutMessage(request.group_id, requestId, sender.name, message);
+
+    res.redirect(`/messages/group/short-notice/${requestId}`);
+  } catch (err) {
+    console.error('POST /messages/group/short-notice/:requestId/send error:', err);
+    res.status(500).send('Error sending message.');
+  }
+});
+
 // GET /messages/all - Get all messages (direct + group) for the logged-in user
 router.get('/all', async (req, res) => {
   const userId = req.session.userId;

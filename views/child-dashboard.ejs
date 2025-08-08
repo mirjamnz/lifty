@@ -28,7 +28,7 @@
 
   <% 
     // Merge and sort all rides by date/time
-    const allRides = [...requests, ...offers, ...recurringAssignments].sort((a, b) => {
+    const allRides = [...requests, ...offers, ...recurringAssignments, ...activityGroupAssignments].sort((a, b) => {
       const aTime = a.pickup_time || a.event_date;
       const bTime = b.pickup_time || b.event_date;
       return new Date(aTime) - new Date(bTime);
@@ -44,11 +44,11 @@
       <% allRides.forEach(function(ride) { %>
         <div class="col-12 col-md-6 col-lg-4">
           <div class="card h-100 shadow-sm" style="border-radius: 1rem;">
-            <div class="card-header text-center" style="background-color: <%= ride.type === 'request' ? '#fff3cd' : ride.type === 'offer' ? '#4dabf7' : '#e3f2fd' %>;">
-              <span class="badge <%= ride.type === 'request' ? 'bg-warning text-dark' : ride.type === 'offer' ? 'bg-primary' : 'bg-info text-dark' %> me-2">
-                <%= ride.type === 'request' ? 'Request' : ride.type === 'offer' ? 'Offer' : 'Recurring' %>
+            <div class="card-header text-center" style="background-color: <%= ride.type === 'request' ? '#fff3cd' : ride.type === 'offer' ? '#4dabf7' : ride.type === 'activity_group' ? '#d1ecf1' : '#e3f2fd' %>;">
+              <span class="badge <%= ride.type === 'request' ? 'bg-warning text-dark' : ride.type === 'offer' ? 'bg-primary' : ride.type === 'activity_group' ? 'bg-info text-dark' : 'bg-info text-dark' %> me-2">
+                <%= ride.type === 'request' ? 'Request' : ride.type === 'offer' ? 'Offer' : ride.type === 'activity_group' ? 'Activity Group' : 'Recurring' %>
               </span>
-              <% if (ride.type === 'recurring') { %>
+              <% if (ride.type === 'recurring' || ride.type === 'activity_group') { %>
                 <span class="badge bg-light text-dark me-2" style="font-weight: 500; font-size: 1rem;">
                   <%= new Date(ride.event_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) %>
                 </span>
@@ -91,6 +91,33 @@
                 <% if (ride.notes) { %>
                   <div class="alert alert-secondary py-1 px-2 small mb-0 mt-2"><%= ride.notes %></div>
                 <% } %>
+              <% } else if (ride.type === 'activity_group') { %>
+                <h5 class="card-title fw-bold text-info mb-3"><%= ride.group_name %></h5>
+                <ul class="list-group list-group-flush mb-2">
+                  <li class="list-group-item bg-transparent py-1">
+                    <i class="fas fa-clock me-2 text-info"></i>
+                    <strong>Time:</strong> <%= ride.start_time %> - <%= ride.end_time %>
+                  </li>
+                  <li class="list-group-item bg-transparent py-1">
+                    <i class="fas fa-user me-2 text-success"></i>
+                    <strong>Driver:</strong> <%= ride.driver_name %>
+                  </li>
+                  <li class="list-group-item bg-transparent py-1">
+                    <i class="fas fa-map-marker-alt me-2 text-warning"></i>
+                    <strong>Location:</strong> <%= ride.location %>
+                  </li>
+                  <li class="list-group-item bg-transparent py-1">
+                    <i class="fas fa-calendar-week me-2 text-primary"></i>
+                    <strong>Schedule:</strong> <%= ride.day_of_week %>s
+                  </li>
+                  <li class="list-group-item bg-transparent py-1">
+                    <i class="fas fa-route me-2 text-info"></i>
+                    <strong>Type:</strong> <%= ride.assignment_type.charAt(0).toUpperCase() + ride.assignment_type.slice(1) %>
+                  </li>
+                </ul>
+                <% if (ride.notes) { %>
+                  <div class="alert alert-secondary py-1 px-2 small mb-0 mt-2"><%= ride.notes %></div>
+                <% } %>
               <% } else { %>
                 <ul class="list-group list-group-flush mb-2">
                   <li class="list-group-item bg-transparent py-1">
@@ -126,6 +153,11 @@
               <% } %>
               <% if (ride.type === 'recurring') { %>
                 <a href="/messages/group/recurring/<%= ride.event_id %>" class="btn btn-sm btn-outline-primary ms-2">
+                  <i class="fas fa-comments me-1"></i>Group Chat
+                </a>
+              <% } %>
+              <% if (ride.type === 'activity_group') { %>
+                <a href="/groups/<%= ride.group_id %>" class="btn btn-sm btn-outline-primary ms-2">
                   <i class="fas fa-comments me-1"></i>Group Chat
                 </a>
               <% } %>

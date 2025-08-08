@@ -509,6 +509,165 @@ function initLiftyMaps() {
         </div>
       <% } %>
 
+      <!-- Trusted Groups Section -->
+      <div class="card mb-4">
+        <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">
+            <i class="fas fa-users me-2"></i>
+            Trusted Groups (<%= typeof trustedGroups !== 'undefined' ? trustedGroups.length : 0 %>)
+          </h5>
+          <a href="/trusted-groups" class="btn btn-primary btn-sm">
+            <i class="fas fa-eye me-1"></i> View All
+          </a>
+        </div>
+        <div class="card-body">
+          <% if (typeof trustedGroups !== 'undefined' && trustedGroups.length > 0) { %>
+            <div class="row">
+              <% trustedGroups.forEach(group => { %>
+                <div class="col-md-6 mb-3">
+                  <div class="card h-100 border-warning">
+                    <div class="card-body">
+                      <h6 class="card-title">
+                        <i class="fas fa-users me-1"></i><%= group.name %>
+                      </h6>
+                      <% if (group.description) { %>
+                        <p class="card-text text-muted small"><%= group.description %></p>
+                      <% } %>
+                      <div class="d-flex justify-content-between align-items-center">
+                        <span class="badge bg-info">
+                          <i class="fas fa-user me-1"></i><%= group.member_count %> members
+                        </span>
+                        <div class="btn-group btn-group-sm">
+                          <a href="/trusted-groups" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-eye"></i>
+                          </a>
+                          <a href="/short-notice?group=<%= group.id %>" class="btn btn-outline-success btn-sm">
+                            <i class="fas fa-clock"></i>
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              <% }); %>
+            </div>
+            <div class="text-center mt-3">
+              <a href="/trusted-groups" class="btn btn-outline-warning">
+                <i class="fas fa-users me-1"></i>Manage All Groups
+              </a>
+              <button class="btn btn-primary ms-2" onclick="window.location.href='/trusted-groups'">
+                <i class="fas fa-plus me-1"></i>Create New Group
+              </button>
+            </div>
+          <% } else { %>
+            <div class="text-center py-4">
+              <i class="fas fa-users fa-3x text-muted mb-3"></i>
+              <p class="text-muted mb-3">No trusted groups yet. Create your first group to start coordinating rides with other parents!</p>
+              <a href="/trusted-groups" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i>Create First Group
+              </a>
+            </div>
+          <% } %>
+        </div>
+      </div>
+
+      <!-- Short Notice Requests Section -->
+      <div class="card mb-4">
+        <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">
+            <i class="fas fa-clock me-2"></i>
+            Recent Short Notice Requests (<%= typeof recentShortNoticeRequests !== 'undefined' ? recentShortNoticeRequests.length : 0 %>)
+          </h5>
+          <a href="/short-notice" class="btn btn-light btn-sm">
+            <i class="fas fa-eye me-1"></i> View All
+          </a>
+        </div>
+        <div class="card-body">
+          <% if (typeof recentShortNoticeRequests !== 'undefined' && recentShortNoticeRequests.length > 0) { %>
+            <div class="list-group list-group-flush">
+              <% recentShortNoticeRequests.forEach(request => { %>
+                <div class="list-group-item list-group-item-action">
+                  <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">
+                      <i class="fas fa-car me-1"></i><%= request.requester_name %> - <%= request.group_name %>
+                    </h6>
+                    <small class="text-muted">
+                      <%= new Date(request.created_at).toLocaleDateString() %>
+                    </small>
+                  </div>
+                  <% if (request.message) { %>
+                    <p class="mb-1 text-muted"><%= request.message %></p>
+                  <% } %>
+                  <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">
+                      <i class="fas fa-comments me-1"></i><%= request.response_count %> responses
+                    </small>
+                    <a href="/short-notice/<%= request.id %>" class="btn btn-sm btn-outline-primary">
+                      View Details
+                    </a>
+                  </div>
+                </div>
+              <% }); %>
+            </div>
+            <div class="text-center mt-3">
+              <a href="/short-notice" class="btn btn-outline-danger">
+                <i class="fas fa-clock me-1"></i>View All Requests
+              </a>
+              <a href="/short-notice" class="btn btn-danger ms-2">
+                <i class="fas fa-plus me-1"></i>Send New Request
+              </a>
+            </div>
+          <% } else { %>
+            <div class="text-center py-4">
+              <i class="fas fa-clock fa-3x text-muted mb-3"></i>
+              <p class="text-muted mb-3">No recent short notice requests. When group members need rides, they'll appear here!</p>
+              <a href="/short-notice" class="btn btn-danger">
+                <i class="fas fa-plus me-1"></i>Send Request
+              </a>
+            </div>
+          <% } %>
+        </div>
+      </div>
+
+      <!-- My Short Notice Requests Section -->
+      <% if (typeof myShortNoticeRequests !== 'undefined' && myShortNoticeRequests.length > 0) { %>
+        <div class="card mb-4">
+          <div class="card-header bg-info text-white">
+            <h5 class="mb-0">
+              <i class="fas fa-paper-plane me-2"></i>
+              My Pending Requests (<%= myShortNoticeRequests.length %>)
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="list-group list-group-flush">
+              <% myShortNoticeRequests.forEach(request => { %>
+                <div class="list-group-item">
+                  <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">
+                      <i class="fas fa-users me-1"></i><%= request.group_name %>
+                    </h6>
+                    <small class="text-muted">
+                      <%= new Date(request.created_at).toLocaleDateString() %>
+                    </small>
+                  </div>
+                  <% if (request.message) { %>
+                    <p class="mb-1 text-muted"><%= request.message %></p>
+                  <% } %>
+                  <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">
+                      <i class="fas fa-comments me-1"></i><%= request.response_count %> responses
+                    </small>
+                    <a href="/short-notice/<%= request.id %>" class="btn btn-sm btn-outline-primary">
+                      View Responses
+                    </a>
+                  </div>
+                </div>
+              <% }); %>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
       <!-- Your Children Section -->
       <div class="card mb-4">
         <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
@@ -791,6 +950,7 @@ document.addEventListener('DOMContentLoaded', function() {
         info.el.addEventListener('click', function(e) {
           e.preventDefault();
           const isGroupRecurring = event.extendedProps.type === 'group_recurring';
+          const isActivityGroup = event.extendedProps.type === 'activity_group';
           const isRideRequest = event.extendedProps.type === 'request' || event.extendedProps.type === 'child_request' || event.extendedProps.type === 'my_request';
           const instanceId = event.extendedProps.instance_id || event.extendedProps.instanceId || event.id;
           console.log('🔧 DASHBOARD DEBUG: Event ID:', event.id);
@@ -802,6 +962,20 @@ document.addEventListener('DOMContentLoaded', function() {
           let pickupBtnLabel = '';
           let bothBtnLabel = '';
           if (isGroupRecurring) {
+            dropoffBtnLabel = (event.extendedProps.dropoff_driver && event.extendedProps.dropoff_driver !== 'Unassigned')
+              ? `Take Over Drop Off at ${event.title}`
+              : `I can Drop Off at ${event.title}`;
+            pickupBtnLabel = (event.extendedProps.pickup_driver && event.extendedProps.pickup_driver !== 'Unassigned')
+              ? `Take Over Pick Up from ${event.title}`
+              : `I can Pick Up from ${event.title}`;
+            bothBtnLabel = ((event.extendedProps.dropoff_driver && event.extendedProps.dropoff_driver !== 'Unassigned') ||
+                            (event.extendedProps.pickup_driver && event.extendedProps.pickup_driver !== 'Unassigned'))
+              ? `Take Over Both`
+              : `I can Do Both`;
+          }
+
+          // Get assignment button labels for activity groups
+          if (isActivityGroup) {
             dropoffBtnLabel = (event.extendedProps.dropoff_driver && event.extendedProps.dropoff_driver !== 'Unassigned')
               ? `Take Over Drop Off at ${event.title}`
               : `I can Drop Off at ${event.title}`;
@@ -878,6 +1052,30 @@ document.addEventListener('DOMContentLoaded', function() {
                           </div>
                         ` : ''}
                         ${isGroupRecurring ? `
+                          <div class="alert alert-secondary mb-3">
+                            <strong>Dropoff:</strong> <span class="${event.extendedProps.dropoff_driver === 'Unassigned' ? 'text-danger' : 'text-success'}">
+                              ${event.extendedProps.dropoff_driver || 'Unassigned'}
+                            </span><br>
+                            <strong>Pickup:</strong> <span class="${event.extendedProps.pickup_driver === 'Unassigned' ? 'text-danger' : 'text-success'}">
+                              ${event.extendedProps.pickup_driver || 'Unassigned'}
+                            </span>
+                          </div>
+                          <div class="mt-3">
+                            <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
+                              <input type="hidden" name="assignmentType" value="dropoff">
+                              <button type="submit" class="btn btn-primary btn-sm me-2">${dropoffBtnLabel}</button>
+                            </form>
+                            <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
+                              <input type="hidden" name="assignmentType" value="pickup">
+                              <button type="submit" class="btn btn-success btn-sm me-2">${pickupBtnLabel}</button>
+                            </form>
+                            <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
+                              <input type="hidden" name="assignmentType" value="both">
+                              <button type="submit" class="btn btn-info btn-sm">${bothBtnLabel}</button>
+                            </form>
+                          </div>
+                        ` : ''}
+                        ${isActivityGroup ? `
                           <div class="alert alert-secondary mb-3">
                             <strong>Dropoff:</strong> <span class="${event.extendedProps.dropoff_driver === 'Unassigned' ? 'text-danger' : 'text-success'}">
                               ${event.extendedProps.dropoff_driver || 'Unassigned'}
