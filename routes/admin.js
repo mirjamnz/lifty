@@ -239,18 +239,8 @@ router.get('/dashboard', async (req, res) => {
       ORDER BY u.name, c.name
     `);
 
-    // Get all trusted groups with creator and member information
-    const [trustedGroups] = await db.query(`
-      SELECT 
-        tg.*,
-        u.name as creator_name,
-        COUNT(tgm.user_id) as member_count
-      FROM TrustedGroups tg
-      LEFT JOIN Users u ON tg.creator_id = u.id
-      LEFT JOIN TrustedGroupMembers tgm ON tg.id = tgm.group_id
-      GROUP BY tg.id
-      ORDER BY tg.created_at DESC
-    `);
+    // TrustedGroups feature has been retired – provide empty array to keep template intact
+    const trustedGroups = [];
 
     // Get all users for editing groups
     const [allUsers] = await db.query(`

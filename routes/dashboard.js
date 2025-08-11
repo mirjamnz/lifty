@@ -422,52 +422,11 @@ router.get('/dashboard', async (req, res) => {
     // Load all organizations for the wizard
     const [organizations] = await db.query('SELECT * FROM Organizations ORDER BY name ASC');
 
-    // Get user's trusted groups for dashboard integration
-    const [trustedGroups] = await db.query(`
-      SELECT 
-        tg.*,
-        COUNT(tgm2.user_id) as member_count
-      FROM TrustedGroups tg
-      LEFT JOIN TrustedGroupMembers tgm ON tg.id = tgm.group_id
-      LEFT JOIN TrustedGroupMembers tgm2 ON tg.id = tgm2.group_id
-      WHERE tgm.user_id = ? OR tg.creator_id = ?
-      GROUP BY tg.id
-      ORDER BY tg.created_at DESC
-      LIMIT 3
-    `, [userId, userId]);
-
-    // Get recent short notice requests for dashboard
-    const [recentShortNoticeRequests] = await db.query(`
-      SELECT 
-        snr.*,
-        tg.name as group_name,
-        u.name as requester_name,
-        COUNT(snresp.id) as response_count
-      FROM ShortNoticeRequests snr
-      JOIN TrustedGroups tg ON snr.group_id = tg.id
-      JOIN TrustedGroupMembers tgm ON tg.id = tgm.group_id
-      JOIN Users u ON snr.requester_id = u.id
-      LEFT JOIN ShortNoticeResponses snresp ON snr.id = snresp.request_id
-      WHERE tgm.user_id = ? AND snr.status = 'pending'
-      GROUP BY snr.id
-      ORDER BY snr.created_at DESC
-      LIMIT 5
-    `, [userId]);
-
-    // Get my short notice requests for dashboard
-    const [myShortNoticeRequests] = await db.query(`
-      SELECT 
-        snr.*,
-        tg.name as group_name,
-        COUNT(snresp.id) as response_count
-      FROM ShortNoticeRequests snr
-      JOIN TrustedGroups tg ON snr.group_id = tg.id
-      LEFT JOIN ShortNoticeResponses snresp ON snr.id = snresp.request_id
-      WHERE snr.requester_id = ? AND snr.status = 'pending'
-      GROUP BY snr.id
-      ORDER BY snr.created_at DESC
-      LIMIT 3
-    `, [userId]);
+    // Remove obsolete trusted group and short-notice queries – these tables have been removed
+    // These features were replaced by ActivityGroups – set empty arrays to keep template logic intact
+    const trustedGroups = [];
+    const recentShortNoticeRequests = [];
+    const myShortNoticeRequests = [];
 
     // Determine if profile is incomplete
     // const missingAddress = !user.home_address;
