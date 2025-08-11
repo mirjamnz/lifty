@@ -48,15 +48,8 @@ router.get('/dashboard', async (req, res) => {
       WHERE id != ? AND home_lat IS NOT NULL AND home_lng IS NOT NULL AND home_address IS NOT NULL AND is_address_private = TRUE
     `, [userId]);
 
-    // Get group invitations for this user
-    const [groupInvitations] = await db.query(`
-      SELECT egi.*, re.name AS event_name, re.day_of_week, re.start_time, re.end_time, re.location, u.name AS inviter_name
-      FROM EventGroupInvitations egi
-      JOIN RecurringEvents re ON egi.event_id = re.id
-      JOIN Users u ON egi.inviter_id = u.id
-      WHERE egi.invitee_email = (SELECT email FROM Users WHERE id = ?) AND egi.status = 'pending'
-      ORDER BY egi.invited_at DESC
-    `, [userId]);
+    // Legacy EventGroupInvitations system removed – provide empty array to avoid errors
+    const groupInvitations = [];
 
     // Get calendar events for the user and their children
     const childIds = children.map(c => c.id);
@@ -1178,6 +1171,52 @@ router.get('/calendar', async (req, res) => {
       }
     }
 
+    // === NEW: ActivityGroup scheduled events (same logic as dashboard) ===
+    let activityGroupEvents = [];
+    const [activityGroups] = await db.query(`
+      SELECT DISTINCT ag.id, ag.name, ag.day_of_week, ag.start_time, ag.end_time, ag.location, ag.activity_type
+      FROM ActivityGroups ag
+      JOIN ActivityGroupMembers agm ON ag.id = agm.group_id
+      WHERE agm.user_id = ? AND agm.is_active = TRUE AND ag.is_active = TRUE AND ag.has_schedule = TRUE
+      ORDER BY ag.day_of_week, ag.start_time
+    `, [userId]);
+
+    for (const group of activityGroups) {
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const groupDayIdx = dayNames.indexOf(group.day_of_week);
+
+      for (let week=0; week<4; week++) {
+        const date = new Date(today);
+        date.setDate(today.getDate() + week*7);
+        while (date.getDay() !== groupDayIdx) { date.setDate(date.getDate()+1); }
+        if (date>=today) {
+          const dateStr = date.toISOString().split('T')[0];
+
+          // driver assignments (parent-only and child) – optional, safe fallback
+          let dropoff_driver='Unassigned', pickup_driver='Unassigned';
+          try {
+            const [dRows] = await db.query(`SELECT DISTINCT u.name AS driver FROM ActivityGroupAssignments aga JOIN Users u ON aga.user_id=u.id WHERE aga.group_id=? AND aga.assignment_date=? AND aga.assignment_type='dropoff' AND aga.status='confirmed'`,[group.id,dateStr]);
+            const [pRows] = await db.query(`SELECT DISTINCT u.name AS driver FROM ActivityGroupAssignments aga JOIN Users u ON aga.user_id=u.id WHERE aga.group_id=? AND aga.assignment_date=? AND aga.assignment_type='pickup' AND aga.status='confirmed'`,[group.id,dateStr]);
+            if(dRows.length) dropoff_driver=dRows.map(r=>r.driver).join(', ');
+            if(pRows.length) pickup_driver=pRows.map(r=>r.driver).join(', ');
+          } catch(err){ /* ignore assignment errors for stub tables */ }
+
+          activityGroupEvents.push({
+            id:`activity_group_${group.id}_${dateStr}`,
+            group_date:dateStr,
+            group_name:group.name,
+            start_time:group.start_time,
+            end_time:group.end_time,
+            location:group.location,
+            activity_type:group.activity_type,
+            type:'activity_group',
+            dropoff_driver,
+            pickup_driver
+          });
+        }
+      }
+    }
+
     // Format events for FullCalendar
     calendarEvents = [
       ...rideOffers.map(offer => ({
@@ -1253,6 +1292,24 @@ router.get('/calendar', async (req, res) => {
         backgroundColor: '#6c757d',
         borderColor: '#5a6268',
         type: event.type
+      }))
+    ];
+
+    // Append activityGroupEvents
+    calendarEvents = [
+      ...calendarEvents,
+      ...activityGroupEvents.map(ev=>({
+        id:ev.id,
+        title:ev.group_name,
+        start:`${ev.group_date}T${ev.start_time}`,
+        end:ev.end_time?`${ev.group_date}T${ev.end_time}`:undefined,
+        description:ev.location,
+        backgroundColor:'#17a2b8',
+        borderColor:'#138496',
+        type:ev.type,
+        activity_type:ev.activity_type,
+        dropoff_driver:ev.dropoff_driver,
+        pickup_driver:ev.pickup_driver
       }))
     ];
 
