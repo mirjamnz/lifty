@@ -318,6 +318,27 @@ function initLiftyMaps() {
         </div>
       <% } %>
 
+      <!-- Calendar Overview -->
+      <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0"><i class="fas fa-calendar-alt me-2"></i>Calendar Overview</h5>
+        </div>
+        <div class="card-body">
+          <div id="calendar" class="sidebar-calendar"></div>
+          <div class="calendar-legend mt-3">
+            <div class="legend-item"><div class="legend-color legend-drive"></div><span>You're Driving</span></div>
+            <div class="legend-item"><div class="legend-color legend-ride"></div><span>Child's Ride</span></div>
+            <div class="legend-item"><div class="legend-color" style="background-color: #007bff;"></div><span>My Ride Request</span></div>
+            <div class="legend-item"><div class="legend-color legend-group-recurring"></div><span>Group Event</span></div>
+            <div class="legend-item"><div class="legend-color legend-subscribed-recurring"></div><span>Subscribed Event</span></div>
+          </div>
+          <div class="text-center mt-3">
+            <a href="/calendar" class="btn btn-outline-primary btn-sm"><i class="fas fa-calendar-alt me-1"></i>View Detailed Calendar</a>
+            <a href="/rides" class="btn btn-outline-success btn-sm ms-2"><i class="fas fa-car me-1"></i>Manage Rides</a>
+          </div>
+        </div>
+      </div>
+
       <!-- Home Address Section -->
       <div class="card mb-4">
         <div class="card-header bg-info text-white">
@@ -403,52 +424,21 @@ function initLiftyMaps() {
       </div>
 
       <!-- Community Map Section -->
-      <% if (neighbors && neighbors.length > 0) { %>
-        <div class="card mb-4">
-          <div class="card-header bg-warning text-dark">
-            <h5 class="mb-0">
-              <i class="fas fa-map me-2"></i>
-              Community Map (<%= neighbors.length %> neighbors
-              <% if (typeof privateCount !== 'undefined' && privateCount.count > 0) { %>
-                , <%= privateCount.count %> private
-              <% } %>)
-            </h5>
-          </div>
-          <div class="card-body">
-            <div id="map" style="height: 300px; width: 100%; border-radius: 8px; border: 1px solid #ddd; background-color: #f8f9fa;"></div>
-            <div class="mt-3">
-              <small class="text-muted">
-                <i class="fas fa-info-circle me-1"></i>
-                Showing other registered users in your area with public addresses
-                <% if (typeof privateCount !== 'undefined' && privateCount.count > 0) { %>
-                  <br><i class="fas fa-eye-slash me-1"></i>
-                  <%= privateCount.count %> user<%= privateCount.count > 1 ? 's have' : ' has' %> chosen to keep their address private
-                <% } %>
-              </small>
-              <div id="map-debug" class="mt-2 small text-muted"></div>
-            </div>
-          </div>
+      <div class="card mb-4">
+        <div class="card-header bg-warning text-dark">
+          <h5 class="mb-0">
+            <i class="fas fa-map me-2"></i>
+            Community Map (<%= neighbors.length %> neighbors<% if (typeof privateCount !== 'undefined' && privateCount.count > 0) { %>, <%= privateCount.count %> private<% } %>)
+          </h5>
         </div>
-      <% } else { %>
-        <div class="card mb-4">
-          <div class="card-header bg-light text-muted">
-            <h5 class="mb-0">
-              <i class="fas fa-map me-2"></i>
-              Community Map
-            </h5>
-          </div>
-          <div class="card-body text-center">
-            <p class="text-muted mb-0">
-              <i class="fas fa-info-circle me-1"></i>
-              <% if (typeof privateCount !== 'undefined' && privateCount.count > 0) { %>
-                <%= privateCount.count %> user<%= privateCount.count > 1 ? 's have' : ' has' %> addresses in your area but have chosen to keep them private
-              <% } else { %>
-                No other users with public addresses found yet
-              <% } %>
-            </p>
-          </div>
+        <div class="card-body">
+          <div id="map" style="height: 300px; width: 100%; border-radius: 8px; border: 1px solid #ddd; background-color: #f8f9fa;"></div>
+          <div id="map-legacy" class="d-none" style="height: 300px; width: 100%; border-radius: 8px; border: 1px solid #ddd; background-color: #f8f9fa;"></div>
+
+          <div id="map-debug" class="mt-2 small text-muted"></div>
+          <div id="map-debug-old" class="mt-2 small text-muted"></div>
         </div>
-      <% } %>
+      </div>
 
       <!-- Your Children Section -->
       <div class="card mb-4">
@@ -549,1281 +539,910 @@ function initLiftyMaps() {
         </div>
       </div>
 
-      <!-- Calendar Overview Section -->
-      <div class="card">
-        <div class="card-header bg-primary text-white">
-          <h5 class="mb-0"><i class="fas fa-calendar-alt me-2"></i>Calendar Overview</h5>
+      <!-- Ride Requests from My Schools & Clubs -->
+      <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+          <h5 class="mb-0"><i class="fas fa-hands-helping me-2"></i>Ride Requests from My Schools &amp; Clubs</h5>
         </div>
         <div class="card-body">
-          <div id="calendar" class="sidebar-calendar"></div>
-          <div class="calendar-legend mt-3">
-            <div class="legend-item"><div class="legend-color legend-drive"></div><span>You're Driving</span></div>
-            <div class="legend-item"><div class="legend-color legend-ride"></div><span>Child's Ride</span></div>
-            <div class="legend-item"><div class="legend-color" style="background-color: #007bff;"></div><span>My Ride Request</span></div>
-            <div class="legend-item"><div class="legend-color legend-recurring"></div><span>Recurring Event</span></div>
-            <div class="legend-item"><div class="legend-color legend-group-recurring"></div><span>Group Event</span></div>
-            <div class="legend-item"><div class="legend-color legend-subscribed-recurring"></div><span>Subscribed Event</span></div>
-          </div>
-          <div class="text-center mt-3">
-            <a href="/calendar" class="btn btn-outline-primary btn-sm"><i class="fas fa-calendar-alt me-1"></i>View Detailed Calendar</a>
-            <a href="/rides" class="btn btn-outline-success btn-sm ms-2"><i class="fas fa-car me-1"></i>Manage Rides</a>
-          </div>
+          <% if (affiliatedRideRequests && affiliatedRideRequests.length > 0) { %>
+            <ul class="list-group list-group-flush">
+              <% affiliatedRideRequests.forEach(req => { %>
+                <li class="list-group-item d-flex justify-content-between align-items-start">
+                  <div class="ms-0 flex-grow-1">
+                    <div><strong><%= req.child_name %></strong> (by <%= req.parent_name %>)</div>
+                    <small class="text-muted"><%= new Date(req.pickup_time).toLocaleString() %></small><br>
+                    <small class="text-muted"><i class="fas fa-location-arrow me-1"></i><%= req.pickup_location %> → <%= req.dropoff_location %></small>
+                  </div>
+                  <a href="/rides" class="btn btn-sm btn-outline-success align-self-center">Help</a>
+                </li>
+              <% }); %>
+            </ul>
+          <% } else { %>
+            <div class="text-center text-muted">
+              <i class="fas fa-smile-beam fa-2x mb-2"></i>
+              <p>No ride requests from your affiliations right now.</p>
+            </div>
+          <% } %>
         </div>
       </div>
-    </div>
-  </div>
 
-  <!-- Profile Completion Wizard Modal (always present) -->
-  <div class="modal" id="profileWizardModal" tabindex="-1" aria-labelledby="profileWizardLabel" aria-modal="true" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="profileWizardLabel">Complete Your Profile</h5>
+      <!-- My Pending Ride Requests -->
+      <div class="card mb-4">
+        <div class="card-header bg-warning text-dark">
+          <h5 class="mb-0"><i class="fas fa-car-side me-2"></i>My Pending Ride Requests</h5>
         </div>
-        <div class="modal-body">
-          <!-- Step 1: Home Address -->
-          <div class="wizard-step" id="wizard-step-1">
-            <h5>Step 1 of 2: Add Home Address</h5>
-            <form id="wizard-address-form">
-              <div class="mb-3">
-                <label for="wizard_home_address" class="form-label">Home Address</label>
-                <input type="text" class="form-control" id="wizard_home_address" name="home_address" placeholder="Enter your home address" required />
-                <input type="hidden" name="wizard_home_lat" id="wizard_home_lat" />
-                <input type="hidden" name="wizard_home_lng" id="wizard_home_lng" />
+        <div class="card-body">
+          <% if (myRideRequests && myRideRequests.length > 0) { %>
+            <ul class="list-group list-group-flush">
+              <% myRideRequests.forEach(req => { %>
+                <li class="list-group-item d-flex justify-content-between align-items-start">
+                  <div class="ms-0 flex-grow-1">
+                    <div class="fw-bold"><%= req.child_name %></div>
+                    <small class="text-muted"><%= new Date(req.pickup_time).toLocaleString() %></small><br>
+                    <small class="text-muted"><i class="fas fa-location-arrow me-1"></i><%= req.pickup_location %> → <%= req.dropoff_location %></small>
+                  </div>
+                  <a href="/rides" class="btn btn-sm btn-outline-primary align-self-center">Edit</a>
+                </li>
+              <% }); %>
+            </ul>
+          <% } else { %>
+            <div class="text-center text-muted">
+              <i class="fas fa-check-circle fa-2x mb-2"></i>
+              <p>No pending ride requests.</p>
+            </div>
+          <% } %>
+        </div>
+      </div>
+
+      <!-- Profile Completion Wizard Modal (always present) -->
+      <div class="modal" id="profileWizardModal" tabindex="-1" aria-labelledby="profileWizardLabel" aria-modal="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="profileWizardLabel">Complete Your Profile</h5>
+            </div>
+            <div class="modal-body">
+              <!-- Step 1: Home Address -->
+              <div class="wizard-step" id="wizard-step-1">
+                <h5>Step 1 of 2: Add Home Address</h5>
+                <form id="wizard-address-form">
+                  <div class="mb-3">
+                    <label for="wizard_home_address" class="form-label">Home Address</label>
+                    <input type="text" class="form-control" id="wizard_home_address" name="home_address" placeholder="Enter your home address" required />
+                    <input type="hidden" name="wizard_home_lat" id="wizard_home_lat" />
+                    <input type="hidden" name="wizard_home_lng" id="wizard_home_lng" />
+                  </div>
+                  <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" id="wizard_is_address_private" name="is_address_private" />
+                    <label class="form-check-label" for="wizard_is_address_private">Hide my address from other users</label>
+                  </div>
+                </form>
               </div>
-              <div class="form-check form-switch mb-3">
-                <input class="form-check-input" type="checkbox" id="wizard_is_address_private" name="is_address_private" />
-                <label class="form-check-label" for="wizard_is_address_private">Hide my address from other users</label>
+              <!-- Step 2: Add Children -->
+              <div class="wizard-step d-none" id="wizard-step-2">
+                <h5>Step 2 of 2: Add Children</h5>
+                <form id="wizard-children-form">
+                  <div id="children-list"></div>
+                  <button type="button" class="btn btn-outline-primary btn-sm mb-3" id="add-child-btn">+ Add Child</button>
+                </form>
+                <!-- Hidden template for child entry -->
+                <div id="child-entry-template" class="d-none">
+                  <div class="child-entry mb-3 p-2 border rounded">
+                    <div class="mb-2">
+                      <label>Child Name</label>
+                      <input type="text" class="form-control child-name-input" name="child_name" required />
+                    </div>
+                    <div class="mb-2">
+                      <label>School/Organization</label>
+                      <select class="form-select child-org-select" name="child_org">
+                        <option value="">Select organization</option>
+                        <% organizations.forEach(function(org) { %>
+                          <option value="<%= org.id %>"><%= org.name %> (<%= org.type %>)</option>
+                        <% }); %>
+                      </select>
+                    </div>
+                    <div class="mb-2">
+                      <label>Club (optional)</label>
+                      <input type="text" class="form-control child-club-input" name="child_club" />
+                    </div>
+                    <div class="mb-2">
+                      <label>Child Username (for login)</label>
+                      <input type="text" class="form-control child-username-input" name="child_username" required />
+                    </div>
+                    <div class="mb-2">
+                      <label>Child Password (for login)</label>
+                      <input type="password" class="form-control child-password-input" name="child_password" required />
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-child-btn">Remove</button>
+                  </div>
+                </div>
               </div>
-            </form>
-          </div>
-          <!-- Step 2: Add Children -->
-          <div class="wizard-step d-none" id="wizard-step-2">
-            <h5>Step 2 of 2: Add Children</h5>
-            <form id="wizard-children-form">
-              <div id="children-list"></div>
-              <button type="button" class="btn btn-outline-primary btn-sm mb-3" id="add-child-btn">+ Add Child</button>
-            </form>
-            <!-- Hidden template for child entry -->
-            <div id="child-entry-template" class="d-none">
-              <div class="child-entry mb-3 p-2 border rounded">
-                <div class="mb-2">
-                  <label>Child Name</label>
-                  <input type="text" class="form-control child-name-input" name="child_name" required />
-                </div>
-                <div class="mb-2">
-                  <label>School/Organization</label>
-                  <select class="form-select child-org-select" name="child_org">
-                    <option value="">Select organization</option>
-                    <% organizations.forEach(function(org) { %>
-                      <option value="<%= org.id %>"><%= org.name %> (<%= org.type %>)</option>
-                    <% }); %>
-                  </select>
-                </div>
-                <div class="mb-2">
-                  <label>Club (optional)</label>
-                  <input type="text" class="form-control child-club-input" name="child_club" />
-                </div>
-                <div class="mb-2">
-                  <label>Child Username (for login)</label>
-                  <input type="text" class="form-control child-username-input" name="child_username" required />
-                </div>
-                <div class="mb-2">
-                  <label>Child Password (for login)</label>
-                  <input type="password" class="form-control child-password-input" name="child_password" required />
-                </div>
-                <button type="button" class="btn btn-sm btn-outline-danger remove-child-btn">Remove</button>
+
+            </div>
+            <div class="modal-footer d-flex justify-content-between">
+              <button type="button" class="btn btn-secondary" id="wizard-back-btn" style="display:none;">Back</button>
+              <div>
+                <button type="button" class="btn btn-danger me-2" id="wizard-quit-btn">Quit</button>
+                <button type="button" class="btn btn-link" id="wizard-skip-btn">Skip</button>
+                <button type="button" class="btn btn-primary" id="wizard-next-btn">Next</button>
+                <button type="button" class="btn btn-success d-none" id="wizard-finish-btn">Finish</button>
               </div>
             </div>
           </div>
-
-        </div>
-        <div class="modal-footer d-flex justify-content-between">
-          <button type="button" class="btn btn-secondary" id="wizard-back-btn" style="display:none;">Back</button>
-          <div>
-            <button type="button" class="btn btn-danger me-2" id="wizard-quit-btn">Quit</button>
-            <button type="button" class="btn btn-link" id="wizard-skip-btn">Skip</button>
-            <button type="button" class="btn btn-primary" id="wizard-next-btn">Next</button>
-            <button type="button" class="btn btn-success d-none" id="wizard-finish-btn">Finish</button>
-          </div>
         </div>
       </div>
-    </div>
   </div>
 
-<!-- Dependencies -->
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/locales-all.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@fullcalendar/timegrid@5.11.3/main.global.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/locales-all.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/timegrid@5.11.3/main.global.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-<!-- Dashboard Calendar Initialization -->
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  console.log('Dashboard Calendar - Starting FullCalendar initialization');
-  
-  // Debug: Check if FullCalendar is available
-  if (typeof FullCalendar === 'undefined') {
-    console.error('FullCalendar is not defined! Check if the CDN loaded properly.');
-    return;
-  }
-  console.log('FullCalendar library loaded successfully:', FullCalendar);
-  
-  // Debug: Check if calendar container exists
-  const calendarEl = document.getElementById('calendar');
-  if (!calendarEl) {
-    console.warn('Calendar container element not found - this is normal if not on dashboard page');
-    return;
-  }
-  console.log('Calendar container found:', calendarEl);
-  
-  // Debug: Check calendar events data
-  const calendarEvents = <%- JSON.stringify(calendarEvents || []) %>;
-  console.log('Dashboard calendar events data:', calendarEvents);
-  console.log('Number of events:', calendarEvents.length);
-  
-  // Check if events have valid dates
-  calendarEvents.forEach((event, index) => {
-    console.log(`Dashboard Event ${index}:`, {
-      id: event.id,
-      title: event.title,
-      start: event.start,
-      startType: typeof event.start,
-      startValid: event.start ? new Date(event.start).toString() : 'INVALID',
-      startParsed: event.start ? new Date(event.start) : null
+  <!-- Dashboard Calendar Initialization -->
+  <script>
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('Dashboard Calendar - Starting FullCalendar initialization');
+    
+    // Debug: Check if FullCalendar is available
+    if (typeof FullCalendar === 'undefined') {
+      console.error('FullCalendar is not defined! Check if the CDN loaded properly.');
+      return;
+    }
+    console.log('FullCalendar library loaded successfully:', FullCalendar);
+    
+    // Debug: Check if calendar container exists
+    const calendarEl = document.getElementById('calendar');
+    if (!calendarEl) {
+      console.warn('Calendar container element not found - this is normal if not on dashboard page');
+      return;
+    }
+    console.log('Calendar container found:', calendarEl);
+    
+    // Debug: Check calendar events data
+    const calendarEvents = <%- JSON.stringify(calendarEvents || []) %>;
+    console.log('Dashboard calendar events data:', calendarEvents);
+    console.log('Number of events:', calendarEvents.length);
+    
+    // Check if events have valid dates
+    calendarEvents.forEach((event, index) => {
+      console.log(`Dashboard Event ${index}:`, {
+        id: event.id,
+        title: event.title,
+        start: event.start,
+        startType: typeof event.start,
+        startValid: event.start ? new Date(event.start).toString() : 'INVALID',
+        startParsed: event.start ? new Date(event.start) : null
+      });
     });
-  });
-  
-  try {
-    // Initialize FullCalendar for dashboard
-    const calendar = new FullCalendar.Calendar(calendarEl, {
-      initialView: 'dayGridMonth',
-      headerToolbar: {
-        left: 'prev,next today',
-        center: 'title',
-        right: 'dayGridMonth,timeGridWeek,listWeek'
-      },
-      height: 350, // Fixed height for sidebar
-      timeZone: 'local', // Use local timezone
-      initialDate: new Date(), // Start with current date
-      events: calendarEvents,
-      
-      // Enhanced event styling
-      eventDisplay: 'block',
-      eventTimeFormat: {
-        hour: '2-digit',
-        minute: '2-digit',
-        meridiem: 'short'
-      },
-      
-      // Custom event rendering
-      eventDidMount: function(info) {
-        console.log('Dashboard Event mounted:', info.event);
-        const event = info.event;
-        info.el.title = event.title + ' - ' + (event.extendedProps.description || 'No description');
+    
+    try {
+      // Initialize FullCalendar for dashboard
+      const calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        headerToolbar: {
+          left: 'prev,next today',
+          center: 'title',
+          right: 'dayGridMonth,timeGridWeek,listWeek'
+        },
+        height: 350, // Fixed height for sidebar
+        timeZone: 'local', // Use local timezone
+        initialDate: new Date(), // Start with current date
+        events: calendarEvents,
         
-        // Add click handler for event details
-        info.el.addEventListener('click', function(e) {
-          e.preventDefault();
-          const isGroupRecurring = event.extendedProps.type === 'group_recurring';
-          const isActivityGroup = event.extendedProps.type === 'activity_group';
-          const isRideRequest = event.extendedProps.type === 'request' || event.extendedProps.type === 'child_request' || event.extendedProps.type === 'my_request';
-          const instanceId = event.extendedProps.instance_id || event.extendedProps.instanceId || event.id;
-          console.log('🔧 DASHBOARD DEBUG: Event ID:', event.id);
-          console.log('🔧 DASHBOARD DEBUG: Instance ID:', instanceId);
-          console.log('🔧 DASHBOARD DEBUG: Extended props:', event.extendedProps);
+        // Enhanced event styling
+        eventDisplay: 'block',
+        eventTimeFormat: {
+          hour: '2-digit',
+          minute: '2-digit',
+          meridiem: 'short'
+        },
+        
+        // Custom event rendering
+        eventDidMount: function(info) {
+          console.log('Dashboard Event mounted:', info.event);
+          const event = info.event;
+          info.el.title = event.title + ' - ' + (event.extendedProps.description || 'No description');
           
-          // Get assignment button labels for group recurring events
-          let dropoffBtnLabel = '';
-          let pickupBtnLabel = '';
-          let bothBtnLabel = '';
-          if (isGroupRecurring) {
-            dropoffBtnLabel = (event.extendedProps.dropoff_driver && event.extendedProps.dropoff_driver !== 'Unassigned')
-              ? `Take Over Drop Off at ${event.title}`
-              : `I can Drop Off at ${event.title}`;
-            pickupBtnLabel = (event.extendedProps.pickup_driver && event.extendedProps.pickup_driver !== 'Unassigned')
-              ? `Take Over Pick Up from ${event.title}`
-              : `I can Pick Up from ${event.title}`;
-            bothBtnLabel = ((event.extendedProps.dropoff_driver && event.extendedProps.dropoff_driver !== 'Unassigned') ||
-                            (event.extendedProps.pickup_driver && event.extendedProps.pickup_driver !== 'Unassigned'))
-              ? `Take Over Both`
-              : `I can Do Both`;
-          }
-
-          // Get assignment button labels for activity groups
-          if (isActivityGroup) {
-            dropoffBtnLabel = (event.extendedProps.dropoff_driver && event.extendedProps.dropoff_driver !== 'Unassigned')
-              ? `Take Over Drop Off at ${event.title}`
-              : `I can Drop Off at ${event.title}`;
-            pickupBtnLabel = (event.extendedProps.pickup_driver && event.extendedProps.pickup_driver !== 'Unassigned')
-              ? `Take Over Pick Up from ${event.title}`
-              : `I can Pick Up from ${event.title}`;
-            bothBtnLabel = ((event.extendedProps.dropoff_driver && event.extendedProps.dropoff_driver !== 'Unassigned') ||
-                            (event.extendedProps.pickup_driver && event.extendedProps.pickup_driver !== 'Unassigned'))
-              ? `Take Over Both`
-              : `I can Do Both`;
-          }
-
-          // Get status badge HTML for ride requests
-          let statusBadge = '';
-          if (isRideRequest) {
-            const status = event.extendedProps.status || 'pending';
-            let badgeClass = 'bg-secondary';
-            let statusText = 'Unknown';
-            if (status === 'pending' || status === 'Pending') {
-              badgeClass = 'bg-warning text-dark';
-              statusText = 'Pending';
-            } else if (status === 'assigned' || status === 'Assigned') {
-              badgeClass = 'bg-primary';
-              statusText = 'Assigned';
-            } else if (status === 'completed' || status === 'Completed') {
-              badgeClass = 'bg-success';
-              statusText = 'Completed';
-            } else if (status === 'cancelled' || status === 'Cancelled') {
-              badgeClass = 'bg-danger';
-              statusText = 'Cancelled';
+          // Add click handler for event details
+          info.el.addEventListener('click', function(e) {
+            e.preventDefault();
+            const isGroupRecurring = event.extendedProps.type === 'group_recurring';
+            const isActivityGroup = event.extendedProps.type === 'activity_group';
+            const isRideRequest = event.extendedProps.type === 'request' || event.extendedProps.type === 'child_request' || event.extendedProps.type === 'my_request';
+            const instanceId = event.extendedProps.instance_id || event.extendedProps.instanceId || event.id;
+            console.log('🔧 DASHBOARD DEBUG: Event ID:', event.id);
+            console.log('🔧 DASHBOARD DEBUG: Instance ID:', instanceId);
+            console.log('🔧 DASHBOARD DEBUG: Extended props:', event.extendedProps);
+            
+            // Get assignment button labels for group recurring events
+            let dropoffBtnLabel = '';
+            let pickupBtnLabel = '';
+            let bothBtnLabel = '';
+            if (isGroupRecurring) {
+              dropoffBtnLabel = (event.extendedProps.dropoff_driver && event.extendedProps.dropoff_driver !== 'Unassigned')
+                ? `Take Over Drop Off at ${event.title}`
+                : `I can Drop Off at ${event.title}`;
+              pickupBtnLabel = (event.extendedProps.pickup_driver && event.extendedProps.pickup_driver !== 'Unassigned')
+                ? `Take Over Pick Up from ${event.title}`
+                : `I can Pick Up from ${event.title}`;
+              bothBtnLabel = ((event.extendedProps.dropoff_driver && event.extendedProps.dropoff_driver !== 'Unassigned') ||
+                              (event.extendedProps.pickup_driver && event.extendedProps.pickup_driver !== 'Unassigned'))
+                ? `Take Over Both`
+                : `I can Do Both`;
             }
-            statusBadge = `<span class="badge ${badgeClass} mb-2">${statusText}</span>`;
-          }
 
-          const modalHTML = `
-            <div class="modal fade" id="eventModal" tabindex="-1" aria-labelledby="eventModalLabel" aria-hidden="true">
-              <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                  <div class="modal-header">
-                    <h5 class="modal-title" id="eventModalLabel">
-                      <i class="fas fa-calendar-event me-2"></i>${event.title}
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                  </div>
-                  <div class="modal-body">
-                    <div class="row">
-                      <div class="col-12">
-                        ${statusBadge}
-                        <p class="text-muted mb-3">
-                          <i class="fas fa-info-circle me-2"></i>
-                          ${event.extendedProps.description || 'No description'}
-                        </p>
-                        <div class="alert alert-info">
-                          <i class="fas fa-clock me-2"></i>
-                          <strong>Time:</strong> ${event.start.toLocaleString('en-NZ', { 
-                            weekday: 'long',
-                            year: 'numeric', 
-                            month: 'long', 
-                            day: 'numeric',
-                            hour: '2-digit', 
-                            minute: '2-digit',
-                            hour12: true 
-                          })}
-                          ${event.end ? `<br><i class="fas fa-stop-circle me-2"></i><strong>End:</strong> ${event.end.toLocaleString('en-NZ', { 
-                            hour: '2-digit', 
-                            minute: '2-digit',
-                            hour12: true 
-                          })}` : ''}
+            // Get assignment button labels for activity groups
+            if (isActivityGroup) {
+              dropoffBtnLabel = (event.extendedProps.dropoff_driver && event.extendedProps.dropoff_driver !== 'Unassigned')
+                ? `Take Over Drop Off at ${event.title}`
+                : `I can Drop Off at ${event.title}`;
+              pickupBtnLabel = (event.extendedProps.pickup_driver && event.extendedProps.pickup_driver !== 'Unassigned')
+                ? `Take Over Pick Up from ${event.title}`
+                : `I can Pick Up from ${event.title}`;
+              bothBtnLabel = ((event.extendedProps.dropoff_driver && event.extendedProps.dropoff_driver !== 'Unassigned') ||
+                              (event.extendedProps.pickup_driver && event.extendedProps.pickup_driver !== 'Unassigned'))
+                ? `Take Over Both`
+                : `I can Do Both`;
+            }
+
+            // Get status badge HTML for ride requests
+            let statusBadge = '';
+            if (isRideRequest) {
+              const status = event.extendedProps.status || 'pending';
+              let badgeClass = 'bg-secondary';
+              let statusText = 'Unknown';
+              if (status === 'pending' || status === 'Pending') {
+                badgeClass = 'bg-warning text-dark';
+                statusText = 'Pending';
+              } else if (status === 'assigned' || status === 'Assigned') {
+                badgeClass = 'bg-primary';
+                statusText = 'Assigned';
+              } else if (status === 'completed' || status === 'Completed') {
+                badgeClass = 'bg-success';
+                statusText = 'Completed';
+              } else if (status === 'cancelled' || status === 'Cancelled') {
+                badgeClass = 'bg-danger';
+                statusText = 'Cancelled';
+              }
+              statusBadge = `<span class="badge ${badgeClass} mb-2">${statusText}</span>`;
+            }
+
+            const modalHTML = `
+              <div class="modal fade" id="eventModal" tabindex="-1" aria-labelledby="eventModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                  <div class="modal-content">
+                    <div class="modal-header">
+                      <h5 class="modal-title" id="eventModalLabel">
+                        <i class="fas fa-calendar-event me-2"></i>${event.title}
+                      </h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                      <div class="row">
+                        <div class="col-12">
+                          ${statusBadge}
+                          <p class="text-muted mb-3">
+                            <i class="fas fa-info-circle me-2"></i>
+                            ${event.extendedProps.description || 'No description'}
+                          </p>
+                          <div class="alert alert-info">
+                            <i class="fas fa-clock me-2"></i>
+                            <strong>Time:</strong> ${event.start.toLocaleString('en-NZ', { 
+                              weekday: 'long',
+                              year: 'numeric', 
+                              month: 'long', 
+                              day: 'numeric',
+                              hour: '2-digit', 
+                              minute: '2-digit',
+                              hour12: true 
+                            })}
+                            ${event.end ? `<br><i class="fas fa-stop-circle me-2"></i><strong>End:</strong> ${event.end.toLocaleString('en-NZ', { 
+                              hour: '2-digit', 
+                              minute: '2-digit',
+                              hour12: true 
+                            })}` : ''}
+                          </div>
+                          ${isRideRequest && event.extendedProps.driver_name ? `
+                            <div class="alert alert-success mb-3">
+                              <i class="fas fa-user me-2"></i>
+                              <strong>Driver:</strong> ${event.extendedProps.driver_name}
+                            </div>
+                          ` : ''}
+                          ${isGroupRecurring ? `
+                            <div class="alert alert-secondary mb-3">
+                              <strong>Dropoff:</strong> <span class="${event.extendedProps.dropoff_driver === 'Unassigned' ? 'text-danger' : 'text-success'}">
+                                ${event.extendedProps.dropoff_driver || 'Unassigned'}
+                              </span><br>
+                              <strong>Pickup:</strong> <span class="${event.extendedProps.pickup_driver === 'Unassigned' ? 'text-danger' : 'text-success'}">
+                                ${event.extendedProps.pickup_driver || 'Unassigned'}
+                              </span>
+                            </div>
+                            <div class="mt-3">
+                              <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
+                                <input type="hidden" name="assignmentType" value="dropoff">
+                                <button type="submit" class="btn btn-primary btn-sm me-2">${dropoffBtnLabel}</button>
+                              </form>
+                              <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
+                                <input type="hidden" name="assignmentType" value="pickup">
+                                <button type="submit" class="btn btn-success btn-sm me-2">${pickupBtnLabel}</button>
+                              </form>
+                              <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
+                                <input type="hidden" name="assignmentType" value="both">
+                                <button type="submit" class="btn btn-info btn-sm">${bothBtnLabel}</button>
+                              </form>
+                            </div>
+                          ` : ''}
+                          ${isActivityGroup ? `
+                            <div class="alert alert-secondary mb-3">
+                              <strong>Dropoff:</strong> <span class="${event.extendedProps.dropoff_driver === 'Unassigned' ? 'text-danger' : 'text-success'}">
+                                ${event.extendedProps.dropoff_driver || 'Unassigned'}
+                              </span><br>
+                              <strong>Pickup:</strong> <span class="${event.extendedProps.pickup_driver === 'Unassigned' ? 'text-danger' : 'text-success'}">
+                                ${event.extendedProps.pickup_driver || 'Unassigned'}
+                              </span>
+                            </div>
+                            <div class="mt-3">
+                              <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
+                                <input type="hidden" name="assignmentType" value="dropoff">
+                                <button type="submit" class="btn btn-primary btn-sm me-2">${dropoffBtnLabel}</button>
+                              </form>
+                              <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
+                                <input type="hidden" name="assignmentType" value="pickup">
+                                <button type="submit" class="btn btn-success btn-sm me-2">${pickupBtnLabel}</button>
+                              </form>
+                              <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
+                                <input type="hidden" name="assignmentType" value="both">
+                                <button type="submit" class="btn btn-info btn-sm">${bothBtnLabel}</button>
+                              </form>
+                            </div>
+                          ` : ''}
+                          ${isRideRequest ? `
+                            <div class="mt-3">
+                              <a href="/rides" class="btn btn-outline-primary btn-sm me-2">
+                                <i class="fas fa-car me-1"></i>View Ride Details
+                              </a>
+                              <a href="/messages/group/ride/${event.id.replace(/^(ride_|child_ride_|my_ride_)/, '')}" class="btn btn-outline-info btn-sm">
+                                <i class="fas fa-comments me-1"></i>Chat
+                              </a>
+                            </div>
+                          ` : ''}
                         </div>
-                        ${isRideRequest && event.extendedProps.driver_name ? `
-                          <div class="alert alert-success mb-3">
-                            <i class="fas fa-user me-2"></i>
-                            <strong>Driver:</strong> ${event.extendedProps.driver_name}
-                          </div>
-                        ` : ''}
-                        ${isGroupRecurring ? `
-                          <div class="alert alert-secondary mb-3">
-                            <strong>Dropoff:</strong> <span class="${event.extendedProps.dropoff_driver === 'Unassigned' ? 'text-danger' : 'text-success'}">
-                              ${event.extendedProps.dropoff_driver || 'Unassigned'}
-                            </span><br>
-                            <strong>Pickup:</strong> <span class="${event.extendedProps.pickup_driver === 'Unassigned' ? 'text-danger' : 'text-success'}">
-                              ${event.extendedProps.pickup_driver || 'Unassigned'}
-                            </span>
-                          </div>
-                          <div class="mt-3">
-                            <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
-                              <input type="hidden" name="assignmentType" value="dropoff">
-                              <button type="submit" class="btn btn-primary btn-sm me-2">${dropoffBtnLabel}</button>
-                            </form>
-                            <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
-                              <input type="hidden" name="assignmentType" value="pickup">
-                              <button type="submit" class="btn btn-success btn-sm me-2">${pickupBtnLabel}</button>
-                            </form>
-                            <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
-                              <input type="hidden" name="assignmentType" value="both">
-                              <button type="submit" class="btn btn-info btn-sm">${bothBtnLabel}</button>
-                            </form>
-                          </div>
-                        ` : ''}
-                        ${isActivityGroup ? `
-                          <div class="alert alert-secondary mb-3">
-                            <strong>Dropoff:</strong> <span class="${event.extendedProps.dropoff_driver === 'Unassigned' ? 'text-danger' : 'text-success'}">
-                              ${event.extendedProps.dropoff_driver || 'Unassigned'}
-                            </span><br>
-                            <strong>Pickup:</strong> <span class="${event.extendedProps.pickup_driver === 'Unassigned' ? 'text-danger' : 'text-success'}">
-                              ${event.extendedProps.pickup_driver || 'Unassigned'}
-                            </span>
-                          </div>
-                          <div class="mt-3">
-                            <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
-                              <input type="hidden" name="assignmentType" value="dropoff">
-                              <button type="submit" class="btn btn-primary btn-sm me-2">${dropoffBtnLabel}</button>
-                            </form>
-                            <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
-                              <input type="hidden" name="assignmentType" value="pickup">
-                              <button type="submit" class="btn btn-success btn-sm me-2">${pickupBtnLabel}</button>
-                            </form>
-                            <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
-                              <input type="hidden" name="assignmentType" value="both">
-                              <button type="submit" class="btn btn-info btn-sm">${bothBtnLabel}</button>
-                            </form>
-                          </div>
-                        ` : ''}
-                        ${isRideRequest ? `
-                          <div class="mt-3">
-                            <a href="/rides" class="btn btn-outline-primary btn-sm me-2">
-                              <i class="fas fa-car me-1"></i>View Ride Details
-                            </a>
-                            <a href="/messages/group/ride/${event.id.replace(/^(ride_|child_ride_|my_ride_)/, '')}" class="btn btn-outline-info btn-sm">
-                              <i class="fas fa-comments me-1"></i>Chat
-                            </a>
-                          </div>
-                        ` : ''}
                       </div>
                     </div>
-                  </div>
-                  <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                      <i class="fas fa-times me-1"></i>Close
-                    </button>
-                    <a href="/calendar" class="btn btn-primary">
-                      <i class="fas fa-calendar-alt me-1"></i>View Full Calendar
-                    </a>
+                    <div class="modal-footer">
+                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>Close
+                      </button>
+                      <a href="/calendar" class="btn btn-primary">
+                        <i class="fas fa-calendar-alt me-1"></i>View Full Calendar
+                      </a>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          `;
-          const existingModal = document.getElementById('eventModal');
-          if (existingModal) {
-            existingModal.remove();
-          }
-          document.body.insertAdjacentHTML('beforeend', modalHTML);
-          const modal = new bootstrap.Modal(document.getElementById('eventModal'));
-          modal.show();
-          document.getElementById('eventModal').addEventListener('hidden.bs.modal', function() {
-            this.remove();
+            `;
+            const existingModal = document.getElementById('eventModal');
+            if (existingModal) {
+              existingModal.remove();
+            }
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+            const modal = new bootstrap.Modal(document.getElementById('eventModal'));
+            modal.show();
+            document.getElementById('eventModal').addEventListener('hidden.bs.modal', function() {
+              this.remove();
+            });
           });
-        });
-      },
-      
-      // Day cell rendering for highlighting
-      dayCellDidMount: function(arg) {
-        const date = arg.date;
-        const dayOfWeek = date.getDay();
-        
-        // Add weekend styling
-        if (dayOfWeek === 0 || dayOfWeek === 6) {
-          arg.el.style.backgroundColor = '#f8f9fa';
-          arg.el.style.fontWeight = 'bold';
-        }
-        
-        // Add today highlighting
-        const today = new Date();
-        if (date.toDateString() === today.toDateString()) {
-          arg.el.style.border = '2px solid #007bff';
-          arg.el.style.borderRadius = '8px';
-        }
-      },
-      
-      // Loading state
-      loading: function(isLoading) {
-        console.log('Dashboard Calendar loading state:', isLoading);
-      },
-      
-      // View-specific settings
-      views: {
-        dayGridMonth: {
-          dayMaxEvents: 3, // Show max 3 events per day in sidebar
-          moreLinkClick: 'popover'
         },
-        timeGridWeek: {
-          slotMinTime: '06:00:00',
-          slotMaxTime: '22:00:00'
+        
+        // Day cell rendering for highlighting
+        dayCellDidMount: function(arg) {
+          const date = arg.date;
+          const dayOfWeek = date.getDay();
+          
+          // Add weekend styling
+          if (dayOfWeek === 0 || dayOfWeek === 6) {
+            arg.el.style.backgroundColor = '#f8f9fa';
+            arg.el.style.fontWeight = 'bold';
+          }
+          
+          // Add today highlighting
+          const today = new Date();
+          if (date.toDateString() === today.toDateString()) {
+            arg.el.style.border = '2px solid #007bff';
+            arg.el.style.borderRadius = '8px';
+          }
         },
-        listWeek: {
-          listDayFormat: { weekday: 'long', month: 'long', day: 'numeric' },
-          listDaySideFormat: { weekday: 'long' }
-        }
-      },
-      
-      // Custom event colors based on type
-      eventClassNames: function(arg) {
-        const event = arg.event;
-        const classes = [];
         
-        // Add type-specific classes
-        if (event.extendedProps.type === 'request') {
-          classes.push('event-drive');
-        } else if (event.extendedProps.type === 'child_request') {
-          classes.push('event-ride');
-        } else if (event.extendedProps.type === 'my_request') {
-          classes.push('event-my-request');
-        } else if (event.extendedProps.type === 'recurring') {
-          classes.push('event-recurring');
-        } else if (event.extendedProps.type === 'group_recurring') {
-          classes.push('event-group-recurring');
-        } else if (event.extendedProps.type === 'subscribed_recurring') {
-          classes.push('event-subscribed-recurring');
-        }
+        // Loading state
+        loading: function(isLoading) {
+          console.log('Dashboard Calendar loading state:', isLoading);
+        },
         
-        return classes;
-      }
-    });
-    
-    console.log('Dashboard FullCalendar instance created:', calendar);
-    
-    // Render the calendar
-    calendar.render();
-    console.log('Dashboard FullCalendar rendered successfully');
-    
-    // Debug: Check if calendar is visible
-    setTimeout(() => {
-      const calendarContainer = calendarEl.querySelector('.fc');
-      if (calendarContainer) {
-        console.log('Dashboard Calendar DOM structure created:', calendarContainer);
-        console.log('Dashboard Calendar dimensions:', {
-          width: calendarContainer.offsetWidth,
-          height: calendarContainer.offsetHeight,
-          visible: calendarContainer.offsetWidth > 0 && calendarContainer.offsetHeight > 0
-        });
-        
-        // Check for events in the DOM
-        const eventElements = calendarContainer.querySelectorAll('.fc-event');
-        console.log('Dashboard Event elements found in DOM:', eventElements.length);
-        eventElements.forEach((el, index) => {
-          console.log(`Dashboard Event element ${index}:`, el.textContent, el);
-        });
-      } else {
-        console.warn('Dashboard Calendar DOM structure not found after render - calendar may not have loaded properly');
-      }
-    }, 100);
-    
-  } catch (error) {
-    console.error('Error initializing Dashboard FullCalendar:', error);
-    console.error('Error stack:', error.stack);
-  }
-});
-</script>
-
-<!-- Initialize autocomplete only for input elements, not select elements -->
-<script>
-// Ensure autocomplete only applies to input elements, not select elements
-document.addEventListener('DOMContentLoaded', function() {
-  // Only initialize autocomplete on input elements with the autocomplete class
-  document.querySelectorAll('input.autocomplete').forEach(input => {
-    const type = input.dataset.type || 'organization';
-    
-    if (typeof autoComplete !== 'undefined') {
-      new autoComplete({
-        selector: () => input,
-        threshold: 1,
-        debounce: 200,
-        searchEngine: "loose",
-        data: {
-          src: async (query) => {
-            try {
-              const res = await fetch(`/organizations/autocomplete?term=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}`);
-              return await res.json();
-            } catch (err) {
-              console.error("Autocomplete fetch error", err);
-              return [];
-            }
+        // View-specific settings
+        views: {
+          dayGridMonth: {
+            dayMaxEvents: 3, // Show max 3 events per day in sidebar
+            moreLinkClick: 'popover'
           },
-          keys: ["label"]
+          timeGridWeek: {
+            slotMinTime: '06:00:00',
+            slotMaxTime: '22:00:00'
+          },
+          listWeek: {
+            listDayFormat: { weekday: 'long', month: 'long', day: 'numeric' },
+            listDaySideFormat: { weekday: 'long' }
+          }
         },
-        resultsList: {
-          noResults: true,
-          maxResults: 10,
-          render: true
+        
+        // Custom event colors based on type
+        eventClassNames: function(arg) {
+          const event = arg.event;
+          const classes = [];
+          
+          // Add type-specific classes
+          if (event.extendedProps.type === 'request') {
+            classes.push('event-drive');
+          } else if (event.extendedProps.type === 'child_request') {
+            classes.push('event-ride');
+          } else if (event.extendedProps.type === 'my_request') {
+            classes.push('event-my-request');
+          } else if (event.extendedProps.type === 'recurring') {
+            classes.push('event-recurring');
+          } else if (event.extendedProps.type === 'group_recurring') {
+            classes.push('event-group-recurring');
+          } else if (event.extendedProps.type === 'subscribed_recurring') {
+            classes.push('event-subscribed-recurring');
+          }
+          
+          return classes;
         },
-        resultItem: {
-          highlight: true,
-          content: (data) => data.label
-        },
-        onSelection: (feedback) => {
-          const selected = feedback.selection.value;
-          input.value = selected.value || selected.label || "";
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-        },
-        events: {
-          input: {
-            selection: (event) => {
-              const feedback = event.detail;
-              const selected = feedback.selection.value;
-              event.target.value = selected.value || selected.label || "";
-              event.target.dispatchEvent(new Event('input', { bubbles: true }));
-            }
+        
+        // After each view change, ensure the week containing today is at the top when in month view
+        datesSet: function(info) {
+          if (info.view.type === 'dayGridMonth') {
+            setTimeout(() => {
+              const scroller = calendarEl.querySelector('.fc-daygrid-body-scroller');
+              const todayCell = calendarEl.querySelector('.fc-day-today');
+              if (scroller && todayCell) {
+                // The cell is a <td>; its parent is <tr>
+                const weekRow = todayCell.closest('tr');
+                if (weekRow) {
+                  scroller.scrollTop = weekRow.offsetTop;
+                }
+              }
+            }, 0);
           }
         }
       });
+      
+      console.log('Dashboard FullCalendar instance created:', calendar);
+      
+      // Render the calendar
+      calendar.render();
+      console.log('Dashboard FullCalendar rendered successfully');
+      
+      // Debug: Check if calendar is visible
+      setTimeout(() => {
+        const calendarContainer = calendarEl.querySelector('.fc');
+        if (calendarContainer) {
+          console.log('Dashboard Calendar DOM structure created:', calendarContainer);
+          console.log('Dashboard Calendar dimensions:', {
+            width: calendarContainer.offsetWidth,
+            height: calendarContainer.offsetHeight,
+            visible: calendarContainer.offsetWidth > 0 && calendarContainer.offsetHeight > 0
+          });
+          
+          // Check for events in the DOM
+          const eventElements = calendarContainer.querySelectorAll('.fc-event');
+          console.log('Dashboard Event elements found in DOM:', eventElements.length);
+          eventElements.forEach((el, index) => {
+            console.log(`Dashboard Event element ${index}:`, el.textContent, el);
+          });
+        } else {
+          console.warn('Dashboard Calendar DOM structure not found after render - calendar may not have loaded properly');
+        }
+      }, 100);
+      
+    } catch (error) {
+      console.error('Error initializing Dashboard FullCalendar:', error);
+      console.error('Error stack:', error.stack);
     }
   });
-});
-</script>
+  </script>
 
-<!-- Debug -->
-<script>console.log('showProfileWizard:', <%= showProfileWizard ? 'true' : 'false' %>);</script>
-
-<% if (showProfileWizard) { %>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  // Add Child Only Mode
-  let addChildOnlyMode = false;
-
-  // Wizard Modal Initialization
-  if (document.getElementById('profileWizardModal')) {
-    console.log('Profile wizard modal found, initializing...');
-    let wizardStep = 1;
-    const totalSteps = 2; // Simplified to 2 steps
-
-    function showStep(step) {
-      for (let i = 1; i <= totalSteps; i++) {
-        document.getElementById('wizard-step-' + i).classList.toggle('d-none', i !== step);
-      }
-      document.getElementById('wizard-back-btn').style.display = step === 1 ? 'none' : '';
-      document.getElementById('wizard-next-btn').classList.toggle('d-none', step === totalSteps);
-      document.getElementById('wizard-finish-btn').classList.toggle('d-none', step !== totalSteps);
+  <!-- Initialize autocomplete only for input elements, not select elements -->
+  <script>
+  // Ensure autocomplete only applies to input elements, not select elements
+  document.addEventListener('DOMContentLoaded', function() {
+    // Only initialize autocomplete on input elements with the autocomplete class
+    document.querySelectorAll('input.autocomplete').forEach(input => {
+      const type = input.dataset.type || 'organization';
       
-      // Auto-add child entry when moving to step 2
-      if (step === 2) {
-        const childrenList = document.getElementById('children-list');
-        if (childrenList.children.length === 0) {
-          const template = document.getElementById('child-entry-template').firstElementChild.cloneNode(true);
-          template.querySelector('.remove-child-btn').onclick = function() {
-            template.remove();
-          };
-          childrenList.appendChild(template);
+      if (typeof autoComplete !== 'undefined') {
+        new autoComplete({
+          selector: () => input,
+          threshold: 1,
+          debounce: 200,
+          searchEngine: "loose",
+          data: {
+            src: async (query) => {
+              try {
+                const res = await fetch(`/organizations/autocomplete?term=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}`);
+                return await res.json();
+              } catch (err) {
+                console.error("Autocomplete fetch error", err);
+                return [];
+              }
+            },
+            keys: ["label"]
+          },
+          resultsList: {
+            noResults: true,
+            maxResults: 10,
+            render: true
+          },
+          resultItem: {
+            highlight: true,
+            content: (data) => data.label
+          },
+          onSelection: (feedback) => {
+            const selected = feedback.selection.value;
+            input.value = selected.value || selected.label || "";
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+          },
+          events: {
+            input: {
+              selection: (event) => {
+                const feedback = event.detail;
+                const selected = feedback.selection.value;
+                event.target.value = selected.value || selected.label || "";
+                event.target.dispatchEvent(new Event('input', { bubbles: true }));
+              }
+            }
+          }
+        });
+      }
+    });
+  });
+  </script>
+
+  <!-- Debug -->
+  <script>console.log('showProfileWizard:', <%= showProfileWizard ? 'true' : 'false' %>);</script>
+
+  <% if (showProfileWizard) { %>
+  <script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Add Child Only Mode
+    let addChildOnlyMode = false;
+
+    // Wizard Modal Initialization
+    if (document.getElementById('profileWizardModal')) {
+      console.log('Profile wizard modal found, initializing...');
+      let wizardStep = 1;
+      const totalSteps = 2; // Simplified to 2 steps
+
+      function showStep(step) {
+        for (let i = 1; i <= totalSteps; i++) {
+          document.getElementById('wizard-step-' + i).classList.toggle('d-none', i !== step);
         }
-      }
-    }
-
-    function showWizardError(msg) {
-      let err = document.getElementById('wizard-error-msg');
-      if (!err) {
-        err = document.createElement('div');
-        err.id = 'wizard-error-msg';
-        err.className = 'alert alert-danger';
-        err.style.marginBottom = '10px';
-        document.querySelector('#wizard-step-' + wizardStep + ' form').prepend(err);
-      }
-      err.textContent = msg;
-    }
-
-    function clearWizardError() {
-      const err = document.getElementById('wizard-error-msg');
-      if (err) err.remove();
-    }
-
-
-
-    // Add Quit button handler
-    const wizardQuitBtn = document.getElementById('wizard-quit-btn');
-    if (wizardQuitBtn) {
-      wizardQuitBtn.onclick = async function() {
-        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('profileWizardModal'));
-        modal.hide();
-        // Optionally mark wizard as skipped (uncomment if desired):
-        // await fetch('/api/profile/complete', { method: 'POST' });
-        // window.location.reload();
-      };
-    }
-
-    // Wizard finish button handler for both add child only mode and profile completion
-    const wizardFinishBtn = document.getElementById('wizard-finish-btn');
-    if (wizardFinishBtn) {
-      wizardFinishBtn.onclick = async function() {
-        console.log('🧙‍♂️ Wizard: Finish button clicked! addChildOnlyMode:', addChildOnlyMode);
+        document.getElementById('wizard-back-btn').style.display = step === 1 ? 'none' : '';
+        document.getElementById('wizard-next-btn').classList.toggle('d-none', step === totalSteps);
+        document.getElementById('wizard-finish-btn').classList.toggle('d-none', step !== totalSteps);
         
-        if (window.addChildOnlyMode) {
-          // Add Child Only Mode logic
+        // Auto-add child entry when moving to step 2
+        if (step === 2) {
           const childrenList = document.getElementById('children-list');
-          const childEntries = Array.from(childrenList.querySelectorAll('.child-entry'));
-          if (childEntries.length === 0) {
-            showWizardError('Please add at least one child.');
-            return;
+          if (childrenList.children.length === 0) {
+            const template = document.getElementById('child-entry-template').firstElementChild.cloneNode(true);
+            template.querySelector('.remove-child-btn').onclick = function() {
+              template.remove();
+            };
+            childrenList.appendChild(template);
           }
-          const children = [];
-          for (const entry of childEntries) {
-            const name = entry.querySelector('.child-name-input').value.trim();
-            const org_id = entry.querySelector('.child-org-select').value;
-            const club = entry.querySelector('.child-club-input').value.trim();
-            const username = entry.querySelector('.child-username-input').value.trim();
-            const password = entry.querySelector('.child-password-input').value.trim();
-            if (!name || !org_id || !username || !password) {
-              showWizardError('Each child must have a name, organization, username, and password.');
-              return;
-            }
-            children.push({
-              name,
-              org_id: Number(org_id),
-              club,
-              username,
-              password,
-              parent_id: <%= session.userId %>
-            });
-          }
-          try {
-            const resp = await fetch('/api/profile/children', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ children })
-            });
-            const data = await resp.json();
-            if (!resp.ok || !data.success) {
-              showWizardError(data.error || 'Failed to save children. Please try again.');
-              return;
-            }
-            // Success: hide modal and reload page
-            console.log('🧙‍♂️ Wizard: Add Child Only Mode - Children saved successfully!');
-            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('profileWizardModal'));
-            modal.hide();
-            window.location.reload();
-          } catch (err) {
-            showWizardError('Network error. Please try again.');
-            return;
-          }
-        } else {
-          // Profile Completion Mode logic (Step 2 - Children)
-          console.log('🧙‍♂️ Wizard: Processing profile completion finish...');
-          clearWizardError();
-          const childrenList = document.getElementById('children-list');
-          const childEntries = Array.from(childrenList.querySelectorAll('.child-entry'));
-          if (childEntries.length === 0) {
-            showWizardError('Please add at least one child.');
-            return;
-          }
-          const children = [];
-          for (const entry of childEntries) {
-            const name = entry.querySelector('.child-name-input').value.trim();
-            const org_id = entry.querySelector('.child-org-select').value;
-            const club = entry.querySelector('.child-club-input').value.trim();
-            const username = entry.querySelector('.child-username-input').value.trim();
-            const password = entry.querySelector('.child-password-input').value.trim();
-            if (!name || !org_id || !username || !password) {
-              showWizardError('Each child must have a name, organization, username, and password.');
-              return;
-            }
-            children.push({
-              name,
-              org_id: Number(org_id),
-              club,
-              username,
-              password,
-              parent_id: <%= session.userId %>
-            });
-          }
-          try {
-            console.log('🧙‍♂️ Wizard: About to send API call...');
-            console.log('🧙‍♂️ Wizard: Children data:', children);
-            console.log('🧙‍♂️ Wizard: Sending children data:', JSON.stringify({ children }, null, 2));
-            
-            const requestBody = JSON.stringify({ children });
-            console.log('🧙‍♂️ Wizard: Request body:', requestBody);
-            
-            const resp = await fetch('/api/profile/children', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: requestBody
-            });
-            
-            console.log('🧙‍♂️ Wizard: Response received!');
-            console.log('🧙‍♂️ Wizard: Response status:', resp.status);
-            console.log('🧙‍♂️ Wizard: Response headers:', resp.headers);
-            
-            const data = await resp.json();
-            console.log('🧙‍♂️ Wizard: Response data:', data);
-            
-            if (!resp.ok || !data.success) {
-              console.log('🧙‍♂️ Wizard: API call failed!');
-              showWizardError(data.error || 'Failed to save children. Please try again.');
-              return;
-            }
-            console.log('🧙‍♂️ Wizard: Children saved successfully!');
-            
-            // Mark profile as completed
-            console.log('🧙‍♂️ Wizard: Marking profile as completed...');
-            const completeResp = await fetch('/api/profile/complete', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' }
-            });
-            
-            if (!completeResp.ok) {
-              console.log('🧙‍♂️ Wizard: Failed to mark profile as completed, but continuing...');
-            } else {
-              console.log('🧙‍♂️ Wizard: Profile marked as completed successfully!');
-            }
-            
-            // Complete the wizard and reload the page
-            console.log('🧙‍♂️ Wizard: Completing wizard and reloading page');
-            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('profileWizardModal'));
-            modal.hide();
-            window.location.reload();
-            return;
-          } catch (err) {
-            console.error('🧙‍♂️ Wizard: Error saving children:', err);
-            console.error('🧙‍♂️ Wizard: Error details:', err.message);
-            console.error('🧙‍♂️ Wizard: Error stack:', err.stack);
-            showWizardError('Network error. Please try again.');
-            return;
-          }
-        }
-      };
-    }
-
-    // Wizard button event listeners
-    console.log('🧙‍♂️ Wizard: Setting up Next button event handler');
-    document.getElementById('wizard-next-btn').onclick = async function() {
-      console.log('🧙‍♂️ Wizard: Next button clicked! Current step:', wizardStep);
-      if (wizardStep === 1) {
-        clearWizardError();
-        const address = document.getElementById('wizard_home_address').value.trim();
-        const lat = document.getElementById('wizard_home_lat').value;
-        const lng = document.getElementById('wizard_home_lng').value;
-        const isPrivate = document.getElementById('wizard_is_address_private').checked;
-        if (!address || !lat || !lng) {
-          showWizardError('Please select a valid address from the dropdown.');
-          return;
-        }
-        try {
-          const resp = await fetch('/api/profile/address', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ home_address: address, home_lat: lat, home_lng: lng, is_address_private: isPrivate })
-          });
-          const data = await resp.json();
-          if (!resp.ok || !data.success) {
-            showWizardError(data.error || 'Failed to save address. Please try again.');
-            return;
-          }
-        } catch (err) {
-          showWizardError('Network error. Please try again.');
-          return;
         }
       }
-      if (wizardStep === 2) {
-        clearWizardError();
-        const childrenList = document.getElementById('children-list');
-        const childEntries = Array.from(childrenList.querySelectorAll('.child-entry'));
-        if (childEntries.length === 0) {
-          showWizardError('Please add at least one child.');
-          return;
-        }
-        const children = [];
-        for (const entry of childEntries) {
-          const name = entry.querySelector('.child-name-input').value.trim();
-          const org_id = entry.querySelector('.child-org-select').value;
-          const club = entry.querySelector('.child-club-input').value.trim();
-          const username = entry.querySelector('.child-username-input').value.trim();
-          const password = entry.querySelector('.child-password-input').value.trim();
-          if (!name || !org_id || !username || !password) {
-            showWizardError('Each child must have a name, organization, username, and password.');
-            return;
-          }
-          children.push({
-            name,
-            org_id: Number(org_id),
-            club,
-            username,
-            password,
-            parent_id: <%= session.userId %>
-          });
-        }
-        try {
-          console.log('🧙‍♂️ Wizard: About to send API call...');
-          console.log('🧙‍♂️ Wizard: Children data:', children);
-          console.log('🧙‍♂️ Wizard: Sending children data:', JSON.stringify({ children }, null, 2));
-          
-          const requestBody = JSON.stringify({ children });
-          console.log('🧙‍♂️ Wizard: Request body:', requestBody);
-          
-          const resp = await fetch('/api/profile/children', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: requestBody
-          });
-          
-          console.log('🧙‍♂️ Wizard: Response received!');
-          console.log('🧙‍♂️ Wizard: Response status:', resp.status);
-          console.log('🧙‍♂️ Wizard: Response headers:', resp.headers);
-          
-          const data = await resp.json();
-          console.log('🧙‍♂️ Wizard: Response data:', data);
-          
-          if (!resp.ok || !data.success) {
-            console.log('🧙‍♂️ Wizard: API call failed!');
-            showWizardError(data.error || 'Failed to save children. Please try again.');
-            return;
-          }
-          console.log('🧙‍♂️ Wizard: Children saved successfully!');
-          
-          // Complete the wizard and reload the page
-          console.log('🧙‍♂️ Wizard: Completing wizard and reloading page');
-          const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('profileWizardModal'));
-          modal.hide();
-          window.location.reload();
-          return;
-        } catch (err) {
-          console.error('🧙‍♂️ Wizard: Error saving children:', err);
-          console.error('🧙‍♂️ Wizard: Error details:', err.message);
-          console.error('🧙‍♂️ Wizard: Error stack:', err.stack);
-          showWizardError('Network error. Please try again.');
-          return;
-        }
-      }
-      
-      // Only advance to next step if not on the final step
-      if (wizardStep < totalSteps) {
-        wizardStep++;
-        console.log('🧙‍♂️ Wizard: Advancing to step:', wizardStep);
-        showStep(wizardStep);
-      }
-    };
 
-    document.getElementById('wizard-back-btn').onclick = function() {
-      if (wizardStep > 1) {
-        wizardStep--;
-        showStep(wizardStep);
+      function showWizardError(msg) {
+        let err = document.getElementById('wizard-error-msg');
+        if (!err) {
+          err = document.createElement('div');
+          err.id = 'wizard-error-msg';
+          err.className = 'alert alert-danger';
+          err.style.marginBottom = '10px';
+          document.querySelector('#wizard-step-' + wizardStep + ' form').prepend(err);
+        }
+        err.textContent = msg;
       }
-    };
 
-    // Finish button handler
-    document.getElementById('wizard-finish-btn').onclick = async function() {
-      console.log('🧙‍♂️ Wizard: Finish button clicked!');
-      
-      // Handle the current step (same logic as Next button for step 2)
-      if (wizardStep === 1) {
-        clearWizardError();
-        const address = document.getElementById('wizard_home_address').value.trim();
-        const isPrivate = document.getElementById('wizard_is_address_private').checked;
-        
-        if (!address) {
-          showWizardError('Please enter your home address.');
-          return;
-        }
-        
-        // Get coordinates from the address
-        const lat = document.getElementById('wizard_home_lat').value;
-        const lng = document.getElementById('wizard_home_lng').value;
-        
-        if (!lat || !lng) {
-          showWizardError('Please select a valid address from the dropdown.');
-          return;
-        }
-        
-        try {
-          const resp = await fetch('/api/profile/address', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ home_address: address, home_lat: lat, home_lng: lng, is_address_private: isPrivate })
-          });
-          const data = await resp.json();
-          if (!resp.ok || !data.success) {
-            showWizardError(data.error || 'Failed to save address. Please try again.');
-            return;
-          }
-        } catch (err) {
-          showWizardError('Network error. Please try again.');
-          return;
-        }
+      function clearWizardError() {
+        const err = document.getElementById('wizard-error-msg');
+        if (err) err.remove();
       }
-      
-      if (wizardStep === 2) {
-        clearWizardError();
-        const childrenList = document.getElementById('children-list');
-        const childEntries = Array.from(childrenList.querySelectorAll('.child-entry'));
-        if (childEntries.length === 0) {
-          showWizardError('Please add at least one child.');
-          return;
-        }
-        const children = [];
-        for (const entry of childEntries) {
-          const name = entry.querySelector('.child-name-input').value.trim();
-          const org_id = entry.querySelector('.child-org-select').value;
-          const club = entry.querySelector('.child-club-input').value.trim();
-          const username = entry.querySelector('.child-username-input').value.trim();
-          const password = entry.querySelector('.child-password-input').value.trim();
-          if (!name || !org_id || !username || !password) {
-            showWizardError('Each child must have a name, organization, username, and password.');
-            return;
-          }
-          children.push({
-            name,
-            org_id: Number(org_id),
-            club,
-            username,
-            password,
-            parent_id: <%= session.userId %>
-          });
-        }
-        try {
-          console.log('🧙‍♂️ Wizard: About to send API call...');
-          console.log('🧙‍♂️ Wizard: Children data:', children);
-          console.log('🧙‍♂️ Wizard: Sending children data:', JSON.stringify({ children }, null, 2));
-          
-          const requestBody = JSON.stringify({ children });
-          console.log('🧙‍♂️ Wizard: Request body:', requestBody);
-          
-          const resp = await fetch('/api/profile/children', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: requestBody
-          });
-          
-          console.log('🧙‍♂️ Wizard: Response received!');
-          console.log('🧙‍♂️ Wizard: Response status:', resp.status);
-          console.log('🧙‍♂️ Wizard: Response headers:', resp.headers);
-          
-          const data = await resp.json();
-          console.log('🧙‍♂️ Wizard: Response data:', data);
-          
-          if (!resp.ok || !data.success) {
-            console.log('🧙‍♂️ Wizard: API call failed!');
-            showWizardError(data.error || 'Failed to save children. Please try again.');
-            return;
-          }
-          console.log('🧙‍♂️ Wizard: Children saved successfully!');
-          
-          // Mark profile as completed
-          console.log('🧙‍♂️ Wizard: Marking profile as completed...');
-          const completeResp = await fetch('/api/profile/complete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-          });
-          
-          if (!completeResp.ok) {
-            console.log('🧙‍♂️ Wizard: Failed to mark profile as completed, but children were saved.');
-          } else {
-            console.log('🧙‍♂️ Wizard: Profile marked as completed successfully.');
-          }
-          
-          // Complete the wizard and reload the page
-          console.log('🧙‍♂️ Wizard: Completing wizard and reloading page');
-          const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('profileWizardModal'));
-          modal.hide();
-          window.location.reload();
-          return;
-        } catch (err) {
-          console.error('🧙‍♂️ Wizard: Error saving children:', err);
-          console.error('🧙‍♂️ Wizard: Error details:', err.message);
-          console.error('🧙‍♂️ Wizard: Error stack:', err.stack);
-          showWizardError('Network error. Please try again.');
-          return;
-        }
-      }
-    };
 
-    document.getElementById('wizard-skip-btn').onclick = async function() {
-      try {
-        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('profileWizardModal'));
-        modal.hide();
-        // await fetch('/api/profile/complete', { method: 'POST' }); // Commented out as per instructions
-        window.location.reload();
-      } catch (err) {
-        console.error('Error skipping wizard:', err);
-        showWizardError('Network error. Please try again.');
-      }
-    };
-
-    document.getElementById('add-child-btn').onclick = function() {
-      const template = document.getElementById('child-entry-template').firstElementChild.cloneNode(true);
-      template.querySelector('.remove-child-btn').onclick = function() {
-        template.remove();
-      };
-      document.getElementById('children-list').appendChild(template);
-    };
-
-    // Initialize the modal for new users (only show automatically if profile is not completed)
-    try {
-      const wizardModal = new bootstrap.Modal(document.getElementById('profileWizardModal'), {
-        backdrop: 'static',
-        keyboard: false
-      });
-      showStep(1);
-      console.log('Wizard modal initialized');
-      
-      // Only show the modal automatically for new users (profile_completed = 0)
-      <% if (!user.profile_completed) { %>
-        wizardModal.show();
-        console.log('Wizard modal shown automatically for new user');
-      <% } else { %>
-        console.log('Wizard modal initialized but not shown (user profile completed)');
-      <% } %>
-    } catch (e) {
-      console.error('Error initializing wizard modal:', e);
-    }
-  }
-});
-</script>
-<% } %>
-
-<!-- Add Child Button Handler - Always Loaded (not conditional) -->
-<script>
-// TEST: Check if this script is loading at all
-console.log('🧙‍♂️ TEST: Dashboard script is loading!');
-
-// Open Add Child Wizard button handler - wait for DOM to be ready
-console.log('🧙‍♂️ Wizard: Script starting, setting up DOM ready listener...');
-document.addEventListener('DOMContentLoaded', function() {
-  console.log('🧙‍♂️ Wizard: DOM loaded, looking for openAddChildWizard button...');
-  const openAddChildWizardBtn = document.getElementById('openAddChildWizard');
-  console.log('🧙‍♂️ Wizard: openAddChildWizard button found:', openAddChildWizardBtn);
-  if (openAddChildWizardBtn) {
-    console.log('🧙‍♂️ Wizard: Setting up click handler for openAddChildWizard button');
-    openAddChildWizardBtn.onclick = function() {
-      console.log('🧙‍♂️ Wizard: Add Child button clicked!');
-      // Set global variable for add child only mode
-      window.addChildOnlyMode = true;
-      console.log('🧙‍♂️ Wizard: Creating modal instance...');
-      const wizardModal = new bootstrap.Modal(document.getElementById('profileWizardModal'), {
-        backdrop: 'static',
-        keyboard: false
-      });
-      console.log('🧙‍♂️ Wizard: Modal instance created, showing modal...');
-      wizardModal.show();
-      console.log('🧙‍♂️ Wizard: Modal show() called');
-      // Only show step 2
-      document.getElementById('wizard-step-1').classList.add('d-none');
-      document.getElementById('wizard-step-2').classList.remove('d-none');
-      document.getElementById('wizard-back-btn').style.display = 'none';
-      document.getElementById('wizard-skip-btn').style.display = 'none';
-      document.getElementById('wizard-next-btn').style.display = 'none';
-      console.log('🧙‍♂️ Wizard: Setting up Finish button visibility...');
-      const finishBtn = document.getElementById('wizard-finish-btn');
-      console.log('🧙‍♂️ Wizard: Finish button element:', finishBtn);
-      if (finishBtn) {
-        finishBtn.classList.remove('d-none');
-        finishBtn.textContent = 'Add Child';
-        finishBtn.style.display = 'inline-block';
-        console.log('🧙‍♂️ Wizard: Finish button classes after setup:', finishBtn.className);
-        console.log('🧙‍♂️ Wizard: Finish button style display:', finishBtn.style.display);
-        console.log('🧙‍♂️ Wizard: Finish button computed style display:', window.getComputedStyle(finishBtn).display);
-        console.log('🧙‍♂️ Wizard: Finish button visibility:', window.getComputedStyle(finishBtn).visibility);
-        console.log('🧙‍♂️ Wizard: Finish button opacity:', window.getComputedStyle(finishBtn).opacity);
-        console.log('🧙‍♂️ Wizard: Finish button parent display:', window.getComputedStyle(finishBtn.parentElement).display);
-        console.log('🧙‍♂️ Wizard: Finish button offsetParent:', finishBtn.offsetParent);
-        console.log('🧙‍♂️ Wizard: Finish button offsetWidth:', finishBtn.offsetWidth);
-        console.log('🧙‍♂️ Wizard: Finish button offsetHeight:', finishBtn.offsetHeight);
-      } else {
-        console.log('🧙‍♂️ Wizard: ERROR - Finish button not found!');
-      }
-      document.getElementById('profileWizardLabel').textContent = 'Add a Child';
-      
-      // Add Quit button handler for Add Child Only Mode
+      // Add Quit button handler
       const wizardQuitBtn = document.getElementById('wizard-quit-btn');
       if (wizardQuitBtn) {
-        wizardQuitBtn.onclick = function() {
-          console.log('🧙‍♂️ Wizard: Quit button clicked in Add Child Only Mode');
+        wizardQuitBtn.onclick = async function() {
           const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('profileWizardModal'));
           modal.hide();
         };
       }
-      
-      // Add Finish button handler for Add Child Only Mode
+
+      // Wizard finish button handler for both add child only mode and profile completion
       const wizardFinishBtn = document.getElementById('wizard-finish-btn');
       if (wizardFinishBtn) {
         wizardFinishBtn.onclick = async function() {
-          console.log('🧙‍♂️ Wizard: Finish button clicked in Add Child Only Mode');
+          console.log('🧙‍♂️ Wizard: Finish button clicked! addChildOnlyMode:', addChildOnlyMode);
           
-          // Validate and save child data
-          const childrenList = document.getElementById('children-list');
-          const childEntries = Array.from(childrenList.querySelectorAll('.child-entry'));
-          if (childEntries.length === 0) {
-            alert('Please add at least one child.');
-            return;
-          }
-          
-          const children = [];
-          for (const entry of childEntries) {
-            const name = entry.querySelector('.child-name-input').value.trim();
-            const org_id = entry.querySelector('.child-org-select').value;
-            const club = entry.querySelector('.child-club-input').value.trim();
-            const username = entry.querySelector('.child-username-input').value.trim();
-            const password = entry.querySelector('.child-password-input').value.trim();
-            if (!name || !org_id || !username || !password) {
-              alert('Each child must have a name, organization, username, and password.');
+          if (window.addChildOnlyMode) {
+            // Add Child Only Mode logic
+            const childrenList = document.getElementById('children-list');
+            const childEntries = Array.from(childrenList.querySelectorAll('.child-entry'));
+            if (childEntries.length === 0) {
+              showWizardError('Please add at least one child.');
               return;
             }
-            children.push({
-              name,
-              org_id: Number(org_id),
-              club,
-              username,
-              password,
-              parent_id: <%= session.userId %>
-            });
+            const children = [];
+            for (const entry of childEntries) {
+              const name = entry.querySelector('.child-name-input').value.trim();
+              const org_id = entry.querySelector('.child-org-select').value;
+              const club = entry.querySelector('.child-club-input').value.trim();
+              const username = entry.querySelector('.child-username-input').value.trim();
+              const password = entry.querySelector('.child-password-input').value.trim();
+              if (!name || !org_id || !username || !password) {
+                showWizardError('Each child must have a name, organization, username, and password.');
+                return;
+              }
+              children.push({
+                name,
+                org_id: Number(org_id),
+                club,
+                username,
+                password,
+                parent_id: <%= session.userId %>
+              });
+            }
+            try {
+              const resp = await fetch('/api/profile/children', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ children })
+              });
+              const data = await resp.json();
+              if (!resp.ok || !data.success) {
+                showWizardError(data.error || 'Failed to save children. Please try again.');
+                return;
+              }
+              // Success: hide modal and reload page
+              console.log('🧙‍♂️ Wizard: Add Child Only Mode - Children saved successfully!');
+              const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('profileWizardModal'));
+              modal.hide();
+              window.location.reload();
+            } catch (err) {
+              showWizardError('Network error. Please try again.');
+              return;
+            }
+          } else {
+            // Profile Completion Mode logic (Step 2 - Children)
+            console.log('🧙‍♂️ Wizard: Processing profile completion finish...');
+            clearWizardError();
+            const childrenList = document.getElementById('children-list');
+            const childEntries = Array.from(childrenList.querySelectorAll('.child-entry'));
+            if (childEntries.length === 0) {
+              showWizardError('Please add at least one child.');
+              return;
+            }
+            const children = [];
+            for (const entry of childEntries) {
+              const name = entry.querySelector('.child-name-input').value.trim();
+              const org_id = entry.querySelector('.child-org-select').value;
+              const club = entry.querySelector('.child-club-input').value.trim();
+              const username = entry.querySelector('.child-username-input').value.trim();
+              const password = entry.querySelector('.child-password-input').value.trim();
+              if (!name || !org_id || !username || !password) {
+                showWizardError('Each child must have a name, organization, username, and password.');
+                return;
+              }
+              children.push({
+                name,
+                org_id: Number(org_id),
+                club,
+                username,
+                password,
+                parent_id: <%= session.userId %>
+              });
+            }
+            try {
+              console.log('🧙‍♂️ Wizard: About to send API call...');
+              const requestBody = JSON.stringify({ children });
+              
+              const resp = await fetch('/api/profile/children', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: requestBody
+              });
+              
+              const data = await resp.json();
+              
+              if (!resp.ok || !data.success) {
+                console.log('🧙‍♂️ Wizard: API call failed!');
+                showWizardError(data.error || 'Failed to save children. Please try again.');
+                return;
+              }
+              console.log('🧙‍♂️ Wizard: Children saved successfully!');
+              
+              // Mark profile as completed
+              console.log('🧙‍♂️ Wizard: Marking profile as completed...');
+              const completeResp = await fetch('/api/profile/complete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+              });
+              
+              if (!completeResp.ok) {
+                console.log('🧙‍♂️ Wizard: Failed to mark profile as completed, but continuing...');
+              } else {
+                console.log('🧙‍♂️ Wizard: Profile marked as completed successfully!');
+              }
+              
+              // Complete the wizard and reload the page
+              console.log('🧙‍♂️ Wizard: Completing wizard and reloading page');
+              const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('profileWizardModal'));
+              modal.hide();
+              window.location.reload();
+              return;
+            } catch (err) {
+              console.error('🧙‍♂️ Wizard: Error saving children:', err);
+              showWizardError('Network error. Please try again.');
+              return;
+            }
           }
-          
+        };
+      }
+
+      // Wizard button event listeners
+      document.getElementById('wizard-next-btn').onclick = async function() {
+        console.log('🧙‍♂️ Wizard: Next button clicked! Current step:', wizardStep);
+        if (wizardStep === 1) {
+          clearWizardError();
+          const address = document.getElementById('wizard_home_address').value.trim();
+          const lat = document.getElementById('wizard_home_lat').value;
+          const lng = document.getElementById('wizard_home_lng').value;
+          const isPrivate = document.getElementById('wizard_is_address_private').checked;
+          if (!address || !lat || !lng) {
+            showWizardError('Please select a valid address from the dropdown.');
+            return;
+          }
           try {
-            console.log('🧙‍♂️ Wizard: Saving child data in Add Child Only Mode...');
-            const resp = await fetch('/api/profile/children', {
+            const resp = await fetch('/api/profile/address', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ children })
+              body: JSON.stringify({ home_address: address, home_lat: lat, home_lng: lng, is_address_private: isPrivate })
             });
             const data = await resp.json();
             if (!resp.ok || !data.success) {
-              alert(data.error || 'Failed to save child. Please try again.');
+              showWizardError(data.error || 'Failed to save address. Please try again.');
               return;
             }
-            
-            console.log('🧙‍♂️ Wizard: Child saved successfully in Add Child Only Mode!');
-            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('profileWizardModal'));
-            modal.hide();
-            window.location.reload();
           } catch (err) {
-            console.error('🧙‍♂️ Wizard: Error saving child:', err);
-            alert('Network error. Please try again.');
+            showWizardError('Network error. Please try again.');
             return;
           }
-        };
-      }
-      
-      // Clear children-list and add one child entry by default
-      const childrenList = document.getElementById('children-list');
-      childrenList.innerHTML = '';
-      const template = document.getElementById('child-entry-template').firstElementChild.cloneNode(true);
-      template.querySelector('.remove-child-btn').onclick = function() {
-        template.remove();
+        }
+        
+        // Only advance to next step if not on the final step
+        if (wizardStep < totalSteps) {
+          wizardStep++;
+          console.log('🧙‍♂️ Wizard: Advancing to step:', wizardStep);
+          showStep(wizardStep);
+        }
       };
-      childrenList.appendChild(template);
-    };
-    console.log('🧙‍♂️ Wizard: Click handler attached successfully');
-  } else {
-    console.log('🧙‍♂️ Wizard: ERROR - openAddChildWizard button not found!');
-    // Try again after a short delay in case the button is added dynamically
-    setTimeout(function() {
-      console.log('🧙‍♂️ Wizard: Retrying to find button after delay...');
-      const retryBtn = document.getElementById('openAddChildWizard');
-      console.log('🧙‍♂️ Wizard: Retry - button found:', retryBtn);
-      if (retryBtn) {
-        console.log('🧙‍♂️ Wizard: Setting up click handler on retry...');
-        retryBtn.onclick = function() {
-          console.log('🧙‍♂️ Wizard: Add Child button clicked (retry)!');
-          window.addChildOnlyMode = true;
-          const wizardModal = new bootstrap.Modal(document.getElementById('profileWizardModal'), {
-            backdrop: 'static',
-            keyboard: false
-          });
-          wizardModal.show();
-          // Only show step 2
-          document.getElementById('wizard-step-1').classList.add('d-none');
-          document.getElementById('wizard-step-2').classList.remove('d-none');
-          document.getElementById('wizard-back-btn').style.display = 'none';
-          document.getElementById('wizard-skip-btn').style.display = 'none';
-          document.getElementById('wizard-next-btn').style.display = 'none';
-          console.log('🧙‍♂️ Wizard: Setting up Finish button visibility (retry)...');
-          const finishBtn = document.getElementById('wizard-finish-btn');
-          console.log('🧙‍♂️ Wizard: Finish button element (retry):', finishBtn);
-          if (finishBtn) {
-            finishBtn.classList.remove('d-none');
-            finishBtn.textContent = 'Add Child';
-            finishBtn.style.display = 'inline-block';
-            console.log('🧙‍♂️ Wizard: Finish button classes after setup (retry):', finishBtn.className);
-            console.log('🧙‍♂️ Wizard: Finish button style display (retry):', finishBtn.style.display);
-            console.log('🧙‍♂️ Wizard: Finish button computed style display (retry):', window.getComputedStyle(finishBtn).display);
-            console.log('🧙‍♂️ Wizard: Finish button visibility (retry):', window.getComputedStyle(finishBtn).visibility);
-            console.log('🧙‍♂️ Wizard: Finish button opacity (retry):', window.getComputedStyle(finishBtn).opacity);
-            console.log('🧙‍♂️ Wizard: Finish button parent display (retry):', window.getComputedStyle(finishBtn.parentElement).display);
-            console.log('🧙‍♂️ Wizard: Finish button offsetParent (retry):', finishBtn.offsetParent);
-            console.log('🧙‍♂️ Wizard: Finish button offsetWidth (retry):', finishBtn.offsetWidth);
-            console.log('🧙‍♂️ Wizard: Finish button offsetHeight (retry):', finishBtn.offsetHeight);
-          } else {
-            console.log('🧙‍♂️ Wizard: ERROR - Finish button not found (retry)!');
-          }
-          document.getElementById('profileWizardLabel').textContent = 'Add a Child';
-          
-          // Add Quit button handler for Add Child Only Mode (retry)
-          const wizardQuitBtn = document.getElementById('wizard-quit-btn');
-          if (wizardQuitBtn) {
-            wizardQuitBtn.onclick = function() {
-              console.log('🧙‍♂️ Wizard: Quit button clicked in Add Child Only Mode (retry)');
-              const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('profileWizardModal'));
-              modal.hide();
-            };
-          }
-          
-          // Add Finish button handler for Add Child Only Mode (retry)
-          const wizardFinishBtn = document.getElementById('wizard-finish-btn');
-          if (wizardFinishBtn) {
-            wizardFinishBtn.onclick = async function() {
-              console.log('🧙‍♂️ Wizard: Finish button clicked in Add Child Only Mode (retry)');
-              
-              // Validate and save child data
-              const childrenList = document.getElementById('children-list');
-              const childEntries = Array.from(childrenList.querySelectorAll('.child-entry'));
-              if (childEntries.length === 0) {
-                alert('Please add at least one child.');
-                return;
-              }
-              
-              const children = [];
-              for (const entry of childEntries) {
-                const name = entry.querySelector('.child-name-input').value.trim();
-                const org_id = entry.querySelector('.child-org-select').value;
-                const club = entry.querySelector('.child-club-input').value.trim();
-                const username = entry.querySelector('.child-username-input').value.trim();
-                const password = entry.querySelector('.child-password-input').value.trim();
-                if (!name || !org_id || !username || !password) {
-                  alert('Each child must have a name, organization, username, and password.');
-                  return;
-                }
-                children.push({
-                  name,
-                  org_id: Number(org_id),
-                  club,
-                  username,
-                  password,
-                  parent_id: <%= session.userId %>
-                });
-              }
-              
-              try {
-                console.log('🧙‍♂️ Wizard: Saving child data in Add Child Only Mode (retry)...');
-                const resp = await fetch('/api/profile/children', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ children })
-                });
-                const data = await resp.json();
-                if (!resp.ok || !data.success) {
-                  alert(data.error || 'Failed to save child. Please try again.');
-                  return;
-                }
-                
-                console.log('🧙‍♂️ Wizard: Child saved successfully in Add Child Only Mode (retry)!');
-                const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('profileWizardModal'));
-                modal.hide();
-                window.location.reload();
-              } catch (err) {
-                console.error('🧙‍♂️ Wizard: Error saving child:', err);
-                alert('Network error. Please try again.');
-                return;
-              }
-            };
-          }
-          
-          // Clear children-list and add one child entry by default
-          const childrenList = document.getElementById('children-list');
-          childrenList.innerHTML = '';
-          const template = document.getElementById('child-entry-template').firstElementChild.cloneNode(true);
-          template.querySelector('.remove-child-btn').onclick = function() {
-            template.remove();
-          };
-          childrenList.appendChild(template);
-        };
-        console.log('🧙‍♂️ Wizard: Retry click handler attached successfully');
-      }
-    }, 1000);
-  }
-});
-</script>
 
-<script async defer src="https://maps.googleapis.com/maps/api/js?key=<%= GMAPS_API_KEY %>&libraries=places&callback=initLiftyMaps"></script>
-<%- include('partials/footer1') %>
+      document.getElementById('wizard-back-btn').onclick = function() {
+        if (wizardStep > 1) {
+          wizardStep--;
+          showStep(wizardStep);
+        }
+      };
+
+      document.getElementById('wizard-skip-btn').onclick = async function() {
+        try {
+          const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('profileWizardModal'));
+          modal.hide();
+          window.location.reload();
+        } catch (err) {
+          console.error('Error skipping wizard:', err);
+          showWizardError('Network error. Please try again.');
+        }
+      };
+
+      document.getElementById('add-child-btn').onclick = function() {
+        const template = document.getElementById('child-entry-template').firstElementChild.cloneNode(true);
+        template.querySelector('.remove-child-btn').onclick = function() {
+          template.remove();
+        };
+        document.getElementById('children-list').appendChild(template);
+      };
+
+      // Initialize the modal for new users (only show automatically if profile is not completed)
+      try {
+        const wizardModal = new bootstrap.Modal(document.getElementById('profileWizardModal'), {
+          backdrop: 'static',
+          keyboard: false
+        });
+        showStep(1);
+        console.log('Wizard modal initialized');
+        
+        // Only show the modal automatically for new users (profile_completed = 0)
+        <% if (!user.profile_completed) { %>
+          wizardModal.show();
+          console.log('Wizard modal shown automatically for new user');
+        <% } else { %>
+          console.log('Wizard modal initialized but not shown (user profile completed)');
+        <% } %>
+      } catch (e) {
+        console.error('Error initializing wizard modal:', e);
+      }
+    }
+  });
+  </script>
+  <% } %>
+
+  <!-- Add Child Button Handler - Always Loaded (not conditional) -->
+  <script>
+  // Open Add Child Wizard button handler - wait for DOM to be ready
+  console.log('🧙‍♂️ Wizard: Script starting, setting up DOM ready listener...');
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('🧙‍♂️ Wizard: DOM loaded, looking for openAddChildWizard button...');
+    const openAddChildWizardBtn = document.getElementById('openAddChildWizard');
+    console.log('🧙‍♂️ Wizard: openAddChildWizard button found:', openAddChildWizardBtn);
+    if (openAddChildWizardBtn) {
+      console.log('🧙‍♂️ Wizard: Setting up click handler for openAddChildWizard button');
+      openAddChildWizardBtn.onclick = function() {
+        console.log('🧙‍♂️ Wizard: Add Child button clicked!');
+        // Set global variable for add child only mode
+        window.addChildOnlyMode = true;
+        console.log('🧙‍♂️ Wizard: Creating modal instance...');
+        const wizardModal = new bootstrap.Modal(document.getElementById('profileWizardModal'), {
+          backdrop: 'static',
+          keyboard: false
+        });
+        console.log('🧙‍♂️ Wizard: Modal instance created, showing modal...');
+        wizardModal.show();
+        console.log('🧙‍♂️ Wizard: Modal show() called');
+        // Only show step 2
+        document.getElementById('wizard-step-1').classList.add('d-none');
+        document.getElementById('wizard-step-2').classList.remove('d-none');
+        document.getElementById('wizard-back-btn').style.display = 'none';
+        document.getElementById('wizard-skip-btn').style.display = 'none';
+        document.getElementById('wizard-next-btn').style.display = 'none';
+        console.log('🧙‍♂️ Wizard: Setting up Finish button visibility...');
+        const finishBtn = document.getElementById('wizard-finish-btn');
+        console.log('🧙‍♂️ Wizard: Finish button element:', finishBtn);
+        if (finishBtn) {
+          finishBtn.classList.remove('d-none');
+          finishBtn.textContent = 'Add Child';
+          finishBtn.style.display = 'inline-block';
+        }
+        document.getElementById('profileWizardLabel').textContent = 'Add a Child';
+        
+        // Clear children-list and add one child entry by default
+        const childrenList = document.getElementById('children-list');
+        childrenList.innerHTML = '';
+        const template = document.getElementById('child-entry-template').firstElementChild.cloneNode(true);
+        template.querySelector('.remove-child-btn').onclick = function() {
+          template.remove();
+        };
+        childrenList.appendChild(template);
+      };
+      console.log('🧙‍♂️ Wizard: Click handler attached successfully');
+    } else {
+      console.log('🧙‍♂️ Wizard: ERROR - openAddChildWizard button not found!');
+    }
+  });
+  </script>
+
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key=<%= GMAPS_API_KEY %>&libraries=places&callback=initLiftyMaps"></script>
+
+  <%- include('partials/footer1') %>

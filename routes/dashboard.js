@@ -421,6 +421,34 @@ router.get('/dashboard', async (req, res) => {
     const recentShortNoticeRequests = [];
     const myShortNoticeRequests = [];
 
+    // Get names of organizations the user is affiliated with
+    const [orgNamesRows] = await db.query(`
+      SELECT o.name 
+      FROM Organizations o
+      JOIN UserAffiliations ua ON ua.organization_id = o.id
+      WHERE ua.user_id = ?
+    `, [userId]);
+    const affiliatedOrgNames = orgNamesRows.map(r => r.name);
+
+    // Fetch all pending ride requests within next 7 days
+    const [pendingRequests] = await db.query(`
+      SELECT rr.*, c.name AS child_name, u.name AS parent_name
+      FROM RideRequests rr
+      JOIN Children c ON rr.child_id = c.id
+      JOIN Users u ON rr.user_id = u.id
+      WHERE rr.pickup_time >= NOW() 
+        AND rr.pickup_time <= DATE_ADD(NOW(), INTERVAL 7 DAY)
+        AND (rr.status IS NULL OR rr.status = 'Pending')
+        AND rr.assigned_user_id IS NULL
+      ORDER BY rr.pickup_time ASC
+    `);
+
+    // Filter by affiliations
+    const affiliatedRideRequests = pendingRequests.filter(req => {
+      const locs = [(req.pickup_location || '').toLowerCase(), (req.dropoff_location || '').toLowerCase()];
+      return affiliatedOrgNames.some(name => locs.some(l => l.includes(name.toLowerCase())));
+    });
+
     // Determine if profile is incomplete
     // const missingAddress = !user.home_address;
     // const missingChildren = children.length === 0;
@@ -444,6 +472,8 @@ router.get('/dashboard', async (req, res) => {
       calendarEvents,
       trustedGroups,
       recentShortNoticeRequests,
+      myRideRequests,
+      affiliatedRideRequests,
       myShortNoticeRequests,
       success: req.session.success,
       error: req.session.error,

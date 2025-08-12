@@ -34,19 +34,7 @@
             </div>
           </div>
         </div>
-        <div class="col-md-6">
-          <div class="card border-warning">
-            <div class="card-body">
-              <h5 class="card-title text-warning">
-                <i class="fas fa-users me-2"></i>Trusted Group Notifications
-              </h5>
-              <p class="card-text">
-                <span class="badge bg-warning"><%= unreadTrustedGroup || 0 %> unread</span>
-                <span class="text-muted ms-2"><%= (trustedGroupNotifications && trustedGroupNotifications.length) || 0 %> total</span>
-              </p>
-            </div>
-          </div>
-        </div>
+        <!-- Removed Trusted Group stats -->
       </div>
 
       <!-- General Notifications -->
@@ -87,44 +75,7 @@
         </div>
       </div>
 
-      <!-- Trusted Group Notifications -->
-      <div class="card">
-        <div class="card-header bg-warning text-dark">
-          <h5 class="mb-0">
-            <i class="fas fa-users me-2"></i>Trusted Group Notifications
-          </h5>
-        </div>
-        <div class="card-body">
-          <% if (!trustedGroupNotifications || trustedGroupNotifications.length === 0) { %>
-            <div class="text-center text-muted py-4">
-              <i class="fas fa-users fa-3x mb-3"></i>
-              <p>No trusted group notifications yet.</p>
-            </div>
-          <% } else { %>
-            <div class="list-group">
-              <% trustedGroupNotifications.forEach(notification => { %>
-                <div class="list-group-item list-group-item-action <%= !notification.is_read ? 'list-group-item-warning' : '' %>" 
-                     data-trusted-notification-id="<%= notification.id %>">
-                  <div class="d-flex w-100 justify-content-between">
-                    <h6 class="mb-1"><%= notification.title || notification.notification_type || 'Group Notification' %></h6>
-                    <small class="text-muted">
-                      <%= notification.created_at ? new Date(notification.created_at).toLocaleDateString() : 'Unknown date' %>
-                      <% if (!notification.is_read) { %>
-                        <span class="badge bg-warning ms-2">New</span>
-                      <% } %>
-                    </small>
-                  </div>
-                  <p class="mb-1"><%= notification.message || 'No message content' %></p>
-                  <small class="text-muted">
-                    <i class="fas fa-users me-1"></i><%= notification.group_name || 'Unknown Group' %>
-                    <i class="fas fa-tag ms-2 me-1"></i><%= notification.notification_type || 'group' %>
-                  </small>
-                </div>
-              <% }); %>
-            </div>
-          <% } %>
-        </div>
-      </div>
+      <!-- Trusted Group Notifications section removed -->
     </div>
   </div>
 </div>
@@ -140,13 +91,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 
-  // Trusted group notifications
-  document.querySelectorAll('[data-trusted-notification-id]').forEach(item => {
-    item.addEventListener('click', function() {
-      const notificationId = this.getAttribute('data-trusted-notification-id');
-      markTrustedGroupNotificationAsRead(notificationId);
-    });
-  });
+  // Removed trusted group click handler
 });
 
 function markNotificationAsRead(notificationId) {
@@ -171,27 +116,7 @@ function markNotificationAsRead(notificationId) {
   .catch(error => console.error('Error marking notification as read:', error));
 }
 
-function markTrustedGroupNotificationAsRead(notificationId) {
-  fetch(`/notifications/trusted-group/${notificationId}/read`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    }
-  })
-  .then(response => response.json())
-  .then(data => {
-    if (data.success) {
-      // Remove the "New" badge and update styling
-      const notification = document.querySelector(`[data-trusted-notification-id="${notificationId}"]`);
-      if (notification) {
-        notification.classList.remove('list-group-item-warning');
-        const badge = notification.querySelector('.badge');
-        if (badge) badge.remove();
-      }
-    }
-  })
-  .catch(error => console.error('Error marking trusted group notification as read:', error));
-}
+// Removed trusted group read function
 </script>
 
 <%- include('partials/footer1') %>

@@ -19,21 +19,9 @@ router.get('/', async (req, res) => {
       LIMIT 50
     `, [userId]);
     
-    // Get trusted group notifications
-    const [trustedGroupNotifications] = await db.query(`
-      SELECT 
-        tgn.*,
-        tg.name as group_name
-      FROM TrustedGroupNotifications tgn
-      JOIN TrustedGroups tg ON tgn.group_id = tg.id
-      WHERE tgn.user_id = ?
-      ORDER BY tgn.created_at DESC
-      LIMIT 50
-    `, [userId]);
-    
-    // Get unread counts
+    const trustedGroupNotifications = [];
+    const unreadTrustedGroup = 0;
     const unreadGeneral = await notifications.getUnreadNotificationsCount(userId);
-    const unreadTrustedGroup = await notifications.getUnreadTrustedGroupNotificationsCount(userId);
     
     res.render('notifications', {
       session: req.session,
