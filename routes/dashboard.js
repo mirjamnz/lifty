@@ -445,6 +445,7 @@ router.get('/dashboard', async (req, res) => {
 
     // Filter by affiliations
     const affiliatedRideRequests = pendingRequests.filter(req => {
+      if (req.user_id === userId) return false; // skip own requests
       const locs = [(req.pickup_location || '').toLowerCase(), (req.dropoff_location || '').toLowerCase()];
       return affiliatedOrgNames.some(name => locs.some(l => l.includes(name.toLowerCase())));
     });
