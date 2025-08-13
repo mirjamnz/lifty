@@ -2,6 +2,79 @@
 <%- include('partials/header1') %>
 <%- include('partials/navbar1') %>
 
+<style>
+/* REFINED MODAL CSS - VISIBLE BUT INTERACTIVE */
+.custom-modal {
+  display: none !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background-color: rgba(0,0,0,0.5) !important;
+  z-index: 999999 !important;
+  overflow-y: auto !important;
+}
+
+.custom-modal.active {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.modal-content-wrapper {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  background: white !important;
+  border-radius: 8px !important;
+  padding: 0 !important;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+  max-height: 90vh !important;
+  overflow-y: auto !important;
+  z-index: 1000000 !important;
+  pointer-events: auto !important;
+}
+
+/* ALLOW NORMAL INTERACTIONS INSIDE MODAL */
+.custom-modal.active .modal-content-wrapper,
+.custom-modal.active .modal-content-wrapper *,
+.custom-modal.active .modal-content-wrapper input,
+.custom-modal.active .modal-content-wrapper select,
+.custom-modal.active .modal-content-wrapper button,
+.custom-modal.active .modal-content-wrapper form {
+  pointer-events: auto !important;
+  cursor: auto !important;
+}
+
+.custom-modal.active .modal-content-wrapper input:hover,
+.custom-modal.active .modal-content-wrapper select:hover,
+.custom-modal.active .modal-content-wrapper button:hover {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* ONLY DISABLE HOVER EFFECTS ON BACKGROUND ELEMENTS WHEN MODAL IS OPEN */
+.modal-active .card:hover {
+  transform: none !important;
+}
+
+.modal-active section .col-md-4:hover {
+  transform: none !important;
+}
+
+/* KEEP MODAL BACKDROP CLICKABLE */
+.custom-modal.active {
+  pointer-events: auto !important;
+}
+
+/* BUT MODAL CONTENT SHOULD BLOCK BACKDROP CLICKS */
+.custom-modal.active .modal-content-wrapper {
+  pointer-events: auto !important;
+}
+</style>
+
 <div class="container py-5">
   <h2 class="mb-4">🏫 Schools & Clubs Management</h2>
 
@@ -83,7 +156,7 @@
 
           <% if (organizations && organizations.length > 0) { %>
             <div class="table-responsive">
-                              <table class="table">
+              <table class="table">
                 <thead class="table-light">
                   <tr>
                     <th>Name</th>
@@ -103,38 +176,36 @@
                         </span>
                       </td>
                       <td><%= org.address || 'Not specified' %></td>
-                                                      <td>
-                                  <div class="d-flex flex-column align-items-start">
-                                    <small class="text-muted">
-                                      <i class="fas fa-users me-1"></i>
-                                      <a href="/organizations/<%= org.id %>/details" class="text-decoration-none">
-                                        <span class="badge bg-primary hover-bg-primary-dark"><%= org.parent_count || 0 %> parents</span>
-                                      </a>
-                                    </small>
-                                    <small class="text-muted mt-1">
-                                      <i class="fas fa-child me-1"></i>
-                                      <a href="/organizations/<%= org.id %>/details" class="text-decoration-none">
-                                        <span class="badge bg-success hover-bg-success-dark"><%= org.child_count || 0 %> children</span>
-                                      </a>
-                                    </small>
-                                  </div>
-                                </td>
+                      <td>
+                        <div class="d-flex flex-column align-items-start">
+                          <small class="text-muted">
+                            <i class="fas fa-users me-1"></i>
+                            <a href="/organizations/<%= org.id %>/details" class="text-decoration-none">
+                              <span class="badge bg-primary hover-bg-primary-dark"><%= org.parent_count || 0 %> parents</span>
+                            </a>
+                          </small>
+                          <small class="text-muted mt-1">
+                            <i class="fas fa-child me-1"></i>
+                            <a href="/organizations/<%= org.id %>/details" class="text-decoration-none">
+                              <span class="badge bg-success hover-bg-success-dark"><%= org.child_count || 0 %> children</span>
+                            </a>
+                          </small>
+                        </div>
+                      </td>
                       <td>
                         <% 
                           // Check if user is already affiliated with this organization
                           const isAffiliated = userAffiliations && userAffiliations.some(aff => aff.id === org.id);
                         %>
                         <% if (!isAffiliated) { %>
-                                          <button class="btn btn-sm btn-success" onclick="openModal('<%= org.id %>')">
-                  <i class="fas fa-user-plus me-1"></i>Join
-                </button>
+                          <button class="btn btn-sm btn-success" onclick="openJoinModal('<%= org.id %>')">
+                            <i class="fas fa-user-plus me-1"></i>Join
+                          </button>
                         <% } else { %>
                           <span class="badge bg-success">Already Member</span>
                         <% } %>
-
                       </td>
                     </tr>
-
                   <% }) %>
                 </tbody>
               </table>
@@ -151,13 +222,13 @@
                 const isAffiliated = userAffiliations && userAffiliations.some(aff => aff.id === org.id);
               %>
               <% if (!isAffiliated) { %>
-                <div class="custom-modal" id="joinModal<%= org.id %>" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1050;">
-                  <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 8px; padding: 0; min-width: 400px; max-width: 500px;">
+                <div class="custom-modal" id="joinModal<%= org.id %>">
+                  <div class="modal-content-wrapper" style="min-width: 400px; max-width: 500px;">
                     <div style="padding: 1rem; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center;">
                       <h5 style="margin: 0;">
                         <i class="fas fa-user-plus me-2"></i>Join <%= org.name %>
                       </h5>
-                      <button type="button" class="btn-close" onclick="closeModal('<%= org.id %>')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+                      <button type="button" class="btn-close" onclick="closeJoinModal('<%= org.id %>')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
                     </div>
                     <form action="/organizations/<%= org.id %>/join" method="POST" id="joinForm<%= org.id %>">
                       <div style="padding: 1rem;">
@@ -185,7 +256,7 @@
                         </div>
                       </div>
                       <div style="padding: 1rem; border-top: 1px solid #dee2e6; display: flex; justify-content: flex-end; gap: 0.5rem;">
-                        <button type="button" class="btn btn-secondary" onclick="closeModal('<%= org.id %>')">Cancel</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeJoinModal('<%= org.id %>')">Cancel</button>
                         <button type="submit" class="btn btn-success" id="submitBtn<%= org.id %>">
                           <i class="fas fa-user-plus me-1"></i>Join Organization
                         </button>
@@ -198,8 +269,8 @@
           <% } %>
 
           <!-- Add Organization Modal -->
-          <div class="custom-modal" id="addOrganizationModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1050;">
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 8px; padding: 0; min-width: 500px; max-width: 600px;">
+          <div class="custom-modal" id="addOrganizationModal">
+            <div class="modal-content-wrapper" style="min-width: 500px; max-width: 600px;">
               <div style="padding: 1rem; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center;">
                 <h5 style="margin: 0;">
                   <i class="fas fa-plus me-2"></i>Add New Organization
@@ -253,8 +324,6 @@
               </form>
             </div>
           </div>
-
-
         </div>
       </div>
     </div>
@@ -322,79 +391,107 @@
 </div>
 
 <script>
-// Custom modal functions
-function openModal(orgId) {
-  const modal = document.getElementById('joinModal' + orgId);
+// REFINED JAVASCRIPT - VISIBLE BUT INTERACTIVE
+function forceModalVisible(modalId) {
+  const modal = document.getElementById(modalId);
   if (modal) {
+    // Add body class to override background hover effects only
+    document.body.classList.add('modal-active');
+    
+    // Make modal visible
+    modal.classList.add('active');
     modal.style.display = 'block';
-    document.body.style.overflow = 'hidden'; // Prevent background scrolling
+    modal.style.visibility = 'visible';
+    modal.style.opacity = '1';
+    
+    // Disable body scroll
+    document.body.style.overflow = 'hidden';
+    
+    // Force repaint once
+    modal.offsetHeight;
+    
+    console.log('🔧 Modal visible and interactive:', modalId);
   }
 }
 
-function closeModal(orgId) {
-  const modal = document.getElementById('joinModal' + orgId);
+function forceModalHidden(modalId) {
+  const modal = document.getElementById(modalId);
   if (modal) {
+    document.body.classList.remove('modal-active');
+    modal.classList.remove('active');
     modal.style.display = 'none';
-    document.body.style.overflow = ''; // Restore scrolling
+    document.body.style.overflow = '';
+    console.log('🔧 Modal hidden:', modalId);
   }
 }
 
-// Close modal when clicking outside
-document.addEventListener('click', function(event) {
-  if (event.target.classList.contains('custom-modal')) {
-    event.target.style.display = 'none';
-    document.body.style.overflow = '';
-  }
-});
+function openJoinModal(orgId) {
+  console.log('🔧 Opening join modal for org:', orgId);
+  forceModalVisible('joinModal' + orgId);
+}
 
-// Remove affiliation function
+function closeJoinModal(orgId) {
+  console.log('🔧 Closing join modal for org:', orgId);
+  forceModalHidden('joinModal' + orgId);
+}
+
+function openAddModal() {
+  console.log('🔧 Opening add modal');
+  forceModalVisible('addOrganizationModal');
+}
+
+function closeAddModal() {
+  console.log('🔧 Closing add modal');
+  forceModalHidden('addOrganizationModal');
+}
+
 function removeAffiliation(orgId, orgName) {
   if (confirm(`Are you sure you want to leave ${orgName}?`)) {
-    // Create a form and submit it
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = `/organizations/${orgId}/leave`;
-    
     document.body.appendChild(form);
     form.submit();
   }
 }
 
-// Add organization function
-function openAddModal() {
-  const modal = document.getElementById('addOrganizationModal');
-  if (modal) {
-    modal.style.display = 'block';
-    document.body.style.overflow = 'hidden';
-  }
-}
-
-function closeAddModal() {
-  const modal = document.getElementById('addOrganizationModal');
-  if (modal) {
-    modal.style.display = 'none';
-    document.body.style.overflow = '';
-  }
-}
-
-// Handle role selection in join modals
+// Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
-  // Get all role select elements
-  const roleSelects = document.querySelectorAll('select[name="role"]');
-  
-  roleSelects.forEach(function(select) {
-    select.addEventListener('change', function() {
-      const orgId = this.id.replace('role', '');
-      const childSelect = document.getElementById('childSelect' + orgId);
-      
-      if (this.value === 'child') {
-        childSelect.style.display = 'block';
-      } else {
-        childSelect.style.display = 'none';
+  console.log('🔧 Setting up refined event handlers...');
+
+  // Backdrop click handlers
+  document.querySelectorAll('.custom-modal').forEach(modal => {
+    modal.addEventListener('click', function(event) {
+      // Only close if clicking directly on the backdrop (not modal content)
+      if (event.target === modal) {
+        if (modal.id === 'addOrganizationModal') {
+          closeAddModal();
+        } else if (modal.id.startsWith('joinModal')) {
+          const orgId = modal.id.replace('joinModal', '');
+          closeJoinModal(orgId);
+        }
       }
     });
   });
-  
+
+  // Prevent modal content clicks from closing modal
+  document.querySelectorAll('.modal-content-wrapper').forEach(wrapper => {
+    wrapper.addEventListener('click', function(event) {
+      event.stopPropagation();
+    });
+  });
+
+  // Role selection handlers
+  document.querySelectorAll('select[name="role"]').forEach(select => {
+    select.addEventListener('change', function() {
+      const orgId = this.id.replace('role', '');
+      const childSelect = document.getElementById('childSelect' + orgId);
+      if (childSelect) {
+        childSelect.style.display = this.value === 'child' ? 'block' : 'none';
+      }
+    });
+  });
+
   // Search functionality
   const searchInput = document.getElementById('organizationSearch');
   const clearSearchBtn = document.getElementById('clearSearch');
@@ -407,23 +504,37 @@ document.addEventListener('DOMContentLoaded', function() {
       
       rows.forEach(function(row) {
         const text = row.textContent.toLowerCase();
-        if (text.includes(searchTerm)) {
-          row.style.display = '';
-        } else {
-          row.style.display = 'none';
-        }
+        row.style.display = text.includes(searchTerm) ? '' : 'none';
       });
     });
     
-    clearSearchBtn.addEventListener('click', function() {
-      searchInput.value = '';
-      const rows = tableBody.querySelectorAll('tr');
-      rows.forEach(function(row) {
-        row.style.display = '';
+    if (clearSearchBtn) {
+      clearSearchBtn.addEventListener('click', function() {
+        searchInput.value = '';
+        const rows = tableBody.querySelectorAll('tr');
+        rows.forEach(function(row) {
+          row.style.display = '';
+        });
       });
-    });
+    }
   }
+
+  // ESC key handler
+  document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+      document.querySelectorAll('.custom-modal.active').forEach(modal => {
+        if (modal.id === 'addOrganizationModal') {
+          closeAddModal();
+        } else if (modal.id.startsWith('joinModal')) {
+          const orgId = modal.id.replace('joinModal', '');
+          closeJoinModal(orgId);
+        }
+      });
+    }
+  });
+
+  console.log('✅ Refined event handlers set up complete');
 });
 </script>
 
-<%- include('partials/footer1') %> 
+<%- include('partials/footer1') %>
