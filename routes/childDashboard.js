@@ -99,8 +99,7 @@ router.get('/child-dashboard', async (req, res) => {
         types[0];
     });
 
-    // 5. Load child's ActivityGroup events (filtered by range)
-    // Show events for groups where the child is a member, regardless of specific assignments
+    // 5. Load child's ActivityGroup events (show for groups where child is a member)
     const [activityGroupEvents] = await db.query(
       `SELECT 
          ag.id AS group_id,
@@ -108,38 +107,52 @@ router.get('/child-dashboard', async (req, res) => {
          ag.location,
          ag.start_time,
          ag.end_time,
-         ag.day_of_week,
-         DATE_ADD(?, INTERVAL (7 + DAYOFWEEK(?) - DAYOFWEEK(STR_TO_DATE(ag.day_of_week, '%a'))) % 7 DAY) AS event_date,
-         GROUP_CONCAT(DISTINCT CONCAT(ua.name, ' (', aga.assignment_type, ')') SEPARATOR ', ') AS driver_assignments
+         ag.day_of_week
        FROM ActivityGroups ag
        JOIN ActivityGroupMembers agm ON ag.id = agm.group_id
-       LEFT JOIN ActivityGroupAssignments aga ON ag.id = aga.group_id 
-         AND aga.assignment_date = DATE_ADD(?, INTERVAL (7 + DAYOFWEEK(?) - DAYOFWEEK(STR_TO_DATE(ag.day_of_week, '%a'))) % 7 DAY)
-         AND aga.status = 'confirmed' AND aga.is_cancelled = FALSE
-       LEFT JOIN Users ua ON aga.user_id = ua.id
-       WHERE agm.child_id = ? AND agm.is_active = TRUE AND ag.is_active = TRUE AND ag.has_schedule = TRUE
-         AND DATE_ADD(?, INTERVAL (7 + DAYOFWEEK(?) - DAYOFWEEK(STR_TO_DATE(ag.day_of_week, '%a'))) % 7 DAY) >= ?
-         AND DATE_ADD(?, INTERVAL (7 + DAYOFWEEK(?) - DAYOFWEEK(STR_TO_DATE(ag.day_of_week, '%a'))) % 7 DAY) <= ?
-       GROUP BY ag.id, ag.name, ag.location, ag.start_time, ag.end_time, ag.day_of_week
-       ORDER BY event_date ASC`,
-      [todayStr, todayStr, todayStr, todayStr, user.child_profile_id, todayStr, todayStr, todayStr, todayStr, todayStr, maxDateStr]
+       WHERE agm.child_id = ? AND agm.is_active = TRUE AND ag.is_active = TRUE AND ag.has_schedule = TRUE`,
+      [user.child_profile_id]
     );
     
-    const activityGroupAssignments = activityGroupEvents.map(event => {
-      return {
-        group_id: event.group_id,
-        group_name: event.group_name,
-        location: event.location,
-        start_time: event.start_time,
-        end_time: event.end_time,
-        day_of_week: event.day_of_week,
-        event_date: event.event_date,
-        driver_name: event.driver_assignments || 'Not assigned yet',
-        assignment_type: 'group_member',
-        formatted_time: new Date(event.event_date).toLocaleString('en-NZ', { dateStyle: 'medium', timeStyle: 'short' }),
-        type: 'activity_group'
-      };
-    });
+    const activityGroupAssignments = [];
+    
+    // For each group, calculate upcoming events in the date range
+    for (const group of activityGroupEvents) {
+      // Calculate next occurrence of this day of week
+      const today = new Date();
+      const dayOfWeekMap = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
+      const targetDay = dayOfWeekMap[group.day_of_week];
+      
+      // Find all occurrences in the date range
+      for (let d = new Date(today); d <= new Date(maxDateStr + 'T23:59:59'); d.setDate(d.getDate() + 1)) {
+        if (d.getDay() === targetDay && d >= new Date(todayStr)) {
+          const eventDate = d.toISOString().split('T')[0];
+          
+          // Get driver assignments for this specific date
+          const [assignments] = await db.query(`
+            SELECT GROUP_CONCAT(DISTINCT CONCAT(u.name, ' (', aga.assignment_type, ')') SEPARATOR ', ') AS driver_assignments
+            FROM ActivityGroupAssignments aga
+            JOIN Users u ON aga.user_id = u.id
+            WHERE aga.group_id = ? AND DATE(aga.assignment_date) = ? 
+              AND aga.status = 'confirmed' AND aga.is_cancelled = FALSE
+          `, [group.group_id, eventDate]);
+          
+          activityGroupAssignments.push({
+            group_id: group.group_id,
+            group_name: group.group_name,
+            location: group.location,
+            start_time: group.start_time,
+            end_time: group.end_time,
+            day_of_week: group.day_of_week,
+            event_date: eventDate,
+            driver_name: assignments[0]?.driver_assignments || 'Not assigned yet',
+            assignment_type: 'group_member',
+            formatted_time: new Date(eventDate).toLocaleString('en-NZ', { dateStyle: 'medium', timeStyle: 'short' }),
+            type: 'activity_group'
+          });
+        }
+      }
+    }
 
     // After fetching requests, offers, recurringAssignments, activityGroupAssignments
     // If there are no rides for the selected range, auto-expand to next available ride

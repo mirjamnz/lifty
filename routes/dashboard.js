@@ -69,10 +69,19 @@ router.get('/dashboard', async (req, res) => {
     
     // Get ride requests where user is assigned as driver (RideRequests)
     const [assignedRides] = await db.query(`
-      SELECT rr.id, rr.pickup_time, rr.pickup_location, rr.dropoff_location, c.name as child_name, 
-             rr.status, rr.assigned_user_id, 'request' as type
-      FROM RideRequests rr 
-      JOIN Children c ON rr.child_id = c.id 
+      SELECT 
+        rr.id,
+        rr.pickup_time,
+        rr.pickup_location,
+        IF(rr.pickup_location = 'Home', u.home_address, rr.pickup_location) AS pickup_address,
+        rr.dropoff_location,
+        c.name AS child_name,
+        rr.status,
+        rr.assigned_user_id,
+        'request' AS type
+      FROM RideRequests rr
+      JOIN Children c ON rr.child_id = c.id
+      JOIN Users u ON rr.user_id = u.id -- parent user who requested ride
       WHERE rr.assigned_user_id = ? AND rr.pickup_time >= NOW()
     `, [userId]);
 
@@ -326,11 +335,13 @@ router.get('/dashboard', async (req, res) => {
         id: `ride_${ride.id}`,
         title: `Drive: ${ride.child_name}`,
         start: ride.pickup_time,
-        description: `${ride.pickup_location} → ${ride.dropoff_location || 'Unknown'}`,
+        description: `${ride.pickup_address || ride.pickup_location} → ${ride.dropoff_location || 'Unknown'}`,
         backgroundColor: '#dc3545',
         borderColor: '#c82333',
         type: ride.type,
-        status: ride.status || 'assigned'
+        status: ride.status || 'assigned',
+        child_name: ride.child_name,
+        pickup_address: ride.pickup_address || ride.pickup_location
       })),
       ...childrenRides.map(ride => ({
         id: `child_ride_${ride.id}`,
@@ -450,6 +461,26 @@ router.get('/dashboard', async (req, res) => {
       return affiliatedOrgNames.some(name => locs.some(l => l.includes(name.toLowerCase())));
     });
 
+    // Fetch active ride offers (future) from other users
+    const [allOffers] = await db.query(`
+      SELECT ro.*, u.name AS driver_name
+      FROM RideOffers ro
+      JOIN Users u ON ro.user_id = u.id
+      WHERE ro.pickup_time >= NOW()
+        AND (ro.available_seats IS NULL OR ro.available_seats > 0)
+      ORDER BY ro.pickup_time ASC
+    `);
+
+    const affiliatedRideOffers = allOffers.filter(of => {
+      if (of.user_id === userId) return false; // skip own offers
+      const locs = [
+        (of.pickup_location || '').toLowerCase(),
+        (of.dropoff_location || '').toLowerCase(),
+        (of.school || '').toLowerCase()
+      ];
+      return affiliatedOrgNames.some(name => locs.some(l => l.includes(name.toLowerCase())));
+    });
+
     // Determine if profile is incomplete
     // const missingAddress = !user.home_address;
     // const missingChildren = children.length === 0;
@@ -475,6 +506,7 @@ router.get('/dashboard', async (req, res) => {
       recentShortNoticeRequests,
       myRideRequests,
       affiliatedRideRequests,
+      affiliatedRideOffers,
       myShortNoticeRequests,
       success: req.session.success,
       error: req.session.error,
@@ -1263,11 +1295,13 @@ router.get('/calendar', async (req, res) => {
         id: `ride_${ride.id}`,
         title: `Drive: ${ride.child_name}`,
         start: ride.pickup_time, // Use the original date string directly
-        description: `${ride.pickup_location} → ${ride.dropoff_location || 'Unknown'}`,
+        description: `${ride.pickup_address || ride.pickup_location} → ${ride.dropoff_location || 'Unknown'}`,
         backgroundColor: '#dc3545',
         borderColor: '#c82333',
         type: ride.type,
-        status: ride.status || 'assigned'
+        status: ride.status || 'assigned',
+        child_name: ride.child_name,
+        pickup_address: ride.pickup_address || ride.pickup_location
       })),
       ...childrenRides.map(ride => ({
         id: `child_ride_${ride.id}`,

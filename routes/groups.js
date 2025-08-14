@@ -35,10 +35,10 @@ router.get('/', async (req, res) => {
       JOIN ActivityGroupMembers agm ON ag.id = agm.group_id
       LEFT JOIN ActivityGroupMembers agm2 ON ag.id = agm2.group_id AND agm2.is_active = TRUE
       JOIN Users u ON ag.creator_id = u.id
-      WHERE agm.user_id = ? AND ag.creator_id != ? AND agm.is_active = TRUE AND ag.is_active = TRUE
+      WHERE agm.user_id = ? AND agm.is_active = TRUE AND ag.is_active = TRUE
       GROUP BY ag.id
       ORDER BY ag.created_at DESC
-    `, [userId, userId]);
+    `, [userId]);
     
     // Get user's children
     const [children] = await db.query(`
@@ -115,18 +115,19 @@ router.post('/', async (req, res) => {
     `, [groupId, creatorId]);
     
     // Add selected members
-    if (member_ids && member_ids.length > 0) {
-      const memberValues = member_ids.map(userId => [groupId, userId, 'member']);
-      await db.query(`
-        INSERT INTO ActivityGroupMembers (group_id, user_id, role)
-        VALUES ?
-      `, [memberValues]);
+    const memberArray = member_ids ? (Array.isArray(member_ids) ? member_ids : [member_ids]) : [];
+    if (memberArray.length > 0) {
+      const memberValues = memberArray.map(userId => [groupId, userId, 'member']);
+      await db.query(
+        'INSERT INTO ActivityGroupMembers (group_id, user_id, role) VALUES ?',
+        [memberValues]
+      );
       
       // Get creator name for notifications
       const [[creator]] = await db.query('SELECT name FROM Users WHERE id = ?', [creatorId]);
       
       // Notify each added member
-      for (const userId of member_ids) {
+      for (const userId of memberArray) {
         await notifications.notifyUserAddedToActivityGroup(groupId, userId, name, creator.name, has_schedule === 'on');
       }
     }
@@ -190,6 +191,39 @@ router.get('/api/locations', async (req, res) => {
   } catch (err) {
     console.error('❌ Location autocomplete error:', err);
     res.status(500).json({ error: 'Could not fetch locations' });
+  }
+});
+
+// ---------------------------
+// GET /groups/api/users - Autocomplete search for parent users
+// ---------------------------
+router.get('/api/users', async (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json([]);
+  }
+
+  try {
+    const q = (req.query.q || '').trim();
+    if (q.length < 2) {
+      return res.json([]); // Require at least 2 chars
+    }
+
+    const currentUserId = req.session.userId;
+
+    const [users] = await db.query(`
+      SELECT id, name, email
+      FROM Users
+      WHERE role = 'parent'
+        AND id <> ?
+        AND (name LIKE ? OR email LIKE ?)
+      ORDER BY name
+      LIMIT 10
+    `, [currentUserId, `%${q}%`, `%${q}%`]);
+
+    res.json(users);
+  } catch (err) {
+    console.error('❌ User search autocomplete error:', err);
+    res.status(500).json([]);
   }
 });
 
@@ -409,7 +443,7 @@ router.post('/:id/add-children', async (req, res) => {
         if (child.parent_id !== userId) {
           await db.query(`
             INSERT INTO Notifications (user_id, type, title, message, related_type, related_id)
-            VALUES (?, 'child_added_to_group', 'Child Added to Group', ?, 'activity_group', ?)
+            VALUES (?, 'child_add', 'Child Added to Group', ?, 'activity_group', ?)
           `, [child.parent_id, `${child.name} has been added to the group "${group.name}" by ${user.name}.`, groupId]);
         }
         
@@ -497,6 +531,100 @@ router.post('/:id/message', async (req, res) => {
     console.error('❌ Send group message error:', err);
     req.session.error = 'Could not send message.';
     res.redirect(`/groups/${groupId}`);
+  }
+});
+
+// POST /groups/:id/create-schedule - Create recurring schedule for existing group
+router.post('/:id/create-schedule', async (req, res) => {
+  const userId = req.session.userId;
+  const groupId = req.params.id;
+  const { day_of_week, start_time, end_time, location, activity_type } = req.body;
+
+  if (!userId) return res.redirect('/login');
+
+  try {
+    // Validate that the user is an admin of the group
+    const [[membership]] = await db.query(`
+      SELECT * FROM ActivityGroupMembers 
+      WHERE group_id = ? AND user_id = ? AND role = 'admin' AND is_active = TRUE
+    `, [groupId, userId]);
+
+    if (!membership) {
+      return res.redirect(`/groups/${groupId}?error=Only group admins can create schedules`);
+    }
+
+    // Get group details
+    const [[group]] = await db.query('SELECT * FROM ActivityGroups WHERE id = ?', [groupId]);
+    if (!group) {
+      return res.redirect('/groups?error=Group not found');
+    }
+
+    // Check if group already has a schedule
+    if (group.has_schedule) {
+      return res.redirect(`/groups/${groupId}?error=Group already has a recurring schedule`);
+    }
+
+    // Validate required fields
+    if (!day_of_week || !start_time || !end_time || !location || !activity_type) {
+      return res.redirect(`/groups/${groupId}?error=All schedule fields are required`);
+    }
+
+    // Update the group to add schedule information
+    await db.query(`
+      UPDATE ActivityGroups 
+      SET has_schedule = TRUE, 
+          day_of_week = ?, 
+          start_time = ?, 
+          end_time = ?, 
+          location = ?, 
+          activity_type = ?,
+          updated_at = NOW()
+      WHERE id = ?
+    `, [day_of_week, start_time, end_time, location, activity_type, groupId]);
+
+    // Send notification to all group members about the new schedule
+    const [members] = await db.query(`
+      SELECT DISTINCT agm.user_id, u.name as user_name
+      FROM ActivityGroupMembers agm
+      JOIN Users u ON agm.user_id = u.id
+      WHERE agm.group_id = ? AND agm.is_active = TRUE AND agm.user_id != ?
+    `, [groupId, userId]);
+
+    const [[creator]] = await db.query('SELECT name FROM Users WHERE id = ?', [userId]);
+    
+    for (const member of members) {
+      try {
+        await db.query(`
+          INSERT INTO Notifications (user_id, type, title, message, related_type, related_id)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `, [
+          member.user_id,
+          'schedule_add',
+          'Group Schedule Created',
+          `${creator.name} has added a recurring schedule to "${group.name}". The group now meets ${day_of_week}s from ${start_time} to ${end_time} at ${location}. You can now assign yourself as a driver for upcoming events.`,
+          'activity_group',
+          groupId
+        ]);
+      } catch (notifError) {
+        console.error('Error creating schedule notification for user', member.user_id, ':', notifError);
+      }
+    }
+
+    // Send a group message about the new schedule
+    try {
+      await db.query(`
+        INSERT INTO ActivityGroupMessages (group_id, sender_id, message)
+        VALUES (?, ?, ?)
+      `, [groupId, userId, `🎉 Great news! I've added a recurring schedule to our group. We now meet ${day_of_week}s from ${start_time} to ${end_time} at ${location}. You can assign yourself as a driver for upcoming events in the calendar or "My Rides" section!`]);
+    } catch (msgError) {
+      console.error('Error sending schedule creation message:', msgError);
+    }
+
+    res.redirect(`/groups/${groupId}?success=Recurring schedule created successfully! Group members can now assign themselves as drivers.`);
+
+  } catch (err) {
+    console.error('POST /groups/:id/create-schedule error:', err);
+    res.redirect(`/groups/${groupId}?error=Error creating schedule`);
   }
 });
 

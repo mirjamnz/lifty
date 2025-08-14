@@ -221,6 +221,24 @@ router.get('/autocomplete', async (req, res) => {
   }
 });
 
+// ---- Autocomplete API ----
+router.get('/api/search', async (req, res) => {
+  if (!req.session.userId) return res.status(401).json([]);
+  const q = (req.query.q || '').trim();
+  if (q.length < 2) return res.json([]);
+  try {
+    const [rows] = await db.query(
+      `SELECT id, name, address, type FROM Organizations 
+       WHERE name LIKE ? OR address LIKE ? 
+       ORDER BY name LIMIT 10`, [`%${q}%`, `%${q}%`]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('Org search error:', err);
+    res.status(500).json([]);
+  }
+});
+
 
 // POST /organizations/add — create
 router.post('/add', async (req, res) => {
@@ -232,9 +250,12 @@ router.post('/add', async (req, res) => {
     return res.status(400).send('Missing required fields.');
   }
 
-  // Parse lat/lng safely
-  const safeLat = lat && !isNaN(parseFloat(lat)) ? parseFloat(lat) : null;
-  const safeLng = lng && !isNaN(parseFloat(lng)) ? parseFloat(lng) : null;
+  let safeLat = lat && !isNaN(parseFloat(lat)) ? parseFloat(lat) : null;
+  let safeLng = lng && !isNaN(parseFloat(lng)) ? parseFloat(lng) : null;
+
+  // Some older schemas have lat/lng as NOT NULL; fall back to 0 when undefined
+  if (safeLat === null) safeLat = 0;
+  if (safeLng === null) safeLng = 0;
 
   try {
     await db.query(

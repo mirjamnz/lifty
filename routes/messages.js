@@ -617,6 +617,30 @@ router.get('/all', async (req, res) => {
     WHERE childUser.id = ? OR c.user_id = ? OR rr.assigned_user_id = ?
   `, [userId, userId, userId]);
 
+  // Get ActivityGroup messages where user is a member
+  const [[user]] = await db.query('SELECT * FROM Users WHERE id = ?', [userId]);
+  let activityGroups = [];
+  
+  if (user.role === 'child') {
+    // Child user - get groups where they are a member
+    const [childGroups] = await db.query(`
+      SELECT DISTINCT ag.id as group_id, ag.name as group_name
+      FROM ActivityGroups ag
+      JOIN ActivityGroupMembers agm ON ag.id = agm.group_id
+      WHERE agm.child_id = ? AND agm.is_active = TRUE AND ag.is_active = TRUE
+    `, [user.child_profile_id]);
+    activityGroups = childGroups;
+  } else {
+    // Parent user - get groups where they are a member  
+    const [parentGroups] = await db.query(`
+      SELECT DISTINCT ag.id as group_id, ag.name as group_name
+      FROM ActivityGroups ag
+      JOIN ActivityGroupMembers agm ON ag.id = agm.group_id
+      WHERE agm.user_id = ? AND agm.is_active = TRUE AND ag.is_active = TRUE
+    `, [userId]);
+    activityGroups = parentGroups;
+  }
+
   let groupThreads = [];
   if (groupRides.length > 0) {
     const rideIds = groupRides.map(r => r.ride_id);
@@ -667,10 +691,62 @@ router.get('/all', async (req, res) => {
       .sort((a, b) => new Date(b.latest_message.sent_at) - new Date(a.latest_message.sent_at));
   }
 
-  // Combine direct messages and group threads
+  // Get ActivityGroup messages for user's groups
+  let activityGroupThreads = [];
+  if (activityGroups.length > 0) {
+    const groupIds = activityGroups.map(g => g.group_id);
+    
+    // Get all ActivityGroup messages for these groups
+    const [allActivityGroupMessages] = await db.query(
+      `SELECT agm.*, u.name AS sender_name, 'activity_group' as message_type,
+              ag.name as group_name, ag.activity_type, ag.location
+       FROM ActivityGroupMessages agm
+       JOIN Users u ON agm.sender_id = u.id
+       JOIN ActivityGroups ag ON agm.group_id = ag.id
+       WHERE agm.group_id IN (?)
+       ORDER BY agm.sent_at ASC`,
+      [groupIds]
+    );
+
+    // Group messages by group_id
+    const groupedByActivityGroup = {};
+    allActivityGroupMessages.forEach(msg => {
+      if (!groupedByActivityGroup[msg.group_id]) {
+        groupedByActivityGroup[msg.group_id] = {
+          group_id: msg.group_id,
+          group_name: msg.group_name,
+          activity_type: msg.activity_type,
+          location: msg.location,
+          messages: [],
+          unread_count: 0,
+          latest_message: null,
+          type: 'activity_group'
+        };
+      }
+      groupedByActivityGroup[msg.group_id].messages.push(msg);
+      
+      // Note: ActivityGroupMessages table doesn't have read_at column yet
+      // For now, consider all messages from others as unread
+      if (msg.sender_id !== userId) {
+        groupedByActivityGroup[msg.group_id].unread_count++;
+      }
+      
+      // Track latest message
+      if (!groupedByActivityGroup[msg.group_id].latest_message || 
+          new Date(msg.sent_at) > new Date(groupedByActivityGroup[msg.group_id].latest_message.sent_at)) {
+        groupedByActivityGroup[msg.group_id].latest_message = msg;
+      }
+    });
+
+    // Convert to array
+    activityGroupThreads = Object.values(groupedByActivityGroup);
+  }
+
+  // Combine direct messages, group threads, and activity group threads
   const allItems = [
     ...directMessages.map(msg => ({ type: 'direct', data: msg })),
-    ...groupThreads.map(thread => ({ type: 'group_thread', data: thread }))
+    ...groupThreads.map(thread => ({ type: 'group_thread', data: thread })),
+    ...activityGroupThreads.map(thread => ({ type: 'activity_group_thread', data: thread }))
   ].sort((a, b) => {
     const aTime = a.type === 'direct' ? a.data.sent_at : a.data.latest_message.sent_at;
     const bTime = b.type === 'direct' ? b.data.sent_at : b.data.latest_message.sent_at;
@@ -769,6 +845,247 @@ router.get('/child/inbox', async (req, res) => {
     groupThreads,
     totalUnread: groupThreads.reduce((sum, thread) => sum + thread.unread_count, 0)
   });
+});
+
+// GET /messages/group/activity/:groupId - Group messages for ActivityGroups
+router.get('/group/activity/:groupId', async (req, res) => {
+  const userId = req.session.userId;
+  const groupId = req.params.groupId;
+  
+  if (!userId) return res.status(401).send('Not logged in');
+
+  try {
+    // Get user details to check role
+    const [[user]] = await db.query('SELECT * FROM Users WHERE id = ?', [userId]);
+    
+    // Check if user is a member of the group
+    let hasAccess = false;
+    let membership = null;
+    
+    if (user.role === 'child') {
+      const [[childMembership]] = await db.query(`
+        SELECT agm.*, u.name as parent_name
+        FROM ActivityGroupMembers agm
+        JOIN Users u ON agm.user_id = u.id
+        WHERE agm.group_id = ? AND agm.child_id = ? AND agm.is_active = TRUE
+      `, [groupId, user.child_profile_id]);
+      
+      if (childMembership) {
+        hasAccess = true;
+        membership = childMembership;
+        membership.role = 'child';
+      }
+    } else {
+      const [[parentMembership]] = await db.query(`
+        SELECT * FROM ActivityGroupMembers
+        WHERE group_id = ? AND user_id = ? AND is_active = TRUE
+      `, [groupId, userId]);
+      
+      if (parentMembership) {
+        hasAccess = true;
+        membership = parentMembership;
+      }
+    }
+
+    if (!hasAccess) {
+      return res.status(403).send('You do not have access to this group.');
+    }
+
+    // Get group details
+    const [[group]] = await db.query(`
+      SELECT ag.*, u.name AS created_by_name
+      FROM ActivityGroups ag
+      JOIN Users u ON ag.creator_id = u.id
+      WHERE ag.id = ?
+    `, [groupId]);
+
+    if (!group) {
+      return res.status(404).send('Group not found.');
+    }
+
+    // Get group messages
+    const [messages] = await db.query(`
+      SELECT agm.*, u.name AS sender_name
+      FROM ActivityGroupMessages agm
+      JOIN Users u ON agm.sender_id = u.id
+      WHERE agm.group_id = ?
+      ORDER BY agm.sent_at ASC
+    `, [groupId]);
+
+    // Note: ActivityGroupMessages table doesn't have read_at column yet
+    // Read tracking for activity group messages can be added in future update
+
+    // Get group members
+    const [members] = await db.query(`
+      SELECT agm.*, u.name AS user_name, u.email, c.name AS child_name
+      FROM ActivityGroupMembers agm
+      JOIN Users u ON agm.user_id = u.id
+      LEFT JOIN Children c ON agm.child_id = c.id
+      WHERE agm.group_id = ? AND agm.is_active = TRUE
+      ORDER BY agm.role DESC, u.name
+    `, [groupId]);
+
+    res.render('messages-group', {
+      session: req.session,
+      request: group,
+      messages,
+      members,
+      eventType: 'activity_group',
+      user: user,
+      userMembership: membership
+    });
+
+  } catch (err) {
+    console.error('GET /messages/group/activity/:groupId error:', err);
+    res.status(500).send('Error loading group messages.');
+  }
+});
+
+// POST /messages/group/activity/:groupId/send - Send message to ActivityGroup
+router.post('/group/activity/:groupId/send', async (req, res) => {
+  const userId = req.session.userId;
+  const groupId = req.params.groupId;
+  const { message } = req.body;
+
+  if (!userId) return res.status(401).send('Not logged in');
+  if (!message || !message.trim()) return res.status(400).send('Message cannot be empty');
+
+  try {
+    // Get user details to check role
+    const [[user]] = await db.query('SELECT * FROM Users WHERE id = ?', [userId]);
+    
+    // Check if user is a member of the group
+    let hasAccess = false;
+    
+    if (user.role === 'child') {
+      const [[childMembership]] = await db.query(`
+        SELECT agm.*
+        FROM ActivityGroupMembers agm
+        WHERE agm.group_id = ? AND agm.child_id = ? AND agm.is_active = TRUE
+      `, [groupId, user.child_profile_id]);
+      
+      if (childMembership) {
+        hasAccess = true;
+      }
+    } else {
+      const [[parentMembership]] = await db.query(`
+        SELECT * FROM ActivityGroupMembers
+        WHERE group_id = ? AND user_id = ? AND is_active = TRUE
+      `, [groupId, userId]);
+      
+      if (parentMembership) {
+        hasAccess = true;
+      }
+    }
+
+    if (!hasAccess) {
+      return res.status(403).send('You are not a member of this group.');
+    }
+
+    // Get group details
+    const [[group]] = await db.query('SELECT * FROM ActivityGroups WHERE id = ?', [groupId]);
+    if (!group) {
+      return res.status(404).send('Group not found.');
+    }
+
+    // Send the message
+    await db.query(`
+      INSERT INTO ActivityGroupMessages (group_id, sender_id, message)
+      VALUES (?, ?, ?)
+    `, [groupId, userId, message.trim()]);
+
+    // Get sender name for notification
+    const [[sender]] = await db.query('SELECT name FROM Users WHERE id = ?', [userId]);
+
+    // Send notifications to all group members (except sender)
+    const [members] = await db.query(`
+      SELECT DISTINCT agm.user_id, u.name as user_name
+      FROM ActivityGroupMembers agm
+      JOIN Users u ON agm.user_id = u.id
+      WHERE agm.group_id = ? AND agm.is_active = TRUE AND agm.user_id != ?
+    `, [groupId, userId]);
+
+    for (const member of members) {
+      try {
+        await db.query(`
+          INSERT INTO Notifications (user_id, type, title, message, related_type, related_id)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `, [
+          member.user_id,
+          'group_msg',
+          'New Group Message',
+          `New message in "${group.name}" from ${sender.name}: ${message.trim().substring(0, 100)}${message.trim().length > 100 ? '...' : ''}`,
+          'activity_group',
+          groupId
+        ]);
+      } catch (notifError) {
+        console.error('Error creating notification for user', member.user_id, ':', notifError);
+      }
+    }
+
+    // Redirect back to group messages
+    res.redirect(`/messages/group/activity/${groupId}`);
+
+  } catch (err) {
+    console.error('POST /messages/group/activity/:groupId/send error:', err);
+    res.status(500).send('Error sending message.');
+  }
+});
+
+// Ride Request Group Chat
+router.get('/group/ride/:requestId', async (req, res) => {
+  if (!req.session.userId) return res.redirect('/login');
+  const userId = req.session.userId;
+  const requestId = req.params.requestId;
+  try {
+    // Get ride request details
+    const [[request]] = await db.query(`
+      SELECT rr.*, c.name AS child_name, u.name AS parent_name
+      FROM RideRequests rr
+      JOIN Children c ON rr.child_id = c.id
+      JOIN Users u ON rr.user_id = u.id
+      WHERE rr.id = ?
+    `, [requestId]);
+    if (!request) return res.status(404).send('Ride request not found');
+
+    // Fetch messages
+    const [messages] = await db.query(`
+      SELECT m.*, u.name AS sender_name
+      FROM RideRequestMessages m
+      JOIN Users u ON m.sender_id = u.id
+      WHERE m.request_id = ?
+      ORDER BY m.sent_at ASC
+    `, [requestId]);
+
+    res.render('messages-group', {
+      session: req.session,
+      title: `Ride Request: ${request.child_name}`,
+      backUrl: '/rides',
+      messages,
+      actionUrl: `/messages/group/ride/${requestId}/send`
+    });
+  } catch (err) {
+    console.error('Ride request chat load error:', err);
+    res.status(500).send('Could not load ride request chat');
+  }
+});
+
+router.post('/group/ride/:requestId/send', async (req, res) => {
+  if (!req.session.userId) return res.redirect('/login');
+  const userId = req.session.userId;
+  const requestId = req.params.requestId;
+  const { message } = req.body;
+  if (!message || !message.trim()) return res.redirect(`/messages/group/ride/${requestId}`);
+  try {
+    await db.query(
+      'INSERT INTO RideRequestMessages (request_id, sender_id, message) VALUES (?,?,?)',
+      [requestId, userId, message.trim()]
+    );
+    res.redirect(`/messages/group/ride/${requestId}#bottom`);
+  } catch (err) {
+    console.error('Ride request send message error:', err);
+    res.redirect(`/messages/group/ride/${requestId}`);
+  }
 });
 
 module.exports = router; 

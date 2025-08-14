@@ -48,103 +48,12 @@
     </div>
   <% } %>
 
-  <!-- My Groups Section -->
-  <div class="row mb-4">
-    <div class="col">
-      <div class="card">
-        <div class="card-header bg-primary text-white">
-          <h5 class="mb-0">
-            <i class="fas fa-crown me-2"></i>Groups I Created (<%= myGroups.length %>)
-          </h5>
-        </div>
-        <div class="card-body">
-          <% if (myGroups.length === 0) { %>
-            <div class="text-center py-4">
-              <i class="fas fa-users fa-3x text-muted mb-3"></i>
-              <p class="text-muted">You haven't created any groups yet.</p>
-              <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createGroupModal">
-                <i class="fas fa-plus me-1"></i>Create Your First Group
-              </button>
-            </div>
-          <% } else { %>
-            <div class="row">
-              <% myGroups.forEach(group => { %>
-                <div class="col-md-6 col-lg-4 mb-3">
-                  <div class="card h-100 <%= group.has_schedule ? 'border-info' : 'border-success' %>">
-                    <div class="card-header <%= group.has_schedule ? 'bg-info text-white' : 'bg-success text-white' %>">
-                      <h6 class="mb-0">
-                        <i class="fas fa-<%= group.has_schedule ? 'calendar-alt' : 'comments' %> me-1"></i>
-                        <%= group.name %>
-                        <% if (group.privacy === 'private') { %>
-                          <i class="fas fa-lock ms-2" title="Private Group"></i>
-                        <% } %>
-                      </h6>
-                    </div>
-                    <div class="card-body">
-                      <% if (group.description) { %>
-                        <p class="card-text text-muted small"><%= group.description %></p>
-                      <% } %>
-                      
-                      <% if (group.has_schedule) { %>
-                        <div class="mb-2">
-                          <small class="text-info">
-                            <i class="fas fa-clock me-1"></i>
-                            <%= group.day_of_week %>s, <%= group.start_time %> - <%= group.end_time %>
-                          </small>
-                        </div>
-                        <div class="mb-2">
-                          <small class="text-muted">
-                            <i class="fas fa-map-marker-alt me-1"></i>
-                            <%= group.location %>
-                          </small>
-                        </div>
-                      <% } else { %>
-                        <div class="mb-2">
-                          <small class="text-success">
-                            <i class="fas fa-comments me-1"></i>
-                            Chat Group
-                          </small>
-                        </div>
-                      <% } %>
-                      
-                      <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div>
-                          <span class="badge bg-secondary me-1">
-                            <i class="fas fa-users me-1"></i><%= group.member_count %> members
-                          </span>
-                          <% if (group.child_count > 0) { %>
-                            <span class="badge bg-info">
-                              <i class="fas fa-child me-1"></i><%= group.child_count %> children
-                            </span>
-                          <% } %>
-                        </div>
-                        <small class="text-muted">
-                          Created <%= new Date(group.created_at).toLocaleDateString() %>
-                        </small>
-                      </div>
-                      
-                      <div class="d-grid">
-                        <a href="/groups/<%= group.id %>" class="btn btn-primary btn-sm">
-                          <i class="fas fa-eye me-1"></i>View Group
-                        </a>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              <% }); %>
-            </div>
-          <% } %>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- Groups I'm Member Of -->
   <% if (memberGroups.length > 0) { %>
     <div class="row mb-4">
       <div class="col">
         <div class="card">
-          <div class="card-header bg-secondary text-white">
+          <div class="card-header bg-success text-white">
             <h5 class="mb-0">
               <i class="fas fa-user-friends me-2"></i>Groups I'm Member Of (<%= memberGroups.length %>)
             </h5>
@@ -243,7 +152,10 @@
           <div class="row mb-3">
             <div class="col-md-8">
               <label for="groupName" class="form-label">Group Name *</label>
-              <input type="text" class="form-control" id="groupName" name="name" required placeholder="e.g., Westfield Football Parents">
+              <div class="position-relative">
+                <input type="text" class="form-control" id="groupName" name="name" required placeholder="e.g., Westfield Football Parents" autocomplete="off">
+                <div id="groupNameSuggestions" class="position-absolute w-100 bg-white border rounded shadow-sm" style="display: none; z-index: 1000; max-height: 200px; overflow-y: auto;"></div>
+              </div>
             </div>
             <div class="col-md-4">
               <label for="privacy" class="form-label">Privacy</label>
@@ -306,6 +218,7 @@
                     <label for="location" class="form-label">Location</label>
                     <div class="position-relative">
                       <input type="text" class="form-control" id="location" name="location" placeholder="e.g., Westfield Sports Ground" autocomplete="off">
+                      <input type="hidden" id="orgId" name="organization_id" value="">
                       <div id="locationSuggestions" class="position-absolute w-100 bg-white border border-top-0 rounded-bottom shadow-sm" style="display: none; z-index: 1000; max-height: 200px; overflow-y: auto;"></div>
                     </div>
                   </div>
@@ -328,16 +241,11 @@
           <div class="row">
             <div class="col-md-6">
               <label class="form-label">Add Members</label>
-              <div class="border rounded p-2" style="max-height: 150px; overflow-y: auto;">
-                <% allUsers.forEach(user => { %>
-                  <div class="form-check">
-                    <input class="form-check-input" type="checkbox" name="member_ids" value="<%= user.id %>" id="member_<%= user.id %>">
-                    <label class="form-check-label" for="member_<%= user.id %>">
-                      <%= user.name %> (<%= user.email %>)
-                    </label>
-                  </div>
-                <% }); %>
+              <div class="position-relative">
+                <input type="text" id="memberSearch" class="form-control" placeholder="Search parents by name or email..." autocomplete="off">
+                <div id="memberSuggestions" class="position-absolute w-100 bg-white border rounded shadow-sm" style="display: none; z-index: 1000; max-height: 200px; overflow-y: auto;"></div>
               </div>
+              <div id="selectedMembers" class="mt-2 d-flex flex-wrap"></div>
             </div>
             
             <div class="col-md-6" id="childrenSection" style="display: none;">
@@ -465,6 +373,163 @@ function selectLocation(value) {
   locationInput.value = value;
   locationSuggestions.style.display = 'none';
 }
+</script>
+
+<script>
+(function(){
+  const input = document.getElementById('location');
+  const list = document.getElementById('locationSuggestions');
+  if(!input || !list) return;
+
+  let timeout;
+  input.addEventListener('input', function(){
+    clearTimeout(timeout);
+    const term = this.value.trim();
+    if(term.length < 2){ list.style.display='none'; return; }
+    timeout = setTimeout(()=>{
+      fetch(`/organizations/api/search?q=${encodeURIComponent(term)}`)
+        .then(r=>r.json())
+        .then(items=>{
+          if(!items.length){ list.style.display='none'; return; }
+          list.innerHTML = items.map(it=>`
+            <div class="list-group-item list-group-item-action" data-id="${it.id}" data-name="${it.name}" data-address="${it.address || ''}">
+              <strong>${it.name}</strong><br><small>${it.address||''}</small>
+            </div>`).join('');
+          list.style.display='block';
+        }).catch(()=>{list.style.display='none'});
+    },300);
+  });
+
+  list.addEventListener('click', function(e){
+    const item = e.target.closest('[data-id]');
+    if(!item) return;
+    const name = item.dataset.name;
+    const addr = item.dataset.address;
+    document.getElementById('location').value = addr? `${name} - ${addr}`: name;
+    document.getElementById('orgId').value = item.dataset.id;
+    list.style.display='none';
+  });
+
+  document.addEventListener('click', function(e){
+    if(!list.contains(e.target) && e.target!==input){ list.style.display='none'; }
+  });
+})();
+
+// ---------------------------
+// Group Name Autocomplete
+// ---------------------------
+(() => {
+  const input = document.getElementById('groupName');
+  const list = document.getElementById('groupNameSuggestions');
+  if(!input || !list) return;
+
+  let timeout;
+  input.addEventListener('input', function(){
+    clearTimeout(timeout);
+    const term = this.value.trim();
+    if(term.length < 2){ list.style.display = 'none'; return; }
+    timeout = setTimeout(() => {
+      fetch(`/organizations/api/search?q=${encodeURIComponent(term)}`)
+        .then(r => r.json())
+        .then(items => {
+          if(!items.length){ list.style.display = 'none'; return; }
+          list.innerHTML = items.map(it => `
+            <div class="list-group-item list-group-item-action" data-name="${it.name}">
+              <strong>${it.name}</strong>${it.address ? `<br><small>${it.address}</small>` : ''}
+            </div>`).join('');
+          list.style.display = 'block';
+        })
+        .catch(() => { list.style.display = 'none'; });
+    }, 300);
+  });
+
+  list.addEventListener('click', function(e){
+    const item = e.target.closest('[data-name]');
+    if(!item) return;
+    input.value = item.dataset.name;
+    list.style.display = 'none';
+  });
+
+  document.addEventListener('click', function(e){
+    if(!list.contains(e.target) && e.target !== input){
+      list.style.display = 'none';
+    }
+  });
+})();
+
+// ---------------------------
+// Member Search & Select
+// ---------------------------
+(() => {
+  const searchInput = document.getElementById('memberSearch');
+  const suggestions = document.getElementById('memberSuggestions');
+  const selectedContainer = document.getElementById('selectedMembers');
+  if(!searchInput || !suggestions || !selectedContainer) return;
+
+  const selectedIds = new Set();
+  let timeout;
+
+  searchInput.addEventListener('input', () => {
+    clearTimeout(timeout);
+    const term = searchInput.value.trim();
+    if(term.length < 2){ suggestions.style.display='none'; return; }
+    timeout = setTimeout(() => {
+      fetch(`/groups/api/users?q=${encodeURIComponent(term)}`)
+        .then(r => r.json())
+        .then(users => {
+          if(!users.length){ suggestions.style.display='none'; return; }
+          suggestions.innerHTML = users.map(u => `
+            <div class="list-group-item list-group-item-action" data-id="${u.id}" data-name="${u.name}" data-email="${u.email}">
+              <strong>${u.name}</strong> <small class="text-muted">(${u.email})</small>
+            </div>`).join('');
+          suggestions.style.display = 'block';
+        })
+        .catch(() => { suggestions.style.display='none'; });
+    }, 300);
+  });
+
+  suggestions.addEventListener('click', (e) => {
+    const item = e.target.closest('[data-id]');
+    if(!item) return;
+    const id = item.dataset.id;
+    if(selectedIds.has(id)) return;
+    selectedIds.add(id);
+
+    const name = item.dataset.name;
+    const email = item.dataset.email;
+
+    // Create pill
+    const pill = document.createElement('span');
+    pill.className = 'badge bg-secondary me-1 mb-1';
+    pill.style.cursor = 'pointer';
+    pill.innerHTML = `${name} <small>(${email})</small> <i class="fas fa-times ms-1"></i>`;
+    pill.addEventListener('click', () => {
+      selectedContainer.removeChild(pill);
+      selectedIds.delete(id);
+      const hidden = document.getElementById(`memberHidden_${id}`);
+      if(hidden) hidden.remove();
+    });
+
+    selectedContainer.appendChild(pill);
+
+    // Hidden input for form submission
+    const hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    hidden.name = 'member_ids';
+    hidden.value = id;
+    hidden.id = `memberHidden_${id}`;
+    selectedContainer.appendChild(hidden);
+
+    suggestions.style.display = 'none';
+    searchInput.value = '';
+  });
+
+  document.addEventListener('click', (e) => {
+    if(!suggestions.contains(e.target) && e.target !== searchInput){
+      suggestions.style.display = 'none';
+    }
+  });
+})();
 </script>
 
 <%- include('partials/footer1') %>

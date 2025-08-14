@@ -341,7 +341,7 @@ function initLiftyMaps() {
 
       <!-- Home Address Section -->
       <div class="card mb-4">
-        <div class="card-header bg-info text-white">
+        <div class="card-header bg-secondary text-white">
           <h5 class="mb-0">
             <i class="fas fa-home me-2"></i>
             Home Address
@@ -520,7 +520,7 @@ function initLiftyMaps() {
     <div class="col-md-4">
       <!-- Quick Actions -->
       <div class="card mb-4">
-        <div class="card-header bg-info text-white">
+        <div class="card-header bg-success text-white">
           <h5 class="mb-0"><i class="fas fa-bolt me-2"></i>Quick Actions</h5>
         </div>
         <div class="card-body">
@@ -539,35 +539,7 @@ function initLiftyMaps() {
         </div>
       </div>
 
-      <!-- Ride Requests from My Schools & Clubs -->
-      <div class="card mb-4">
-        <div class="card-header bg-info text-white">
-          <h5 class="mb-0"><i class="fas fa-hands-helping me-2"></i>Ride Requests from My Schools &amp; Clubs</h5>
-        </div>
-        <div class="card-body">
-          <% if (affiliatedRideRequests && affiliatedRideRequests.length > 0) { %>
-            <ul class="list-group list-group-flush">
-              <% affiliatedRideRequests.forEach(req => { %>
-                <li class="list-group-item d-flex justify-content-between align-items-start">
-                  <div class="ms-0 flex-grow-1">
-                    <div><strong><%= req.child_name %></strong> (by <%= req.parent_name %>)</div>
-                    <small class="text-muted"><%= new Date(req.pickup_time).toLocaleString() %></small><br>
-                    <small class="text-muted"><i class="fas fa-location-arrow me-1"></i><%= req.pickup_location %> → <%= req.dropoff_location %></small>
-                  </div>
-                  <a href="/rides" class="btn btn-sm btn-outline-success align-self-center">Help</a>
-                </li>
-              <% }); %>
-            </ul>
-          <% } else { %>
-            <div class="text-center text-muted">
-              <i class="fas fa-smile-beam fa-2x mb-2"></i>
-              <p>No ride requests from your affiliations right now.</p>
-            </div>
-          <% } %>
-        </div>
-      </div>
-
-      <!-- My Pending Ride Requests -->
+            <!-- My Pending Ride Requests -->
       <div class="card mb-4">
         <div class="card-header bg-warning text-dark">
           <h5 class="mb-0"><i class="fas fa-car-side me-2"></i>My Pending Ride Requests</h5>
@@ -594,6 +566,65 @@ function initLiftyMaps() {
           <% } %>
         </div>
       </div>
+
+      <!-- Ride Requests from My Schools & Clubs -->
+      <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+          <h5 class="mb-0"><i class="fas fa-hands-helping me-2"></i>Ride Requests from My Schools &amp; Clubs</h5>
+        </div>
+        <div class="card-body">
+          <% if (affiliatedRideRequests && affiliatedRideRequests.length > 0) { %>
+            <ul class="list-group list-group-flush">
+              <% affiliatedRideRequests.forEach(req => { %>
+                <li class="list-group-item d-flex justify-content-between align-items-start">
+                  <div class="ms-0 flex-grow-1">
+                    <div><strong><%= req.child_name %></strong> (by <%= req.parent_name %>)</div>
+                    <small class="text-muted"><%= new Date(req.pickup_time).toLocaleString() %></small><br>
+                    <small class="text-muted"><i class="fas fa-location-arrow me-1"></i><%= req.pickup_location %> → <%= req.dropoff_location %></small>
+                  </div>
+                  <form action="/requests/assign-request/<%= req.id %>" method="POST" class="d-inline-block ms-2">
+                    <button type="submit" class="btn btn-sm btn-outline-success">Help</button>
+                  </form>
+                </li>
+              <% }); %>
+            </ul>
+          <% } else { %>
+            <div class="text-center text-muted">
+              <i class="fas fa-smile-beam fa-2x mb-2"></i>
+              <p>No ride requests from your affiliations right now.</p>
+            </div>
+          <% } %>
+        </div>
+      </div>
+
+      <!-- Ride Offers from My Schools & Clubs -->
+      <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+          <h5 class="mb-0"><i class="fas fa-car me-2"></i>Ride Offers from My Schools &amp; Clubs</h5>
+        </div>
+        <div class="card-body">
+          <% if (affiliatedRideOffers && affiliatedRideOffers.length > 0) { %>
+            <ul class="list-group list-group-flush">
+              <% affiliatedRideOffers.forEach(of => { %>
+                <li class="list-group-item d-flex justify-content-between align-items-start">
+                  <div class="ms-0 flex-grow-1">
+                    <div><strong><%= of.driver_name %></strong> offers a ride</div>
+                    <small class="text-muted"><%= new Date(of.pickup_time).toLocaleString() %></small><br>
+                    <small class="text-muted"><i class="fas fa-location-arrow me-1"></i><%= of.pickup_location %> → <%= of.dropoff_location %></small>
+                  </div>
+                  <a href="/rides" class="btn btn-sm btn-outline-primary align-self-center">View</a>
+                </li>
+              <% }); %>
+            </ul>
+          <% } else { %>
+            <div class="text-center text-muted">
+              <i class="fas fa-car fa-2x mb-2"></i>
+              <p>No ride offers from your affiliations right now.</p>
+            </div>
+          <% } %>
+        </div>
+      </div>
+
 
       <!-- Profile Completion Wizard Modal (always present) -->
       <div class="modal" id="profileWizardModal" tabindex="-1" aria-labelledby="profileWizardLabel" aria-modal="true" data-bs-backdrop="static" data-bs-keyboard="false">

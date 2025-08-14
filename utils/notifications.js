@@ -17,29 +17,12 @@ async function createNotification(userId, type, title, message, relatedType = nu
   }
 }
 
-// Create a trusted group notification
-async function createTrustedGroupNotification(groupId, userId, notificationType, title, message, relatedRequestId = null) {
-  try {
-    await db.query(`
-      INSERT INTO TrustedGroupNotifications (group_id, user_id, notification_type, title, message, related_request_id)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `, [groupId, userId, notificationType, title, message, relatedRequestId]);
-    
-    console.log(`✅ Trusted group notification created for user ${userId}: ${title}`);
-    return true;
-  } catch (err) {
-    console.error('❌ Error creating trusted group notification:', err);
-    return false;
-  }
-}
-
-// Notify user when added to a trusted group
+// Legacy function - now redirects to unified notification system
 async function notifyUserAddedToGroup(groupId, userId, groupName, addedBy) {
-  const title = `Added to Trusted Group`;
-  const message = `You have been added to the trusted group "${groupName}" by ${addedBy}. You can now send and receive ride requests within this group.`;
+  const title = `Added to Group`;
+  const message = `You have been added to the group "${groupName}" by ${addedBy}. You can now participate in group activities.`;
   
-  // Only create trusted group notification (not both general and trusted group)
-  await createTrustedGroupNotification(groupId, userId, 'member_added', title, message);
+  await createNotification(userId, 'group_add', title, message, 'activity_group', groupId);
 }
 
 // Notify user when added to an activity group
@@ -48,63 +31,27 @@ async function notifyUserAddedToActivityGroup(groupId, userId, groupName, addedB
   const groupType = hasSchedule ? 'scheduled activity group' : 'chat group';
   const message = `You have been added to the ${groupType} "${groupName}" by ${addedBy}. You can chat with group members and stay updated on activities.`;
   
-  await createNotification(userId, 'group_added', title, message, 'activity_group', groupId);
+  await createNotification(userId, 'group_add', title, message, 'activity_group', groupId);
 }
 
-// Notify user when removed from a trusted group
+// Legacy function - now redirects to unified notification system  
 async function notifyUserRemovedFromGroup(groupId, userId, groupName, removedBy) {
-  const title = `Removed from Trusted Group`;
-  const message = `You have been removed from the trusted group "${groupName}" by ${removedBy}.`;
+  const title = `Removed from Group`;
+  const message = `You have been removed from the group "${groupName}" by ${removedBy}.`;
   
-  // Only create trusted group notification (not both general and trusted group)
-  await createTrustedGroupNotification(groupId, userId, 'member_removed', title, message);
+  await createNotification(userId, 'group_rem', title, message, 'activity_group', groupId);
 }
 
-// Notify group members about a new short-notice request
+// Legacy functions - these are no longer used since ShortNotice system was removed
+// Keeping stubs for backward compatibility
 async function notifyGroupAboutRideRequest(groupId, requestId, requesterName, pickupTime, pickupLocation, dropoffLocation) {
-  try {
-    // Get all group members
-    const [members] = await db.query(`
-      SELECT user_id FROM TrustedGroupMembers WHERE group_id = ?
-    `, [groupId]);
-    
-    const title = `New Short-Notice Request`;
-    const message = `${requesterName} has sent a short-notice request. Join the discussion to coordinate.`;
-    
-    // Notify each member (except the requester)
-    for (const member of members) {
-      await createTrustedGroupNotification(groupId, member.user_id, 'short_notice_request', title, message, requestId);
-    }
-    
-    console.log(`✅ Notified ${members.length} group members about short-notice request`);
-  } catch (err) {
-    console.error('❌ Error notifying group about short-notice request:', err);
-  }
+  console.log('⚠️  notifyGroupAboutRideRequest called but ShortNotice system has been removed');
+  return;
 }
 
-// Notify users about new messages in short-notice discussions
 async function notifyGroupAboutMessage(groupId, requestId, senderName, messagePreview) {
-  try {
-    // Get all group members except the sender
-    const [members] = await db.query(`
-      SELECT tgm.user_id, u.name 
-      FROM TrustedGroupMembers tgm
-      JOIN Users u ON tgm.user_id = u.id
-      WHERE tgm.group_id = ? AND u.name != ?
-    `, [groupId, senderName]);
-    
-    const title = `New Message in Discussion`;
-    const message = `${senderName} replied: ${messagePreview.substring(0, 100)}${messagePreview.length > 100 ? '...' : ''}`;
-    
-    // Notify each member
-    for (const member of members) {
-      await createTrustedGroupNotification(groupId, member.user_id, 'message_reply', title, message, requestId);
-    }
-    
-    console.log(`✅ Notified ${members.length} group members about new message`);
-  } catch (err) {
-    console.error('❌ Error notifying group about message:', err);
-  }
+  console.log('⚠️  notifyGroupAboutMessage called but ShortNotice system has been removed');
+  return;
 }
 
 // Get unread notifications count for a user
@@ -122,19 +69,10 @@ async function getUnreadNotificationsCount(userId) {
   }
 }
 
-// Get unread trusted group notifications count for a user
+// Legacy function - now returns 0 since TrustedGroupNotifications table was removed
 async function getUnreadTrustedGroupNotificationsCount(userId) {
-  try {
-    const [[result]] = await db.query(`
-      SELECT COUNT(*) as count FROM TrustedGroupNotifications 
-      WHERE user_id = ? AND is_read = FALSE
-    `, [userId]);
-    
-    return result.count;
-  } catch (err) {
-    console.error('❌ Error getting unread trusted group notifications count:', err);
-    return 0;
-  }
+  console.log('⚠️  getUnreadTrustedGroupNotificationsCount called but TrustedGroups system has been removed');
+  return 0;
 }
 
 // Mark notification as read
@@ -152,24 +90,14 @@ async function markNotificationAsRead(notificationId, userId) {
   }
 }
 
-// Mark trusted group notification as read
+// Legacy function - no longer used since TrustedGroupNotifications table was removed
 async function markTrustedGroupNotificationAsRead(notificationId, userId) {
-  try {
-    await db.query(`
-      UPDATE TrustedGroupNotifications SET is_read = TRUE 
-      WHERE id = ? AND user_id = ?
-    `, [notificationId, userId]);
-    
-    return true;
-  } catch (err) {
-    console.error('❌ Error marking trusted group notification as read:', err);
-    return false;
-  }
+  console.log('⚠️  markTrustedGroupNotificationAsRead called but TrustedGroups system has been removed');
+  return true;
 }
 
 module.exports = {
   createNotification,
-  createTrustedGroupNotification,
   notifyUserAddedToGroup,
   notifyUserAddedToActivityGroup,
   notifyUserRemovedFromGroup,

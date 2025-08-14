@@ -1,287 +1,25 @@
 <%- include('partials/header1') %>
 <%- include('partials/navbar1') %>
 
-<!-- FullCalendar v5.11.3 CSS -->
+<!-- FullCalendar CSS -->
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet" />
 
-<style>
-/* Enhanced Calendar Styling for Detail Page */
-.fc {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-}
+<div class="container mt-4">
+  <h3 class="mb-3"><i class="fas fa-calendar-alt me-2"></i>Full Calendar</h3>
+  <div id="calendar"></div>
 
-/* Event type colors */
-.event-drive {
-  background-color: #dc3545 !important;
-  border-color: #c82333 !important;
-  color: white !important;
-}
-
-.event-ride {
-  background-color: #28a745 !important;
-  border-color: #1e7e34 !important;
-  color: white !important;
-}
-
-.event-recurring {
-  background-color: #ffc107 !important;
-  border-color: #e0a800 !important;
-  color: #212529 !important;
-}
-
-/* Weekend styling */
-.fc-day-sun, .fc-day-sat {
-  background-color: #f8f9fa !important;
-}
-
-.fc-day-sun .fc-daygrid-day-number,
-.fc-day-sat .fc-daygrid-day-number {
-  font-weight: bold;
-  color: #6c757d;
-}
-
-/* Today highlighting */
-.fc-day-today {
-  background-color: #e3f2fd !important;
-}
-
-/* Event hover effects */
-.fc-event:hover {
-  opacity: 0.8;
-  transform: scale(1.02);
-  transition: all 0.2s ease;
-}
-
-/* Calendar header styling */
-.fc-header-toolbar {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 10px;
-  border-radius: 12px 12px 0 0;
-  margin-bottom: 0;
-}
-
-.fc-header-toolbar h2 {
-  color: white !important;
-  font-weight: 600;
-  font-size: 1.1rem; /* Smaller font size */
-}
-
-.fc-button {
-  background-color: rgba(255, 255, 255, 0.2) !important;
-  border: 1px solid rgba(255, 255, 255, 0.3) !important;
-  color: white !important;
-  font-weight: 500;
-  transition: all 0.3s ease;
-  border-radius: 6px;
-  padding: 8px 16px;
-}
-
-.fc-button:hover {
-  background-color: rgba(255, 255, 255, 0.3) !important;
-  transform: translateY(-1px);
-}
-
-.fc-button-active {
-  background-color: rgba(255, 255, 255, 0.4) !important;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-/* Calendar body styling */
-.fc-daygrid-body {
-  border-radius: 0 0 12px 12px;
-  overflow: hidden;
-}
-
-/* Event styling */
-.fc-event {
-  border-radius: 6px;
-  font-size: 0.9em;
-  font-weight: 500;
-  padding: 4px 8px;
-  margin: 2px 0;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-/* Tooltip styling */
-.tooltip-inner {
-  background-color: #343a40;
-  color: white;
-  border-radius: 8px;
-  padding: 12px 16px;
-  font-size: 0.9em;
-  line-height: 1.5;
-  max-width: 350px;
-}
-
-.tooltip-arrow::before {
-  border-top-color: #343a40;
-}
-
-/* Legend */
-.calendar-legend {
-  display: flex;
-  justify-content: center;
-  gap: 30px;
-  margin: 20px 0;
-  flex-wrap: wrap;
-  padding: 15px;
-  background: #f8f9fa;
-  border-radius: 8px;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 1em;
-  color: #495057;
-  font-weight: 500;
-}
-
-.legend-color {
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
-  border: 2px solid rgba(0, 0, 0, 0.1);
-}
-
-.legend-drive { background-color: #dc3545; }
-.legend-ride { background-color: #28a745; }
-.legend-recurring { background-color: #ffc107; }
-
-/* Page specific styling */
-.calendar-container {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-}
-
-.page-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 30px;
-  text-align: center;
-}
-
-.page-header h1 {
-  margin: 0;
-  font-weight: 600;
-}
-
-.page-header p {
-  margin: 10px 0 0 0;
-  opacity: 0.9;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .fc-header-toolbar {
-    flex-direction: column;
-    gap: 10px;
-  }
-  
-  .calendar-legend {
-    gap: 15px;
-  }
-  
-  .legend-item {
-    font-size: 0.9em;
-  }
-}
-</style>
-
-<div class="container-fluid py-4">
-  <div class="row">
-    <div class="col-12">
-      <!-- Page Header -->
-      <div class="page-header mb-4">
-        <h1><i class="fas fa-calendar-alt me-3"></i>Activity Calendar</h1>
-        <p>View all your family's rides, events, and activities in one place</p>
-      </div>
-      
-      <!-- Calendar Container -->
-      <div class="calendar-container">
-        <!-- Calendar Legend -->
-        <div class="calendar-legend">
-          <div class="legend-item">
-            <div class="legend-color legend-drive"></div>
-            <span>You're Driving</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-color legend-ride"></div>
-            <span>Child's Ride</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-color legend-recurring"></div>
-            <span>Recurring Event</span>
-          </div>
-        </div>
-        
-        <!-- FullCalendar container -->
-        <div id="calendar"></div>
-      </div>
-      
-      <!-- Quick Actions -->
-      <div class="text-center mt-4">
-        <a href="/dashboard" class="btn btn-outline-secondary me-2">
-          <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
-        </a>
-        <a href="/rides" class="btn btn-primary me-2">
-          <i class="fas fa-car me-1"></i>Manage Rides
-        </a>
-        <a href="/recurring-events" class="btn btn-success">
-          <i class="fas fa-calendar-plus me-1"></i>Manage Events
-        </a>
-      </div>
-    </div>
-  </div>
+  <!-- Event Detail Modal placeholder -->
+  <div id="eventModalContainer"></div>
 </div>
 
-<!-- FullCalendar v5.11.3 JS -->
+<!-- FullCalendar JS & deps -->
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/locales-all.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@fullcalendar/timegrid@5.11.3/main.global.min.js"></script>
-
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-  console.log('Calendar Detail Page - Starting FullCalendar initialization');
-  
-  // Debug: Check if FullCalendar is available
-  if (typeof FullCalendar === 'undefined') {
-    console.error('FullCalendar is not defined! Check if the CDN loaded properly.');
-    return;
-  }
-  console.log('FullCalendar library loaded successfully:', FullCalendar);
-  
-  // Debug: Check if calendar container exists
-  const calendarEl = document.getElementById('calendar');
-  if (!calendarEl) {
-    console.error('Calendar container element not found!');
-    return;
-  }
-  console.log('Calendar container found:', calendarEl);
-  
-  // Debug: Check calendar events data
-  const calendarEvents = <%- JSON.stringify(calendarEvents || []) %>;
-  console.log('Calendar events data:', calendarEvents);
-  console.log('Number of events:', calendarEvents.length);
-  
-  // Check if events have valid dates
-  calendarEvents.forEach((event, index) => {
-    console.log(`Event ${index}:`, {
-      id: event.id,
-      title: event.title,
-      start: event.start,
-      startType: typeof event.start,
-      startValid: event.start ? new Date(event.start).toString() : 'INVALID',
-      startParsed: event.start ? new Date(event.start) : null
-    });
-  });
-  
-  try {
-    // Initialize FullCalendar with enhanced styling and functionality
+  document.addEventListener('DOMContentLoaded', function() {
+    const calendarEl = document.getElementById('calendar');
+    const calendarEvents = <%- JSON.stringify(calendarEvents || []) %>;
+
     const calendar = new FullCalendar.Calendar(calendarEl, {
       initialView: 'dayGridMonth',
       headerToolbar: {
@@ -290,266 +28,70 @@ document.addEventListener('DOMContentLoaded', function() {
         right: 'dayGridMonth,timeGridWeek,listWeek'
       },
       height: 'auto',
-      timeZone: 'local', // Use local timezone
-      initialDate: new Date(), // Start with current date
+      timeZone: 'local',
       events: calendarEvents,
-      
-      // Enhanced event styling
       eventDisplay: 'block',
-      eventTimeFormat: {
-        hour: '2-digit',
-        minute: '2-digit',
-        meridiem: 'short'
-      },
-      
-      // Custom event rendering
-      eventDidMount: function(info) {
-        console.log('Event mounted:', info.event);
+      eventTimeFormat: { hour:'2-digit',minute:'2-digit',meridiem:'short' },
+      eventClick: function(info){
+        info.jsEvent.preventDefault();
         const event = info.event;
-        info.el.title = event.title + ' - ' + (event.extendedProps.description || 'No description');
-        info.el.addEventListener('click', function(e) {
-          e.preventDefault();
-          const isGroupRecurring = event.extendedProps.type === 'group_recurring';
-          const isRideRequest = event.extendedProps.type === 'request' || event.extendedProps.type === 'child_request' || event.extendedProps.type === 'my_request';
-          const instanceId = event.extendedProps.instance_id || event.extendedProps.instanceId || event.id;
+        const isActivityGroup = event.extendedProps.type === 'activity_group';
+        const instanceId = event.extendedProps.instance_id || event.id;
 
-          let dropoffBtnLabel = '';
-          let pickupBtnLabel = '';
-          let bothBtnLabel = '';
-          if (isGroupRecurring) {
-            dropoffBtnLabel = (event.extendedProps.dropoff_driver && event.extendedProps.dropoff_driver !== 'Unassigned')
-              ? `Take Over Drop Off at ${event.title}`
-              : `I can Drop Off at ${event.title}`;
-            pickupBtnLabel = (event.extendedProps.pickup_driver && event.extendedProps.pickup_driver !== 'Unassigned')
-              ? `Take Over Pick Up from ${event.title}`
-              : `I can Pick Up from ${event.title}`;
-            bothBtnLabel = ((event.extendedProps.dropoff_driver && event.extendedProps.dropoff_driver !== 'Unassigned') ||
-                            (event.extendedProps.pickup_driver && event.extendedProps.pickup_driver !== 'Unassigned'))
-              ? `Take Over Both`
-              : `I can Do Both`;
-          }
+        const dropoffLabel = (event.extendedProps.dropoff_driver && event.extendedProps.dropoff_driver !== 'Unassigned')
+          ? `Take Over Drop Off at ${event.title}` : `I can Drop Off at ${event.title}`;
+        const pickupLabel = (event.extendedProps.pickup_driver && event.extendedProps.pickup_driver !== 'Unassigned')
+          ? `Take Over Pick Up from ${event.title}` : `I can Pick Up from ${event.title}`;
+        const bothLabel = ((event.extendedProps.dropoff_driver && event.extendedProps.dropoff_driver !== 'Unassigned') || (event.extendedProps.pickup_driver && event.extendedProps.pickup_driver !== 'Unassigned'))
+          ? 'Take Over Both' : 'I can Do Both';
 
-          // Get status badge HTML for ride requests
-          let statusBadge = '';
-          if (isRideRequest) {
-            const status = event.extendedProps.status || 'pending';
-            let badgeClass = 'bg-secondary';
-            let statusText = 'Unknown';
-            if (status === 'pending' || status === 'Pending') {
-              badgeClass = 'bg-warning text-dark';
-              statusText = 'Pending';
-            } else if (status === 'assigned' || status === 'Assigned') {
-              badgeClass = 'bg-primary';
-              statusText = 'Assigned';
-            } else if (status === 'completed' || status === 'Completed') {
-              badgeClass = 'bg-success';
-              statusText = 'Completed';
-            } else if (status === 'cancelled' || status === 'Cancelled') {
-              badgeClass = 'bg-danger';
-              statusText = 'Cancelled';
-            }
-            statusBadge = `<span class="badge ${badgeClass} mb-2">${statusText}</span>`;
-          }
-
-          const modalHTML = `
-            <div class="modal fade" id="eventModal" tabindex="-1" aria-labelledby="eventModalLabel" aria-hidden="true">
-              <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                  <div class="modal-header">
-                    <h5 class="modal-title" id="eventModalLabel">
-                      <i class="fas fa-calendar-event me-2"></i>${event.title}
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        const modalHTML = `
+          <div class="modal fade" id="eventModal" tabindex="-1" aria-labelledby="eventModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title" id="eventModalLabel"><i class="fas fa-calendar-event me-2"></i>${event.title}</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                  <p class="text-muted mb-3"><i class="fas fa-info-circle me-2"></i>${event.extendedProps.description || 'No description'}</p>
+                  <div class="alert alert-info">
+                    <i class="fas fa-clock me-2"></i><strong>Time:</strong> ${event.start.toLocaleString('en-NZ',{weekday:'long',year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})}
+                    ${event.end ? `<br><i class='fas fa-stop-circle me-2'></i><strong>End:</strong> ${event.end.toLocaleString('en-NZ',{hour:'2-digit',minute:'2-digit',hour12:true})}`:''}
                   </div>
-                  <div class="modal-body">
-                    <div class="row">
-                      <div class="col-12">
-                        ${statusBadge}
-                        <p class="text-muted mb-3">
-                          <i class="fas fa-info-circle me-2"></i>
-                          ${event.extendedProps.description || 'No description'}
-                        </p>
-                        <div class="alert alert-info">
-                          <i class="fas fa-clock me-2"></i>
-                          <strong>Time:</strong> ${event.start.toLocaleString('en-NZ', { 
-                            weekday: 'long',
-                            year: 'numeric', 
-                            month: 'long', 
-                            day: 'numeric',
-                            hour: '2-digit', 
-                            minute: '2-digit',
-                            hour12: true 
-                          })}
-                          ${event.end ? `<br><i class="fas fa-stop-circle me-2"></i><strong>End:</strong> ${event.end.toLocaleString('en-NZ', { 
-                            hour: '2-digit', 
-                            minute: '2-digit',
-                            hour12: true 
-                          })}` : ''}
-                        </div>
-                        ${isRideRequest && event.extendedProps.driver_name ? `
-                          <div class="alert alert-success mb-3">
-                            <i class="fas fa-user me-2"></i>
-                            <strong>Driver:</strong> ${event.extendedProps.driver_name}
-                          </div>
-                        ` : ''}
-                        ${isGroupRecurring ? `
-                          <div class="alert alert-secondary mb-3">
-                            <strong>Dropoff:</strong> <span class="${event.extendedProps.dropoff_driver === 'Unassigned' ? 'text-danger' : 'text-success'}">
-                              ${event.extendedProps.dropoff_driver || 'Unassigned'}
-                            </span><br>
-                            <strong>Pickup:</strong> <span class="${event.extendedProps.pickup_driver === 'Unassigned' ? 'text-danger' : 'text-success'}">
-                              ${event.extendedProps.pickup_driver || 'Unassigned'}
-                            </span>
-                          </div>
-                          <div class="mt-3">
-                            <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
-                              <input type="hidden" name="assignmentType" value="dropoff">
-                              <button type="submit" class="btn btn-primary btn-sm me-2">${dropoffBtnLabel}</button>
-                            </form>
-                            <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
-                              <input type="hidden" name="assignmentType" value="pickup">
-                              <button type="submit" class="btn btn-success btn-sm me-2">${pickupBtnLabel}</button>
-                            </form>
-                            <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
-                              <input type="hidden" name="assignmentType" value="both">
-                              <button type="submit" class="btn btn-info btn-sm">${bothBtnLabel}</button>
-                            </form>
-                          </div>
-                        ` : ''}
-                        ${isRideRequest ? `
-                          <div class="mt-3">
-                            <a href="/rides" class="btn btn-outline-primary btn-sm me-2">
-                              <i class="fas fa-car me-1"></i>View Ride Details
-                            </a>
-                            <a href="/messages/group/ride/${event.id.replace(/^(ride_|child_ride_|my_ride_)/, '')}" class="btn btn-outline-info btn-sm">
-                              <i class="fas fa-comments me-1"></i>Chat
-                            </a>
-                          </div>
-                        ` : ''}
-                      </div>
+                  ${isActivityGroup?`
+                    <div class="alert alert-secondary mb-3">
+                      <strong>Dropoff:</strong> <span class="${event.extendedProps.dropoff_driver==='Unassigned'?'text-danger':'text-success'}">${event.extendedProps.dropoff_driver||'Unassigned'}</span><br>
+                      <strong>Pickup:</strong> <span class="${event.extendedProps.pickup_driver==='Unassigned'?'text-danger':'text-success'}">${event.extendedProps.pickup_driver||'Unassigned'}</span>
                     </div>
-                  </div>
-                  <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                      <i class="fas fa-times me-1"></i>Close
-                    </button>
-                    <a href="/calendar" class="btn btn-primary">
-                      <i class="fas fa-calendar-alt me-1"></i>View Full Calendar
-                    </a>
-                  </div>
+                    <div class="mt-3">
+                      <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
+                        <input type="hidden" name="assignmentType" value="dropoff"><button type="submit" class="btn btn-primary btn-sm me-2">${dropoffLabel}</button>
+                      </form>
+                      <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
+                        <input type="hidden" name="assignmentType" value="pickup"><button type="submit" class="btn btn-success btn-sm me-2">${pickupLabel}</button>
+                      </form>
+                      <form method="POST" action="/event-instances/${instanceId}/assign-self-driver" style="display:inline;">
+                        <input type="hidden" name="assignmentType" value="both"><button type="submit" class="btn btn-info btn-sm">${bothLabel}</button>
+                      </form>
+                    </div>`:''}
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Close</button>
                 </div>
               </div>
             </div>
-          `;
-          const existingModal = document.getElementById('eventModal');
-          if (existingModal) {
-            existingModal.remove();
-          }
-          document.body.insertAdjacentHTML('beforeend', modalHTML);
-          const modal = new bootstrap.Modal(document.getElementById('eventModal'));
-          modal.show();
-          document.getElementById('eventModal').addEventListener('hidden.bs.modal', function() {
-            this.remove();
-          });
-        });
-      },
-      
-      // Day cell rendering for highlighting
-      dayCellDidMount: function(arg) {
-        const date = arg.date;
-        const dayOfWeek = date.getDay();
-        
-        // Add weekend styling
-        if (dayOfWeek === 0 || dayOfWeek === 6) {
-          arg.el.style.backgroundColor = '#f8f9fa';
-          arg.el.style.fontWeight = 'bold';
-        }
-        
-        // Add today highlighting
-        const today = new Date();
-        if (date.toDateString() === today.toDateString()) {
-          arg.el.style.border = '2px solid #007bff';
-          arg.el.style.borderRadius = '8px';
-        }
-      },
-      
-      // Loading state
-      loading: function(isLoading) {
-        console.log('Calendar loading state:', isLoading);
-      },
-      
-      // View-specific settings
-      views: {
-        dayGridMonth: {
-          dayMaxEvents: 5, // Show max 5 events per day, rest as "+more"
-          moreLinkClick: 'popover'
-        },
-        timeGridWeek: {
-          slotMinTime: '06:00:00',
-          slotMaxTime: '22:00:00'
-        }
-      },
-      
-      // Custom event colors based on type
-      eventClassNames: function(arg) {
-        const event = arg.event;
-        const classes = [];
-        
-        // Add type-specific classes
-        if (event.extendedProps.type === 'request') {
-          classes.push('event-drive');
-        } else if (event.extendedProps.type === 'child_request') {
-          classes.push('event-ride');
-        } else if (event.extendedProps.type === 'recurring') {
-          classes.push('event-recurring');
-        }
-        
-        return classes;
+          </div>`;
+
+        const container = document.getElementById('eventModalContainer');
+        container.innerHTML = modalHTML;
+        const modal = new bootstrap.Modal(document.getElementById('eventModal'));
+        modal.show();
+        document.getElementById('eventModal').addEventListener('hidden.bs.modal',function(){this.remove();});
       }
     });
-    
-    console.log('FullCalendar instance created:', calendar);
-    
-    // Render the calendar
     calendar.render();
-    console.log('FullCalendar rendered successfully');
-    
-    // Debug: Check calendar view and navigate to event date if needed
-    const eventDate = new Date('2025-07-14T05:00:00.000Z');
-    console.log('Event date:', eventDate);
-    console.log('Current calendar date:', calendar.getDate());
-    
-    // Navigate to the month containing the event
-    calendar.gotoDate(eventDate);
-    console.log('Navigated to event month:', calendar.getDate());
-    
-    // Debug: Check if calendar is visible
-    setTimeout(() => {
-      const calendarContainer = calendarEl.querySelector('.fc');
-      if (calendarContainer) {
-        console.log('Calendar DOM structure created:', calendarContainer);
-        console.log('Calendar dimensions:', {
-          width: calendarContainer.offsetWidth,
-          height: calendarContainer.offsetHeight,
-          visible: calendarContainer.offsetWidth > 0 && calendarContainer.offsetHeight > 0
-        });
-        
-        // Check for events in the DOM
-        const eventElements = calendarContainer.querySelectorAll('.fc-event');
-        console.log('Event elements found in DOM:', eventElements.length);
-        eventElements.forEach((el, index) => {
-          console.log(`Event element ${index}:`, el.textContent, el);
-        });
-      } else {
-        console.error('Calendar DOM structure not found after render');
-      }
-    }, 100);
-    
-  } catch (error) {
-    console.error('Error initializing FullCalendar:', error);
-    console.error('Error stack:', error.stack);
-  }
-});
+  });
 </script>
 
-<%- include('partials/footer1') %> 
+<%- include('partials/footer1') %>

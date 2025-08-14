@@ -24,15 +24,23 @@ h1, h2, h3 {
 .table {
   border-radius: 0.5rem;
   overflow: hidden;
+  background-color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.table thead {
+  background-color: #e9ecef;
 }
 
 .table th {
-  background-color: #e0f7fa;
-  color: #004d40;
+  color: #343a40;
   font-weight: 600;
+  border-bottom: 2px solid #dee2e6;
 }
 
 .table td {
+  vertical-align: middle;
+  padding: 0.75rem;
   background-color: #ffffff;
 }
 
@@ -161,29 +169,6 @@ footer a:hover {
   color: #212529;
 }
 
-/* Table Enhancements */
-.table {
-  background-color: #fff;
-  border-radius: 0.5rem;
-  overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.table thead {
-  background-color: #e9ecef; /* Light gray background */
-}
-
-.table th {
-  color: #343a40; /* Dark gray text */
-  font-weight: 600;
-  border-bottom: 2px solid #dee2e6;
-}
-
-.table td {
-  vertical-align: middle;
-  padding: 0.75rem;
-}
-
 /* Child Dashboard Card Styling */
 .card {
   border: none;
@@ -236,12 +221,6 @@ footer a:hover {
   padding: 0.25rem 0.5rem;
 }
 
-/* Blocked User Styling */
-.blocked-user {
-  color: #dc3545;
-  text-decoration: line-through;
-}
-
 /* Responsive Adjustments */
 @media (max-width: 768px) {
   .col-12.col-md-6.col-lg-4 {
@@ -273,17 +252,17 @@ footer a:hover {
 /* Bootstrap navbar consistency for light theme */
 .navbar-light .navbar-brand,
 .navbar-light .nav-link {
-  color: #6c757d !important; /* Light gray for all states */
+  color: #6c757d !important;
 }
 
 /* Override active state to match non-active */
 .navbar-light .nav-link.active {
-  color: #6c757d !important; /* Ensure active links are also light gray */
-  font-weight: 600; /* Keep Bootstrap's active styling */
+  color: #6c757d !important;
+  font-weight: 600;
 }
 
 .navbar-light .nav-link:hover {
-  color: #6c757d !important; /* Keep light gray on hover */
+  color: #6c757d !important;
   text-decoration: underline;
 }
 

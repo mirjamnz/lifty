@@ -129,7 +129,7 @@ router.get('/', async (req, res) => {
         'confirmed' AS status,
         rr.note AS notes,
         rr.dropoff_location AS school,
-        rr.pickup_location,
+        IF(rr.pickup_location = 'Home', up.home_address, rr.pickup_location) AS pickup_location,
         rr.pickup_time,
         ? AS driver_name,
         c.name AS child_names,
@@ -139,6 +139,7 @@ router.get('/', async (req, res) => {
         'request' AS ride_type
       FROM RideRequests rr
       JOIN Children c ON rr.child_id = c.id
+      JOIN Users up ON rr.user_id = up.id
       WHERE rr.assigned_user_id = ? AND rr.pickup_time > NOW()
       
       ORDER BY pickup_time DESC

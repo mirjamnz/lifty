@@ -140,6 +140,55 @@
                     </div>
                   </div>
                 </div>
+              <% } else if (item.type === 'activity_group_thread') { %>
+                <!-- ActivityGroup Thread -->
+                <% const thread = item.data; %>
+                <div class="list-group-item message-item <%= thread.unread_count > 0 ? 'unread' : '' %>">
+                  <div class="row align-items-center">
+                    <div class="col-md-8">
+                      <div class="d-flex align-items-center mb-2">
+                        <% if (thread.unread_count > 0) { %>
+                          <span class="badge bg-danger me-2"><%= thread.unread_count %> New</span>
+                        <% } %>
+                        <span class="badge bg-success me-2">Activity Group</span>
+                        <h6 class="mb-0">
+                          <i class="fas fa-users me-2 text-success"></i>
+                          <span class="text-success fw-bold">
+                            <%= thread.group_name %>
+                          </span>
+                          <span class="ms-2 text-muted">
+                            (<%= thread.messages.length %> message<%= thread.messages.length !== 1 ? 's' : '' %>)
+                          </span>
+                        </h6>
+                      </div>
+                      <% if (thread.latest_message) { %>
+                      <p class="mb-1 text-muted">
+                        <i class="fas fa-clock me-1"></i>
+                        Latest: <%= new Date(thread.latest_message.sent_at).toLocaleString() %>
+                        by <%= thread.latest_message.sender_id === session.userId ? 'You' : thread.latest_message.sender_name %>
+                      </p>
+                      <p class="mb-0 message-content">
+                        <em><%= thread.latest_message.message %></em>
+                      </p>
+                      <% } %>
+                      <small class="text-success">
+                        <i class="fas fa-tag me-1"></i>
+                        <%= thread.activity_type || 'Chat Group' %>
+                        <% if (thread.location) { %>
+                          <span class="ms-2">
+                            <i class="fas fa-map-marker-alt me-1"></i>
+                            <%= thread.location %>
+                          </span>
+                        <% } %>
+                      </small>
+                    </div>
+                    <div class="col-md-4 text-end">
+                      <a href="/messages/group/activity/<%= thread.group_id %>" class="btn btn-sm btn-outline-success">
+                        <i class="fas fa-comments me-1"></i>View Chat
+                      </a>
+                    </div>
+                  </div>
+                </div>
               <% } %>
             <% }) %>
           </div>

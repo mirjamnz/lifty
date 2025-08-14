@@ -359,9 +359,7 @@ const orgRoutes = require('./routes/organizations');
 const childDashboardRoutes = require('./routes/childDashboard');
 const messagesRouter = require('./routes/messages');
 const recurringEventsRouter = require('./routes/recurringEvents');
-const recurringEventGroupsRouter = require('./routes/recurringEventGroups');
-const trustedGroupsRouter = require('./routes/trustedGroups');
-const shortNoticeRouter = require('./routes/shortNotice');
+// Obsolete route imports removed - these systems have been unified into Groups
 const groupsRouter = require('./routes/groups');
 const notificationsRouter = require('./routes/notifications');
 
@@ -371,11 +369,10 @@ app.use('/requests', rideRequestRoutes);
 app.use('/rides', rideRoutes);
 app.use('/organizations', orgRoutes);
 app.use('/', childDashboardRoutes);
-// app.use('/messages', messagesRouter);
+app.use('/messages', messagesRouter);
 app.use('/recurring-events', recurringEventsRouter);
-// app.use('/recurring-event-groups', recurringEventGroupsRouter);
-// app.use('/trusted-groups', trustedGroupsRouter);
-// app.use('/short-notice', shortNoticeRouter);
+// Obsolete routes commented out - these systems have been unified into Groups
+// All functionality now available through /groups
 app.use('/groups', groupsRouter);
 app.use('/notifications', notificationsRouter);
 
