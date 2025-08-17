@@ -4,6 +4,21 @@
 
 <div class="container py-5">
   <h2 class="mb-4 fw-bold">Edit Child</h2>
+  <% const parentUser = users.find(u=>u.id===child.user_id); %>
+  <p class="mb-3">
+    <strong>Parent:</strong> <%= parentUser ? parentUser.name : 'N/A' %> 
+    <% if (parentUser) { %><span class="badge bg-secondary"><%= parentUser.email %></span><% } %>
+  </p>
+  <% if (parents && parents.length > 0) { %>
+    <div class="mb-3">
+      <strong>Linked Parents:</strong>
+      <ul class="list-group list-group-flush">
+        <% parents.forEach(p=>{ %>
+          <li class="list-group-item px-0"><%= p.name %> <small class="text-muted">(<%= p.email %>)</small></li>
+        <% }) %>
+      </ul>
+    </div>
+  <% } %>
 
   <% if (session.success) { %>
     <div class="alert alert-success alert-dismissible fade show" role="alert">

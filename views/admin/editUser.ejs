@@ -6,24 +6,67 @@
     <div class="col-md-6">
       <div class="card shadow-sm">
         <div class="card-header bg-primary text-white">
-          <h4 class="mb-0">Edit User Affiliations</h4>
+          <h4 class="mb-0">Edit User Details & Affiliations</h4>
         </div>
         <div class="card-body">
-          <h5 class="mb-3">User: <span class="fw-bold"><%= user.name %></span> <span class="badge bg-secondary"><%= user.email %></span></h5>
-          <form method="POST" action="/admin/users/<%= user.id %>/affiliations">
-            <% organizations.forEach(org => { %>
-              <div class="form-check mb-2">
-                <input class="form-check-input" type="checkbox" name="organization_ids" value="<%= org.id %>"
-                  <%= affiliations.some(a => a.organization_id === org.id) ? 'checked' : '' %> id="org_<%= org.id %>">
-                <label class="form-check-label" for="org_<%= org.id %>">
-                  <%= org.name %> (<%= org.type %>)
-                </label>
+          <h5 class="mb-3">
+            <span class="fw-bold"><%= user.name %></span> <span class="badge bg-secondary"><%= user.email %></span><br>
+            <small class="text-muted">Address: <%= user.home_address || '—' %></small>
+          </h5>
+
+          <% if (user.role === 'child' && parents && parents.length>0) { %>
+            <div class="mb-3">
+              <strong>Linked Parents:</strong>
+              <ul class="list-group list-group-flush">
+                <% parents.forEach(p=>{ %>
+                  <li class="list-group-item px-0"><%= p.name %> <small class="text-muted">(<%= p.email %>)</small></li>
+                <% }) %>
+              </ul>
+            </div>
+          <% } %>
+
+          <% if (user.role !== 'child') { %>
+            <!-- Mockup: Background checks -->
+            <div class="mb-4">
+              <h6 class="text-primary">Background Checks (mockup)</h6>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" disabled id="driverLicenseVerified">
+                <label class="form-check-label" for="driverLicenseVerified">Driver License verified</label>
               </div>
-            <% }) %>
-            <input type="hidden" name="role" value="parent">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" disabled id="policeVetted">
+                <label class="form-check-label" for="policeVetted">Police vetted</label>
+              </div>
+              <small class="text-muted">(Admin functionality coming soon)</small>
+            </div>
+          <% } %>
+          <form method="POST" action="/admin/users/<%= user.id %>/affiliations" id="editUserForm">
+            <!-- Address -->
+            <div class="mb-3">
+              <label for="homeAddress" class="form-label">Home Address</label>
+              <input type="text" class="form-control" id="homeAddress" name="home_address" value="<%= user.home_address || '' %>" placeholder="Enter address...">
+            </div>
+
+            <!-- Affiliations Section -->
+            <h6 class="mt-4">Affiliations</h6>
+            <div class="mb-2">
+              <input type="text" class="form-control" id="orgSearch" placeholder="Search organizations..." autocomplete="off">
+              <div id="orgSuggestions" class="position-absolute bg-white border rounded shadow-sm w-100" style="display:none; max-height:200px; overflow-y:auto; z-index:1000;"></div>
+            </div>
+            <div id="selectedOrgs" class="d-flex flex-wrap mb-3">
+              <% affiliations.forEach(a=>{ %>
+                <% const org = organizations.find(o=>o.id===a.organization_id) || {id:a.organization_id, name:a.organization_id}; %>
+                <span class="badge bg-info text-dark m-1" data-id="<%= org.id %>">
+                  <%= org.name %>
+                  <button type="button" class="btn-close btn-close-white btn-sm ms-1 remove-org" aria-label="Remove"></button>
+                  <input type="hidden" name="organization_ids" value="<%= org.id %>">
+                </span>
+              <% }) %>
+            </div>
+
             <div class="d-flex justify-content-between mt-4">
               <a href="/admin/users" class="btn btn-outline-secondary">Back to Users</a>
-              <button type="submit" class="btn btn-primary">Update Affiliations</button>
+              <button type="submit" class="btn btn-primary">Save Changes</button>
             </div>
           </form>
         </div>
@@ -33,3 +76,57 @@
 </div>
 
 <%- include('../partials/footer1') %> 
+
+<script>
+// === Affiliations search/pill logic ===
+(function(){
+  const searchInput = document.getElementById('orgSearch');
+  const suggestions = document.getElementById('orgSuggestions');
+  const selectedWrap = document.getElementById('selectedOrgs');
+
+  if(!searchInput) return;
+
+  let debounce;
+  searchInput.addEventListener('input', ()=>{
+    clearTimeout(debounce);
+    const q=searchInput.value.trim();
+    if(q.length<2){ suggestions.style.display='none'; return; }
+    debounce=setTimeout(()=>fetch(`/organizations/api/search?q=${encodeURIComponent(q)}`)
+      .then(r=>r.json())
+      .then(arr=>{
+        if(!arr.length){ suggestions.style.display='none'; return; }
+        suggestions.innerHTML = arr.map(o=>`<div class="list-group-item list-group-item-action" data-id="${o.id}" data-name="${o.name}">${o.name}</div>`).join('');
+        suggestions.style.display='block';
+      })
+      .catch(()=>{ suggestions.style.display='none'; }),300);
+  });
+
+  suggestions.addEventListener('click', e=>{
+    const item=e.target.closest('[data-id]');
+    if(!item) return;
+    const id=item.getAttribute('data-id');
+    const name=item.getAttribute('data-name');
+    // prevent duplicates
+    if(selectedWrap.querySelector(`span[data-id="${id}"]`)) return;
+    const span=document.createElement('span');
+    span.className='badge bg-info text-dark m-1';
+    span.setAttribute('data-id',id);
+    span.innerHTML=`${name} <button type="button" class="btn-close btn-close-white btn-sm ms-1 remove-org" aria-label="Remove"></button>`;
+    const input=document.createElement('input');
+    input.type='hidden';
+    input.name='organization_ids';
+    input.value=id;
+    span.appendChild(input);
+    selectedWrap.appendChild(span);
+    suggestions.style.display='none';
+    searchInput.value='';
+  });
+
+  selectedWrap.addEventListener('click', e=>{
+    if(e.target.classList.contains('remove-org')){
+      const badge=e.target.closest('span');
+      badge.remove();
+    }
+  });
+})();
+</script> 

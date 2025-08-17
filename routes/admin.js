@@ -334,17 +334,22 @@ router.post('/users/:id/privacy', async (req, res) => {
 
 // Edit user affiliations (POST)
 router.post('/users/:id/affiliations', async (req, res) => {
-  const userId = req.params.id;
+   const userId = req.params.id;
+  const address = req.body.home_address || null;
   let orgIds = req.body.organization_ids || [];
   if (!Array.isArray(orgIds)) orgIds = [orgIds];
+
+  await db.query('UPDATE Users SET home_address = ? WHERE id = ?', [address, userId]);
+
   await db.query('DELETE FROM UserAffiliations WHERE user_id = ?', [userId]);
   for (const orgId of orgIds) {
+    if (!orgId) continue;
     await db.query(
       'INSERT INTO UserAffiliations (user_id, organization_id, role, created_at) VALUES (?, ?, ?, NOW())',
       [userId, orgId, 'parent']
     );
   }
-  res.redirect(`/admin/users/${userId}/edit?success=Affiliations updated`);
+  res.redirect(`/admin/users/${userId}/edit?success=Details updated`);
 });
 
 // Delete User (specific) must be defined before generic action route
@@ -459,9 +464,21 @@ router.post('/users/:id/:action', async (req, res) => {
 router.get('/users/:id/edit', async (req, res) => {
   const userId = req.params.id;
   const [[user]] = await db.query('SELECT * FROM Users WHERE id = ?', [userId]);
+  let parents = [];
+  if (user && user.role === 'child') {
+    const childId = user.child_profile_id || null;
+    if (childId) {
+      const [pRows] = await db.query(`
+        SELECT u.id, u.name, u.email
+        FROM Users u
+        JOIN ParentChild pc ON pc.parent_id = u.id
+        WHERE pc.child_id = ?`, [childId]);
+      parents = pRows;
+    }
+  }
   const [organizations] = await db.query('SELECT * FROM Organizations ORDER BY name ASC');
   const [affiliations] = await db.query('SELECT * FROM UserAffiliations WHERE user_id = ?', [userId]);
-  res.render('admin/editUser', { user, organizations, affiliations, session: req.session });
+  res.render('admin/editUser', { user, parents, organizations, affiliations, session: req.session });
 });
 // Edit user affiliations (POST)
 router.post('/users/:id/affiliations', async (req, res) => {
@@ -483,7 +500,11 @@ router.get('/children/:id/edit', async (req, res) => {
   const [[child]] = await db.query('SELECT * FROM Children WHERE id = ?', [childId]);
   const [organizations] = await db.query('SELECT * FROM Organizations ORDER BY name ASC');
   const [affiliations] = await db.query('SELECT * FROM UserAffiliations WHERE child_id = ?', [childId]);
-  res.render('admin/editChild', { child, organizations, affiliations, session: req.session });
+  const [parents] = await db.query(`
+      SELECT u.id, u.name, u.email FROM Users u
+      JOIN ParentChild pc ON pc.parent_id = u.id
+      WHERE pc.child_id = ?`, [childId]);
+  res.render('admin/editChild', { child, parents, users, organizations, affiliations, session: req.session });
 });
 // Edit child affiliations (POST)
 router.post('/children/:id/affiliations', async (req, res) => {

@@ -18,6 +18,7 @@
       <tr>
         <th>Name</th>
         <th>Email</th>
+        <th>Address</th>
         <th>Role</th>
         <th>Blocked?</th>
         <th>Actions</th>
@@ -28,6 +29,7 @@
         <tr>
           <td><%= user.name %></td>
           <td><%= user.email %></td>
+          <td><%= user.home_address || '-' %></td>
           <td><%= user.role %><%= user.is_admin ? ' (Admin)' : '' %></td>
           <td><%= user.is_blocked ? 'Yes' : 'No' %></td>
           <td>
