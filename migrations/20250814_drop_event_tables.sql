@@ -3,16 +3,20 @@
 -- ------------------------------------------------------------------
 -- UP: Executes in production/staging when RUN_DROP_UNUSED is enabled
 -- ------------------------------------------------------------------
+SET FOREIGN_KEY_CHECKS = 0;
+
 DROP TABLE IF EXISTS
-  RecurringEvents,
-  EventAssignments,
-  EventGroupInvitations,
-  EventGroupMembers,
-  EventGroupMessages,
   EventInstanceAttendance,
-  EventInstances,
   EventMessages,
-  EventSubscriptions;
+  EventGroupMessages,
+  EventGroupMembers,
+  EventGroupInvitations,
+  EventAssignments,
+  EventSubscriptions,
+  EventInstances,
+  RecurringEvents;
+
+SET FOREIGN_KEY_CHECKS = 1;
 
 -- ------------------------------------------------------------------
 -- DOWN (manual rollback):

@@ -347,6 +347,94 @@ router.post('/users/:id/affiliations', async (req, res) => {
   res.redirect(`/admin/users/${userId}/edit?success=Affiliations updated`);
 });
 
+// Delete User (specific) must be defined before generic action route
+router.post('/users/:id/delete-user', async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const [[user]] = await db.query('SELECT * FROM Users WHERE id = ?', [userId]);
+    if (!user) {
+      req.session.error = 'User not found';
+      return res.redirect('/admin/users');
+    }
+
+    // Remove associated children
+    await db.query('DELETE FROM Children WHERE user_id = ?', [userId]);
+
+    // Clean up relations (ignore if tables absent)
+    await db.query('DELETE FROM ActivityGroupMembers WHERE user_id = ?', [userId]).catch(() => {});
+    await db.query('DELETE FROM RideRequests WHERE user_id = ?', [userId]).catch(() => {});
+    await db.query('DELETE FROM RideOffers WHERE user_id = ?', [userId]).catch(() => {});
+
+    // Delete user
+    const [result] = await db.query('DELETE FROM Users WHERE id = ?', [userId]);
+    if (result.affectedRows === 0) {
+      req.session.error = 'User could not be deleted.';
+      return res.redirect('/admin/users');
+    }
+
+    req.session.success = `✅ User '${user.name}' deleted successfully.`;
+    res.redirect('/admin/users');
+  } catch (err) {
+    console.error('Delete user error:', err);
+    req.session.error = 'Failed to delete user.';
+    res.redirect('/admin/users');
+  }
+});
+
+// Manage Block Status (GET)
+router.get('/users/:id/manage-block', async (req, res) => {
+  try {
+    const [users] = await db.query('SELECT * FROM Users WHERE id = ?', [req.params.id]);
+    if (!users || users.length === 0) {
+      return res.status(404).send('User not found');
+    }
+    const user = users[0];
+    res.render('admin/manageBlock', { user, session: req.session });
+  } catch (err) {
+    console.error('Load manage block error:', err);
+    res.status(500).send('Could not load block management');
+  }
+});
+
+// Update address privacy (admin) - MUST come before /users/:id/:action
+router.post('/users/:id/privacy', async (req, res) => {
+  const userId = req.params.id;
+  const isPrivate = req.body.is_address_private === 'on' ? 1 : 0;
+  
+  console.log('🔍 Privacy toggle request:', {
+    userId,
+    isPrivate,
+    body: req.body,
+    is_address_private: req.body.is_address_private
+  });
+  
+  try {
+    await db.query('UPDATE Users SET is_address_private = ? WHERE id = ?', [isPrivate, userId]);
+    console.log('✅ Privacy updated successfully for user', userId, 'to', isPrivate);
+    req.session.success = '✅ Address privacy updated.';
+    res.redirect('/admin/dashboard');
+  } catch (err) {
+    console.error('❌ Admin privacy update error:', err);
+    req.session.error = 'Failed to update address privacy.';
+    res.redirect('/admin/dashboard');
+  }
+});
+
+// Edit user affiliations (POST)
+router.post('/users/:id/affiliations', async (req, res) => {
+  const userId = req.params.id;
+  let orgIds = req.body.organization_ids || [];
+  if (!Array.isArray(orgIds)) orgIds = [orgIds];
+  await db.query('DELETE FROM UserAffiliations WHERE user_id = ?', [userId]);
+  for (const orgId of orgIds) {
+    await db.query(
+      'INSERT INTO UserAffiliations (user_id, organization_id, role, created_at) VALUES (?, ?, ?, NOW())',
+      [userId, orgId, 'parent']
+    );
+  }
+  res.redirect(`/admin/users/${userId}/edit?success=Affiliations updated`);
+});
+
 // Manage Block Status (POST)
 router.post('/users/:id/:action', async (req, res) => {
   const userId = req.params.id;
@@ -367,588 +455,84 @@ router.post('/users/:id/:action', async (req, res) => {
   }
 });
 
-// Delete User
-router.post('/users/:id/delete', async (req, res) => {
-  try {
-    const userId = req.params.id;
-    const [[user]] = await db.query('SELECT * FROM Users WHERE id = ?', [userId]);
-    if (!user) {
-      req.session.error = 'User not found';
-      return res.redirect('/admin/dashboard');
-    }
-    await db.query('START TRANSACTION');
-    const [childrenResult] = await db.query('SELECT id FROM Children WHERE user_id = ?', [userId]);
-    if (childrenResult.length > 0) {
-      const childIds = childrenResult.map(child => child.id);
-      await db.query('DELETE FROM Children WHERE user_id = ?', [userId]);
-      console.log(`Deleted ${childrenResult.length} children for user ID ${userId}: ${childIds.join(', ')}`);
-    }
-    const [userDeleteResult] = await db.query('DELETE FROM Users WHERE id = ?', [userId]);
-    if (userDeleteResult.affectedRows === 0) {
-      throw new Error('No user was deleted');
-    }
-    console.log(`Deleted user ID ${userId}: ${user.name}`);
-    await db.query('COMMIT');
-    req.session.success = `✅ User '${user.name}' deleted successfully.`;
-    res.redirect('/admin/dashboard');
-  } catch (err) {
-    await db.query('ROLLBACK');
-    console.error('Delete user error:', err);
-    req.session.error = `Failed to delete user: ${err.message || 'Unknown error'}`;
-    res.redirect('/admin/dashboard');
-  }
+// Edit user affiliations (GET)
+router.get('/users/:id/edit', async (req, res) => {
+  const userId = req.params.id;
+  const [[user]] = await db.query('SELECT * FROM Users WHERE id = ?', [userId]);
+  const [organizations] = await db.query('SELECT * FROM Organizations ORDER BY name ASC');
+  const [affiliations] = await db.query('SELECT * FROM UserAffiliations WHERE user_id = ?', [userId]);
+  res.render('admin/editUser', { user, organizations, affiliations, session: req.session });
 });
-
-// POST /admin/organizations/:id/join - Join an organization (admin can join any organization)
-router.post('/organizations/:id/join', async (req, res) => {
-  if (!req.session.userId) return res.redirect('/login');
-  
-  try {
-    const orgId = req.params.id;
-    const userId = req.session.userId;
-    const role = req.body.role || 'parent'; // 'parent' or 'child'
-    const childId = req.body.child_id || null;
-    
-    // Check if organization exists
-    const [[organization]] = await db.query(`
-      SELECT * FROM Organizations WHERE id = ?
-    `, [orgId]);
-    
-    if (!organization) {
-      req.session.error = 'Organization not found.';
-      return res.redirect('/admin/organizations');
-    }
-    
-    // Check if user is already affiliated with this organization
-    const [existingAffiliation] = await db.query(`
-      SELECT * FROM UserAffiliations 
-      WHERE user_id = ? AND organization_id = ? AND role = ?
-    `, [userId, orgId, role]);
-    
-    if (existingAffiliation.length > 0) {
-      req.session.error = `You are already affiliated with ${organization.name} as a ${role}.`;
-      return res.redirect('/admin/organizations');
-    }
-    
-    // Add affiliation
-    await db.query(`
-      INSERT INTO UserAffiliations (user_id, organization_id, role, child_id)
-      VALUES (?, ?, ?, ?)
-    `, [userId, orgId, role, childId]);
-    
-    req.session.success = `Successfully joined ${organization.name} as a ${role}!`;
-    res.redirect('/admin/organizations');
-  } catch (err) {
-    console.error('❌ Join organization error:', err);
-    req.session.error = 'Could not join organization.';
-    res.redirect('/admin/organizations');
-  }
-});
-
-// GET /admin/organizations/:id/details - Show organization details with affiliations
-router.get('/organizations/:id/details', async (req, res) => {
-  console.log('🔍 DEBUG: Organization details route hit for ID:', req.params.id);
-  try {
-    const orgId = req.params.id;
-    console.log('🔍 DEBUG: Looking for organization with ID:', orgId);
-    
-    // Get organization details
-    const [[organization]] = await db.query(`
-      SELECT * FROM Organizations WHERE id = ?
-    `, [orgId]);
-    
-    console.log('🔍 DEBUG: Organization found:', organization);
-    
-    if (!organization) {
-      req.session.error = 'Organization not found.';
-      return res.redirect('/admin/organizations');
-    }
-    
-    // Get parent affiliations
-    const [parentAffiliations] = await db.query(`
-      SELECT 
-        ua.user_id,
-        u.name as parent_name,
-        u.email as parent_email,
-        COUNT(DISTINCT ua.child_id) as children_count,
-        GROUP_CONCAT(DISTINCT c.name ORDER BY c.name SEPARATOR ', ') as children_names
-      FROM UserAffiliations ua
-      JOIN Users u ON ua.user_id = u.id
-      LEFT JOIN Children c ON ua.child_id = c.id
-      WHERE ua.organization_id = ? AND ua.role = 'parent'
-      GROUP BY ua.user_id, u.name, u.email
-      ORDER BY u.name
-    `, [orgId]);
-    
-    console.log('🔍 DEBUG: Parent affiliations found:', parentAffiliations.length);
-    
-    // Get child affiliations (unique children only)
-    const [childAffiliations] = await db.query(`
-      SELECT DISTINCT
-        ua.child_id,
-        c.name as child_name,
-        u.name as parent_name,
-        u.email as parent_email
-      FROM UserAffiliations ua
-      JOIN Children c ON ua.child_id = c.id
-      JOIN Users u ON c.user_id = u.id
-      WHERE ua.organization_id = ? AND ua.role = 'child'
-      ORDER BY c.name
-    `, [orgId]);
-    
-    console.log('🔍 DEBUG: Child affiliations found:', childAffiliations.length);
-    console.log('🔍 DEBUG: Rendering admin/organization-details view');
-    
-    res.render('admin/organization-details', { 
-      session: req.session, 
-      organization,
-      parentAffiliations,
-      childAffiliations,
-      activePage: 'organizations'
-    });
-  } catch (err) {
-    console.error('❌ Admin organization details error:', err);
-    console.error('❌ Error stack:', err.stack);
-    res.status(500).send('Could not load organization details.');
-  }
-});
-
-// Edit Organization (GET)
-router.get('/organizations/:id/edit', async (req, res) => {
-  try {
-    const [[org]] = await db.query('SELECT * FROM Organizations WHERE id = ?', [req.params.id]);
-    if (!org) return res.status(404).send('Organization not found');
-    res.render('admin/editOrg', { org, session: req.session });
-  } catch (err) {
-    console.error('Load org error:', err);
-    res.status(500).send('Could not load organization for editing');
-  }
-});
-
-// Edit Organization (POST)
-router.post('/organizations/:id/edit', async (req, res) => {
-  const { name, address, type } = req.body;
-  try {
+// Edit user affiliations (POST)
+router.post('/users/:id/affiliations', async (req, res) => {
+  const userId = req.params.id;
+  let orgIds = req.body.organization_ids || [];
+  if (!Array.isArray(orgIds)) orgIds = [orgIds];
+  await db.query('DELETE FROM UserAffiliations WHERE user_id = ?', [userId]);
+  for (const orgId of orgIds) {
     await db.query(
-      'UPDATE Organizations SET name = ?, address = ?, type = ? WHERE id = ?',
-      [name.trim(), address.trim(), type.trim(), req.params.id]
+      'INSERT INTO UserAffiliations (user_id, organization_id, role, created_at) VALUES (?, ?, ?, NOW())',
+      [userId, orgId, 'parent']
     );
-    res.redirect('/admin/organizations');
-  } catch (err) {
-    console.error('Update org error:', err);
-    res.status(500).send('Could not update organization: ' + err.message);
   }
+  res.redirect(`/admin/users/${userId}/edit?success=Affiliations updated`);
 });
-
-// Add Organization (GET)
-router.get('/organizations/add', (req, res) => {
-  res.render('admin/addOrg', { session: req.session });
-});
-
-// Add Organization (POST)
-router.post('/organizations/add', async (req, res) => {
-  const { name, address, type } = req.body;
-  const userId = req.session.userId;
-  if (!name || !type || !userId) {
-    return res.status(400).send('Name, type, and admin session are required.');
-  }
-  try {
-    await db.query(
-      'INSERT INTO Organizations (name, type, address, created_by, created_at) VALUES (?, ?, ?, ?, NOW())',
-      [name.trim(), type.trim(), address.trim() || null, userId]
-    );
-    res.redirect('/admin/dashboard');
-  } catch (err) {
-    console.error('Add org error:', err);
-    res.status(500).send('Could not add organization: ' + err.message);
-  }
-});
-
-// Add User (GET)
-router.get('/users/add', async (req, res) => {
-  try {
-    const [users] = await db.query('SELECT id, name, role FROM Users');
-    res.render('admin/addUser', { session: req.session, users });
-  } catch (err) {
-    console.error('Load add user page error:', err);
-    res.status(500).send('Could not load add user page');
-  }
-});
-
-router.post('/users/add', async (req, res) => {
-  const { name, email, password, role, parent_id, school } = req.body;
-  if (!name || !email || !password || !role) {
-    return res.status(400).send('All fields are required.');
-  }
-  try {
-    const hashedPassword = await bcrypt.hash(password, 10);
-    let query = 'INSERT INTO Users (name, email, password_hash, role, created_at';
-    let values = [name.trim(), email.trim(), hashedPassword, role];
-    if (role === 'child' && parent_id) {
-      const [[parent]] = await db.query('SELECT role FROM Users WHERE id = ?', [parent_id]);
-      if (!parent || parent.role !== 'parent') {
-        return res.status(400).send('Selected parent is invalid.');
-      }
-      const [childResult] = await db.query(
-        'INSERT INTO Children (user_id, name, school, created_at) VALUES (?, ?, ?, NOW())',
-        [parent_id, name.trim(), school || 'TBD']
-      );
-      const childId = childResult.insertId;
-      query += ', parent_id, child_profile_id';
-      values.push(parseInt(parent_id), childId);
-    }
-    query += ') VALUES (?, ?, ?, ?, NOW()';
-    if (role === 'child' && parent_id) query += ', ?, ?';
-    query += ')';
-    const [userResult] = await db.query(query, values);
-    if (userResult.affectedRows === 0) {
-      throw new Error('Failed to insert into Users table');
-    }
-    res.redirect('/admin/dashboard');
-  } catch (err) {
-    console.error('Add user error:', err);
-    res.status(500).send('Could not add user: ' + err.message);
-  }
-});
-
-// Add Child (GET)
-router.get('/children/add', async (req, res) => {
-  try {
-    const [users] = await db.query('SELECT id, name, role FROM Users');
-    res.render('admin/addChild', { session: req.session, users });
-  } catch (err) {
-    console.error('Load add child page error:', err);
-    res.status(500).send('Could not load add child page');
-  }
-});
-
-// Add Child (POST)
-router.post('/children/add', async (req, res) => {
-  const { name, school, club, user_id, child_username, child_password } = req.body;
-  if (!name || !school || !user_id || !child_username || !child_password) {
-    return res.status(400).send('Name, school, parent user ID(s), username, and password are required.');
-  }
-  try {
-    const parentIds = Array.isArray(user_id) ? user_id : [user_id];
-    const validParents = [];
-    for (const id of parentIds) {
-      const [[parent]] = await db.query('SELECT role FROM Users WHERE id = ?', [id]);
-      if (!parent || parent.role !== 'parent') {
-        return res.status(400).send(`Selected parent with ID ${id} is invalid.`);
-      }
-      validParents.push(id);
-    }
-    await db.query('START TRANSACTION');
-    
-    // Look up organization_id from school name
-    const [[org]] = await db.query('SELECT id FROM Organizations WHERE name = ? AND type = "school"', [school.trim()]);
-    const organizationId = org ? org.id : null;
-    
-    // Create child record for the first parent (primary parent)
-    const primaryParentId = validParents[0];
-    const [childResult] = await db.query(
-      'INSERT INTO Children (user_id, name, school, club, created_at) VALUES (?, ?, ?, ?, NOW())',
-      [primaryParentId, name.trim(), school.trim(), club ? club.trim() : null]
-    );
-    const childId = childResult.insertId;
-    
-    // Create child user account
-    const hashedPassword = await bcrypt.hash(child_password, 10);
-    const [userResult] = await db.query(
-      'INSERT INTO Users (name, username, email, password_hash, role, parent_id, child_profile_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())',
-      [name.trim(), child_username.trim(), `${child_username.trim()}@child.local`, hashedPassword, 'child', primaryParentId, childId]
-    );
-    if (userResult.affectedRows === 0) {
-      throw new Error('Failed to insert into Users table');
-    }
-    const childUserId = userResult.insertId;
-    
-    // Create ParentChild entries for all parents
-    for (const parentId of validParents) {
-      await db.query(
-        'INSERT INTO ParentChild (parent_id, child_id, created_at) VALUES (?, ?, NOW())',
-        [parentId, childId]
-      );
-    }
-    
-    // Create UserAffiliations if organization was found
-    if (organizationId) {
-      // Parent affiliations for all parents
-      for (const parentId of validParents) {
-        await db.query(
-          'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
-          [parentId, childId, organizationId, 'parent']
-        );
-      }
-      
-      // Child affiliation
-      await db.query(
-        'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
-        [childUserId, childId, organizationId, 'child']
-      );
-    }
-    
-    await db.query('COMMIT');
-    req.session.success = `✅ Child '${name}' added successfully with login for parent(s) ${validParents.join(', ')}.`;
-    res.redirect('/admin/dashboard');
-  } catch (err) {
-    await db.query('ROLLBACK');
-    console.error('Add child error:', err);
-    req.session.error = `Could not add child: ${err.message}`;
-    res.redirect('/admin/children/add');
-  }
-});
-
-// Edit Child (GET)
+// Edit child affiliations (GET)
 router.get('/children/:id/edit', async (req, res) => {
-  try {
-    const [children] = await db.query('SELECT * FROM Children WHERE id = ?', [req.params.id]);
-    if (!children || children.length === 0) {
-      return res.status(404).send('Child not found');
-    }
-    const child = children[0];
-    const [users] = await db.query('SELECT id, name FROM Users WHERE role = "parent"');
-    res.render('admin/editChild', { child, users, session: req.session });
-  } catch (err) {
-    console.error('Load child error:', err);
-    res.status(500).send('Could not load child for editing');
-  }
+  const childId = req.params.id;
+  const [[child]] = await db.query('SELECT * FROM Children WHERE id = ?', [childId]);
+  const [organizations] = await db.query('SELECT * FROM Organizations ORDER BY name ASC');
+  const [affiliations] = await db.query('SELECT * FROM UserAffiliations WHERE child_id = ?', [childId]);
+  res.render('admin/editChild', { child, organizations, affiliations, session: req.session });
 });
-
-// Edit Child (POST)
-router.post('/children/:id/edit', async (req, res) => {
-  const { name, school, club, user_id } = req.body;
-  try {
-    await db.query('START TRANSACTION');
-    
-    // Get the current child info
-    const [[currentChild]] = await db.query('SELECT * FROM Children WHERE id = ?', [req.params.id]);
-    if (!currentChild) {
-      await db.query('ROLLBACK');
-      req.session.error = 'Child not found';
-      return res.redirect('/admin/dashboard');
-    }
-    
-    // Look up organization_id from school name
-    const [[org]] = await db.query('SELECT id FROM Organizations WHERE name = ? AND type = "school"', [school.trim()]);
-    const organizationId = org ? org.id : null;
-    
-    // Update the child record
+// Edit child affiliations (POST)
+router.post('/children/:id/affiliations', async (req, res) => {
+  const childId = req.params.id;
+  let orgIds = req.body.organization_ids || [];
+  if (!Array.isArray(orgIds)) orgIds = [orgIds];
+  await db.query('DELETE FROM UserAffiliations WHERE child_id = ?', [childId]);
+  for (const orgId of orgIds) {
     await db.query(
-      'UPDATE Children SET name = ?, school = ?, club = ?, user_id = ? WHERE id = ?',
-      [name.trim(), school.trim(), club ? club.trim() : null, user_id, req.params.id]
+      'INSERT INTO UserAffiliations (child_id, organization_id, role, created_at) VALUES (?, ?, ?, NOW())',
+      [childId, orgId, 'child']
     );
-    
-    // Update ParentChild entries if the parent changed
-    if (currentChild.user_id != user_id) {
-      // Remove old ParentChild entry
-      await db.query('DELETE FROM ParentChild WHERE child_id = ? AND parent_id = ?', [req.params.id, currentChild.user_id]);
-      // Add new ParentChild entry
-      await db.query('INSERT INTO ParentChild (parent_id, child_id, created_at) VALUES (?, ?, NOW())', [user_id, req.params.id]);
-    }
-    
-    // Update UserAffiliations if organization was found
-    if (organizationId) {
-      // Remove old affiliations for this child
-      await db.query('DELETE FROM UserAffiliations WHERE child_id = ?', [req.params.id]);
-      
-      // Get all parents for this child
-      const [parents] = await db.query('SELECT parent_id FROM ParentChild WHERE child_id = ?', [req.params.id]);
-      
-      // Create new affiliations for all parents
-      for (const parent of parents) {
-        await db.query(
-          'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
-          [parent.parent_id, req.params.id, organizationId, 'parent']
-        );
-      }
-      
-      // Get child user account if it exists
-      const [[childUser]] = await db.query('SELECT id FROM Users WHERE child_profile_id = ?', [req.params.id]);
-      if (childUser) {
-        await db.query(
-          'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
-          [childUser.id, req.params.id, organizationId, 'child']
-        );
-      }
-    }
-    
-    await db.query('COMMIT');
-    req.session.success = `✅ Child '${name}' updated successfully.`;
-    res.redirect('/admin/dashboard');
+  }
+  res.redirect(`/admin/children/${childId}/edit?success=Affiliations updated`);
+});
+
+// List all users (admin)
+router.get('/users', async (req, res) => {
+  try {
+    const [users] = await db.query('SELECT * FROM Users ORDER BY id DESC');
+    res.render('admin/users', { users, session: req.session });
   } catch (err) {
-    await db.query('ROLLBACK');
-    console.error('Update child error:', err);
-    req.session.error = `Failed to update child: ${err.message || 'Unknown error'}`;
-    res.redirect('/admin/dashboard');
+    console.error('Admin users list error:', err);
+    res.status(500).send('Failed to load users list');
   }
 });
 
-// Delete Child
-router.post('/children/:id/delete', async (req, res) => {
+// View/manage members of an activity group
+router.get('/groups/:id/members', async (req, res) => {
+  if (!req.session.userId || !req.session.is_admin) return res.redirect('/login');
+  const groupId = req.params.id;
   try {
-    const childId = req.params.id;
-    await db.query('START TRANSACTION');
-    
-    // First, update or delete the associated user record
-    const [userResult] = await db.query(
-      'SELECT id FROM Users WHERE child_profile_id = ?',
-      [childId]
-    );
-    if (userResult.length > 0) {
-      const userId = userResult[0].id;
-      await db.query('DELETE FROM Users WHERE id = ?', [userId]);
-      console.log(`Deleted user with child_profile_id ${childId}: User ID ${userId}`);
-    }
+    const [[group]] = await db.query('SELECT * FROM ActivityGroups WHERE id = ?', [groupId]);
+    if (!group) return res.status(404).send('Group not found');
 
-    // Delete UserAffiliations for this child
-    await db.query('DELETE FROM UserAffiliations WHERE child_id = ?', [childId]);
-    console.log(`Deleted UserAffiliations entries for child ID ${childId}`);
+    // Parent members (role column)
+    const [members] = await db.query(`
+      SELECT agm.id, agm.role, u.name AS user_name, u.email, c.name AS child_name, c.school, c.club
+      FROM ActivityGroupMembers agm
+      JOIN Users u ON agm.user_id = u.id
+      LEFT JOIN Children c ON agm.child_id = c.id
+      WHERE agm.group_id = ? AND agm.is_active = TRUE
+      ORDER BY u.name, c.name`, [groupId]);
 
-    // Delete ParentChild entries for this child
-    await db.query('DELETE FROM ParentChild WHERE child_id = ?', [childId]);
-    console.log(`Deleted ParentChild entries for child ID ${childId}`);
-
-    // Then delete the child
-    const [[child]] = await db.query('SELECT * FROM Children WHERE id = ?', [childId]);
-    if (!child) {
-      await db.query('ROLLBACK');
-      req.session.error = 'Child not found';
-      return res.redirect('/admin/dashboard');
-    }
-    await db.query('DELETE FROM Children WHERE id = ?', [childId]);
-    await db.query('COMMIT');
-    req.session.success = `✅ Child '${child.name}' deleted successfully.`;
-    res.redirect('/admin/dashboard');
+    const invitations = [];// invitations feature removed
+    res.render('admin/groupMembers', { group, members, invitations, session: req.session });
   } catch (err) {
-    await db.query('ROLLBACK');
-    console.error('Delete child error:', err);
-    req.session.error = `Failed to delete child: ${err.message || 'Unknown error'}`;
-    res.redirect('/admin/dashboard');
-  }
-});
-
-// Admin: Add parent to child (link in ParentChild)
-router.post('/children/:childId/add-parent', async (req, res) => {
-  const childId = req.params.childId;
-  const { parent_email_or_username } = req.body;
-  
-  if (!parent_email_or_username) {
-    req.session.error = 'Parent email or username is required.';
-    return res.redirect('/admin/dashboard');
-  }
-  
-  try {
-    await db.query('START TRANSACTION');
-    
-    // First, verify the child exists
-    const [[child]] = await db.query('SELECT * FROM Children WHERE id = ?', [childId]);
-    if (!child) {
-      await db.query('ROLLBACK');
-      req.session.error = 'Child not found.';
-      return res.redirect('/admin/dashboard');
-    }
-    
-    // Find parent by email or username
-    const [[parent]] = await db.query(
-      'SELECT id, name, email, role FROM Users WHERE (email = ? OR username = ?) AND role = "parent"',
-      [parent_email_or_username, parent_email_or_username]
-    );
-    
-    if (!parent) {
-      await db.query('ROLLBACK');
-      req.session.error = `Parent not found with email/username: ${parent_email_or_username}. Please ensure the parent exists and has the 'parent' role.`;
-      return res.redirect('/admin/dashboard');
-    }
-    
-    // Check if this parent is already linked to this child
-    const [[existingLink]] = await db.query(
-      'SELECT * FROM ParentChild WHERE parent_id = ? AND child_id = ?',
-      [parent.id, childId]
-    );
-    
-    if (existingLink) {
-      await db.query('ROLLBACK');
-      req.session.error = `Parent ${parent.name} is already linked to child ${child.name}.`;
-      return res.redirect('/admin/dashboard');
-    }
-    
-    // Link parent to child in ParentChild
-    await db.query(
-      'INSERT INTO ParentChild (parent_id, child_id, created_at) VALUES (?, ?, NOW())',
-      [parent.id, childId]
-    );
-    
-    await db.query('COMMIT');
-    req.session.success = `✅ Parent ${parent.name} (${parent.email}) successfully linked to child ${child.name}!`;
-    res.redirect('/admin/dashboard');
-    
-  } catch (err) {
-    await db.query('ROLLBACK');
-    console.error('Admin add parent to child error:', err);
-    req.session.error = `Failed to link parent to child: ${err.message}`;
-    res.redirect('/admin/dashboard');
-  }
-});
-
-// Admin: Remove parent from child (unlink in ParentChild)
-router.post('/children/:childId/remove-parent', async (req, res) => {
-  const childId = req.params.childId;
-  const { parent_id } = req.body;
-  
-  if (!parent_id) {
-    req.session.error = 'Parent ID is required.';
-    return res.redirect('/admin/dashboard');
-  }
-  
-  try {
-    await db.query('START TRANSACTION');
-    
-    // First, verify the child exists
-    const [[child]] = await db.query('SELECT * FROM Children WHERE id = ?', [childId]);
-    if (!child) {
-      await db.query('ROLLBACK');
-      req.session.error = 'Child not found.';
-      return res.redirect('/admin/dashboard');
-    }
-    
-    // Verify the parent exists and is linked to this child
-    const [[parentLink]] = await db.query(
-      `SELECT pc.*, u.name as parent_name, u.email as parent_email 
-       FROM ParentChild pc 
-       JOIN Users u ON pc.parent_id = u.id 
-       WHERE pc.parent_id = ? AND pc.child_id = ?`,
-      [parent_id, childId]
-    );
-    
-    if (!parentLink) {
-      await db.query('ROLLBACK');
-      req.session.error = 'Parent is not linked to this child.';
-      return res.redirect('/admin/dashboard');
-    }
-    
-    // Check if this is the primary parent (the one in the Children.user_id field)
-    if (child.user_id == parent_id) {
-      await db.query('ROLLBACK');
-      req.session.error = `Cannot remove ${parentLink.parent_name} as they are the primary parent of ${child.name}. Please reassign the primary parent first.`;
-      return res.redirect('/admin/dashboard');
-    }
-    
-    // Remove the parent-child link
-    await db.query(
-      'DELETE FROM ParentChild WHERE parent_id = ? AND child_id = ?',
-      [parent_id, childId]
-    );
-    
-    await db.query('COMMIT');
-    req.session.success = `✅ Parent ${parentLink.parent_name} (${parentLink.parent_email}) successfully removed from child ${child.name}!`;
-    res.redirect('/admin/dashboard');
-    
-  } catch (err) {
-    await db.query('ROLLBACK');
-    console.error('Admin remove parent from child error:', err);
-    req.session.error = `Failed to remove parent from child: ${err.message}`;
-    res.redirect('/admin/dashboard');
+    console.error('Admin groupMembers error:', err);
+    res.status(500).send('Could not load group members');
   }
 });
 
@@ -956,16 +540,45 @@ router.post('/children/:childId/remove-parent', async (req, res) => {
 router.get('/groups', async (req, res) => {
   try {
     const [groups] = await db.query(`
-      SELECT re.*, u.name AS created_by_name,
-        (SELECT COUNT(*) FROM EventGroupMembers WHERE event_id = re.id AND is_active = TRUE) AS group_member_count
-      FROM RecurringEvents re
-      JOIN Users u ON re.created_by = u.id
-      ORDER BY re.day_of_week, re.start_time
-    `);
+      SELECT ag.*, u.name AS created_by_name,
+        (SELECT COUNT(*) FROM ActivityGroupMembers WHERE group_id = ag.id AND is_active = TRUE) AS group_member_count
+      FROM ActivityGroups ag
+      JOIN Users u ON ag.creator_id = u.id
+      ORDER BY ag.created_at DESC`);
     res.render('admin/groups', { groups, session: req.session });
   } catch (err) {
     console.error('Admin groups error:', err);
     res.status(500).send('Failed to load groups');
+  }
+});
+
+// --- Admin view of all rides (offers + requests) ---
+router.get('/rides', async (req, res) => {
+  if (!req.session.userId || !req.session.is_admin) return res.redirect('/login');
+  try {
+    const [rideOffers] = await db.query(`
+      SELECT ro.*, u.name AS driver_name,
+        (ro.available_seats - COALESCE(booked.total_booked,0)) as remaining_seats
+      FROM RideOffers ro
+      JOIN Users u ON ro.user_id = u.id
+      LEFT JOIN (
+        SELECT offer_id, SUM(seats_requested) as total_booked
+        FROM RideBookings WHERE status = 'confirmed' GROUP BY offer_id
+      ) booked ON ro.id = booked.offer_id
+      ORDER BY ro.pickup_time DESC`);
+
+    const [rideRequests] = await db.query(`
+      SELECT rr.*, u.name AS parent_name, c.name AS child_name, d.name AS driver_name
+      FROM RideRequests rr
+      JOIN Users u ON rr.user_id = u.id
+      JOIN Children c ON rr.child_id = c.id
+      LEFT JOIN Users d ON rr.assigned_user_id = d.id
+      ORDER BY rr.created_at DESC`);
+
+    res.render('admin/rides', { rideOffers, rideRequests, session: req.session });
+  } catch (err) {
+    console.error('Admin rides error:', err);
+    res.status(500).send('Failed to load rides');
   }
 });
 
@@ -1354,59 +967,391 @@ router.get('/messages', async (req, res) => {
   }
 });
 
-// Edit user affiliations (GET)
-router.get('/users/:id/edit', async (req, res) => {
-  const userId = req.params.id;
-  const [[user]] = await db.query('SELECT * FROM Users WHERE id = ?', [userId]);
-  const [organizations] = await db.query('SELECT * FROM Organizations ORDER BY name ASC');
-  const [affiliations] = await db.query('SELECT * FROM UserAffiliations WHERE user_id = ?', [userId]);
-  res.render('admin/editUser', { user, organizations, affiliations, session: req.session });
-});
-// Edit user affiliations (POST)
-router.post('/users/:id/affiliations', async (req, res) => {
-  const userId = req.params.id;
-  let orgIds = req.body.organization_ids || [];
-  if (!Array.isArray(orgIds)) orgIds = [orgIds];
-  await db.query('DELETE FROM UserAffiliations WHERE user_id = ?', [userId]);
-  for (const orgId of orgIds) {
-    await db.query(
-      'INSERT INTO UserAffiliations (user_id, organization_id, role, created_at) VALUES (?, ?, ?, NOW())',
-      [userId, orgId, 'parent']
-    );
+// Add User (GET)
+router.get('/users/add', async (req, res) => {
+  try {
+    const [users] = await db.query('SELECT id, name, role FROM Users');
+    res.render('admin/addUser', { session: req.session, users });
+  } catch (err) {
+    console.error('Load add user page error:', err);
+    res.status(500).send('Could not load add user page');
   }
-  res.redirect(`/admin/users/${userId}/edit?success=Affiliations updated`);
-});
-// Edit child affiliations (GET)
-router.get('/children/:id/edit', async (req, res) => {
-  const childId = req.params.id;
-  const [[child]] = await db.query('SELECT * FROM Children WHERE id = ?', [childId]);
-  const [organizations] = await db.query('SELECT * FROM Organizations ORDER BY name ASC');
-  const [affiliations] = await db.query('SELECT * FROM UserAffiliations WHERE child_id = ?', [childId]);
-  res.render('admin/editChild', { child, organizations, affiliations, session: req.session });
-});
-// Edit child affiliations (POST)
-router.post('/children/:id/affiliations', async (req, res) => {
-  const childId = req.params.id;
-  let orgIds = req.body.organization_ids || [];
-  if (!Array.isArray(orgIds)) orgIds = [orgIds];
-  await db.query('DELETE FROM UserAffiliations WHERE child_id = ?', [childId]);
-  for (const orgId of orgIds) {
-    await db.query(
-      'INSERT INTO UserAffiliations (child_id, organization_id, role, created_at) VALUES (?, ?, ?, NOW())',
-      [childId, orgId, 'child']
-    );
-  }
-  res.redirect(`/admin/children/${childId}/edit?success=Affiliations updated`);
 });
 
-// List all users (admin)
-router.get('/users', async (req, res) => {
+router.post('/users/add', async (req, res) => {
+  const { name, email, password, role, parent_id, school } = req.body;
+  if (!name || !email || !password || !role) {
+    return res.status(400).send('All fields are required.');
+  }
   try {
-    const [users] = await db.query('SELECT * FROM Users ORDER BY id DESC');
-    res.render('admin/users', { users, session: req.session });
+    const hashedPassword = await bcrypt.hash(password, 10);
+    let query = 'INSERT INTO Users (name, email, password_hash, role, created_at';
+    let values = [name.trim(), email.trim(), hashedPassword, role];
+    if (role === 'child' && parent_id) {
+      const [[parent]] = await db.query('SELECT role FROM Users WHERE id = ?', [parent_id]);
+      if (!parent || parent.role !== 'parent') {
+        return res.status(400).send('Selected parent is invalid.');
+      }
+      const [childResult] = await db.query(
+        'INSERT INTO Children (user_id, name, school, created_at) VALUES (?, ?, ?, NOW())',
+        [parent_id, name.trim(), school || 'TBD']
+      );
+      const childId = childResult.insertId;
+      query += ', parent_id, child_profile_id';
+      values.push(parseInt(parent_id), childId);
+    }
+    query += ') VALUES (?, ?, ?, ?, NOW()';
+    if (role === 'child' && parent_id) query += ', ?, ?';
+    query += ')';
+    const [userResult] = await db.query(query, values);
+    if (userResult.affectedRows === 0) {
+      throw new Error('Failed to insert into Users table');
+    }
+    res.redirect('/admin/dashboard');
   } catch (err) {
-    console.error('Admin users list error:', err);
-    res.status(500).send('Failed to load users list');
+    console.error('Add user error:', err);
+    res.status(500).send('Could not add user: ' + err.message);
+  }
+});
+
+// Add Child (GET)
+router.get('/children/add', async (req, res) => {
+  try {
+    const [users] = await db.query('SELECT id, name, role FROM Users');
+    res.render('admin/addChild', { session: req.session, users });
+  } catch (err) {
+    console.error('Load add child page error:', err);
+    res.status(500).send('Could not load add child page');
+  }
+});
+
+// Add Child (POST)
+router.post('/children/add', async (req, res) => {
+  const { name, school, club, user_id, child_username, child_password } = req.body;
+  if (!name || !school || !user_id || !child_username || !child_password) {
+    return res.status(400).send('Name, school, parent user ID(s), username, and password are required.');
+  }
+  try {
+    const parentIds = Array.isArray(user_id) ? user_id : [user_id];
+    const validParents = [];
+    for (const id of parentIds) {
+      const [[parent]] = await db.query('SELECT role FROM Users WHERE id = ?', [id]);
+      if (!parent || parent.role !== 'parent') {
+        return res.status(400).send(`Selected parent with ID ${id} is invalid.`);
+      }
+      validParents.push(id);
+    }
+    await db.query('START TRANSACTION');
+    
+    // Look up organization_id from school name
+    const [[org]] = await db.query('SELECT id FROM Organizations WHERE name = ? AND type = "school"', [school.trim()]);
+    const organizationId = org ? org.id : null;
+    
+    // Create child record for the first parent (primary parent)
+    const primaryParentId = validParents[0];
+    const [childResult] = await db.query(
+      'INSERT INTO Children (user_id, name, school, club, created_at) VALUES (?, ?, ?, ?, NOW())',
+      [primaryParentId, name.trim(), school.trim(), club ? club.trim() : null]
+    );
+    const childId = childResult.insertId;
+    
+    // Create child user account
+    const hashedPassword = await bcrypt.hash(child_password, 10);
+    const [userResult] = await db.query(
+      'INSERT INTO Users (name, username, email, password_hash, role, parent_id, child_profile_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())',
+      [name.trim(), child_username.trim(), `${child_username.trim()}@child.local`, hashedPassword, 'child', primaryParentId, childId]
+    );
+    if (userResult.affectedRows === 0) {
+      throw new Error('Failed to insert into Users table');
+    }
+    const childUserId = userResult.insertId;
+    
+    // Create ParentChild entries for all parents
+    for (const parentId of validParents) {
+      await db.query(
+        'INSERT INTO ParentChild (parent_id, child_id, created_at) VALUES (?, ?, NOW())',
+        [parentId, childId]
+      );
+    }
+    
+    // Create UserAffiliations if organization was found
+    if (organizationId) {
+      // Parent affiliations for all parents
+      for (const parentId of validParents) {
+        await db.query(
+          'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
+          [parentId, childId, organizationId, 'parent']
+        );
+      }
+      
+      // Child affiliation
+      await db.query(
+        'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
+        [childUserId, childId, organizationId, 'child']
+      );
+    }
+    
+    await db.query('COMMIT');
+    req.session.success = `✅ Child '${name}' added successfully with login for parent(s) ${validParents.join(', ')}.`;
+    res.redirect('/admin/dashboard');
+  } catch (err) {
+    await db.query('ROLLBACK');
+    console.error('Add child error:', err);
+    req.session.error = `Could not add child: ${err.message}`;
+    res.redirect('/admin/children/add');
+  }
+});
+
+// Edit Child (GET)
+router.get('/children/:id/edit', async (req, res) => {
+  try {
+    const [children] = await db.query('SELECT * FROM Children WHERE id = ?', [req.params.id]);
+    if (!children || children.length === 0) {
+      return res.status(404).send('Child not found');
+    }
+    const child = children[0];
+    const [users] = await db.query('SELECT id, name FROM Users WHERE role = "parent"');
+    res.render('admin/editChild', { child, users, session: req.session });
+  } catch (err) {
+    console.error('Load child error:', err);
+    res.status(500).send('Could not load child for editing');
+  }
+});
+
+// Edit Child (POST)
+router.post('/children/:id/edit', async (req, res) => {
+  const { name, school, club, user_id } = req.body;
+  try {
+    await db.query('START TRANSACTION');
+    
+    // Get the current child info
+    const [[currentChild]] = await db.query('SELECT * FROM Children WHERE id = ?', [req.params.id]);
+    if (!currentChild) {
+      await db.query('ROLLBACK');
+      req.session.error = 'Child not found';
+      return res.redirect('/admin/dashboard');
+    }
+    
+    // Look up organization_id from school name
+    const [[org]] = await db.query('SELECT id FROM Organizations WHERE name = ? AND type = "school"', [school.trim()]);
+    const organizationId = org ? org.id : null;
+    
+    // Update the child record
+    await db.query(
+      'UPDATE Children SET name = ?, school = ?, club = ?, user_id = ? WHERE id = ?',
+      [name.trim(), school.trim(), club ? club.trim() : null, user_id, req.params.id]
+    );
+    
+    // Update ParentChild entries if the parent changed
+    if (currentChild.user_id != user_id) {
+      // Remove old ParentChild entry
+      await db.query('DELETE FROM ParentChild WHERE child_id = ? AND parent_id = ?', [req.params.id, currentChild.user_id]);
+      // Add new ParentChild entry
+      await db.query('INSERT INTO ParentChild (parent_id, child_id, created_at) VALUES (?, ?, NOW())', [user_id, req.params.id]);
+    }
+    
+    // Update UserAffiliations if organization was found
+    if (organizationId) {
+      // Remove old affiliations for this child
+      await db.query('DELETE FROM UserAffiliations WHERE child_id = ?', [req.params.id]);
+      
+      // Get all parents for this child
+      const [parents] = await db.query('SELECT parent_id FROM ParentChild WHERE child_id = ?', [req.params.id]);
+      
+      // Create new affiliations for all parents
+      for (const parent of parents) {
+        await db.query(
+          'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
+          [parent.parent_id, req.params.id, organizationId, 'parent']
+        );
+      }
+      
+      // Get child user account if it exists
+      const [[childUser]] = await db.query('SELECT id FROM Users WHERE child_profile_id = ?', [req.params.id]);
+      if (childUser) {
+        await db.query(
+          'INSERT INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?, ?, ?, ?, NOW())',
+          [childUser.id, req.params.id, organizationId, 'child']
+        );
+      }
+    }
+    
+    await db.query('COMMIT');
+    req.session.success = `✅ Child '${name}' updated successfully.`;
+    res.redirect('/admin/dashboard');
+  } catch (err) {
+    await db.query('ROLLBACK');
+    console.error('Update child error:', err);
+    req.session.error = `Failed to update child: ${err.message || 'Unknown error'}`;
+    res.redirect('/admin/dashboard');
+  }
+});
+
+// Delete Child
+router.post('/children/:id/delete', async (req, res) => {
+  try {
+    const childId = req.params.id;
+    await db.query('START TRANSACTION');
+    
+    // First, update or delete the associated user record
+    const [userResult] = await db.query(
+      'SELECT id FROM Users WHERE child_profile_id = ?',
+      [childId]
+    );
+    if (userResult.length > 0) {
+      const userId = userResult[0].id;
+      await db.query('DELETE FROM Users WHERE id = ?', [userId]);
+      console.log(`Deleted user with child_profile_id ${childId}: User ID ${userId}`);
+    }
+
+    // Delete UserAffiliations for this child
+    await db.query('DELETE FROM UserAffiliations WHERE child_id = ?', [childId]);
+    console.log(`Deleted UserAffiliations entries for child ID ${childId}`);
+
+    // Delete ParentChild entries for this child
+    await db.query('DELETE FROM ParentChild WHERE child_id = ?', [childId]);
+    console.log(`Deleted ParentChild entries for child ID ${childId}`);
+
+    // Then delete the child
+    const [[child]] = await db.query('SELECT * FROM Children WHERE id = ?', [childId]);
+    if (!child) {
+      await db.query('ROLLBACK');
+      req.session.error = 'Child not found';
+      return res.redirect('/admin/dashboard');
+    }
+    await db.query('DELETE FROM Children WHERE id = ?', [childId]);
+    await db.query('COMMIT');
+    req.session.success = `✅ Child '${child.name}' deleted successfully.`;
+    res.redirect('/admin/dashboard');
+  } catch (err) {
+    await db.query('ROLLBACK');
+    console.error('Delete child error:', err);
+    req.session.error = `Failed to delete child: ${err.message || 'Unknown error'}`;
+    res.redirect('/admin/dashboard');
+  }
+});
+
+// Admin: Add parent to child (link in ParentChild)
+router.post('/children/:childId/add-parent', async (req, res) => {
+  const childId = req.params.childId;
+  const { parent_email_or_username } = req.body;
+  
+  if (!parent_email_or_username) {
+    req.session.error = 'Parent email or username is required.';
+    return res.redirect('/admin/dashboard');
+  }
+  
+  try {
+    await db.query('START TRANSACTION');
+    
+    // First, verify the child exists
+    const [[child]] = await db.query('SELECT * FROM Children WHERE id = ?', [childId]);
+    if (!child) {
+      await db.query('ROLLBACK');
+      req.session.error = 'Child not found.';
+      return res.redirect('/admin/dashboard');
+    }
+    
+    // Find parent by email or username
+    const [[parent]] = await db.query(
+      'SELECT id, name, email, role FROM Users WHERE (email = ? OR username = ?) AND role = "parent"',
+      [parent_email_or_username, parent_email_or_username]
+    );
+    
+    if (!parent) {
+      await db.query('ROLLBACK');
+      req.session.error = `Parent not found with email/username: ${parent_email_or_username}. Please ensure the parent exists and has the 'parent' role.`;
+      return res.redirect('/admin/dashboard');
+    }
+    
+    // Check if this parent is already linked to this child
+    const [[existingLink]] = await db.query(
+      'SELECT * FROM ParentChild WHERE parent_id = ? AND child_id = ?',
+      [parent.id, childId]
+    );
+    
+    if (existingLink) {
+      await db.query('ROLLBACK');
+      req.session.error = `Parent ${parent.name} is already linked to child ${child.name}.`;
+      return res.redirect('/admin/dashboard');
+    }
+    
+    // Link parent to child in ParentChild
+    await db.query(
+      'INSERT INTO ParentChild (parent_id, child_id, created_at) VALUES (?, ?, NOW())',
+      [parent.id, childId]
+    );
+    
+    await db.query('COMMIT');
+    req.session.success = `✅ Parent ${parent.name} (${parent.email}) successfully linked to child ${child.name}!`;
+    res.redirect('/admin/dashboard');
+    
+  } catch (err) {
+    await db.query('ROLLBACK');
+    console.error('Admin add parent to child error:', err);
+    req.session.error = `Failed to link parent to child: ${err.message}`;
+    res.redirect('/admin/dashboard');
+  }
+});
+
+// Admin: Remove parent from child (unlink in ParentChild)
+router.post('/children/:childId/remove-parent', async (req, res) => {
+  const childId = req.params.childId;
+  const { parent_id } = req.body;
+  
+  if (!parent_id) {
+    req.session.error = 'Parent ID is required.';
+    return res.redirect('/admin/dashboard');
+  }
+  
+  try {
+    await db.query('START TRANSACTION');
+    
+    // First, verify the child exists
+    const [[child]] = await db.query('SELECT * FROM Children WHERE id = ?', [childId]);
+    if (!child) {
+      await db.query('ROLLBACK');
+      req.session.error = 'Child not found.';
+      return res.redirect('/admin/dashboard');
+    }
+    
+    // Verify the parent exists and is linked to this child
+    const [[parentLink]] = await db.query(
+      `SELECT pc.*, u.name as parent_name, u.email as parent_email 
+       FROM ParentChild pc 
+       JOIN Users u ON pc.parent_id = u.id 
+       WHERE pc.parent_id = ? AND pc.child_id = ?`,
+      [parent_id, childId]
+    );
+    
+    if (!parentLink) {
+      await db.query('ROLLBACK');
+      req.session.error = 'Parent is not linked to this child.';
+      return res.redirect('/admin/dashboard');
+    }
+    
+    // Check if this is the primary parent (the one in the Children.user_id field)
+    if (child.user_id == parent_id) {
+      await db.query('ROLLBACK');
+      req.session.error = `Cannot remove ${parentLink.parent_name} as they are the primary parent of ${child.name}. Please reassign the primary parent first.`;
+      return res.redirect('/admin/dashboard');
+    }
+    
+    // Remove the parent-child link
+    await db.query(
+      'DELETE FROM ParentChild WHERE parent_id = ? AND child_id = ?',
+      [parent_id, childId]
+    );
+    
+    await db.query('COMMIT');
+    req.session.success = `✅ Parent ${parentLink.parent_name} (${parentLink.parent_email}) successfully removed from child ${child.name}!`;
+    res.redirect('/admin/dashboard');
+    
+  } catch (err) {
+    await db.query('ROLLBACK');
+    console.error('Admin remove parent from child error:', err);
+    req.session.error = `Failed to remove parent from child: ${err.message}`;
+    res.redirect('/admin/dashboard');
   }
 });
 

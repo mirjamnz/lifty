@@ -1,0 +1,54 @@
+<%- include('../partials/header1') %>
+<%- include(session && session.is_admin ? '../partials/navbar2' : '../partials/navbar1') %>
+
+<div class="container py-5">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0 text-primary"><i class="fas fa-car me-2"></i>All Rides</h2>
+    <a href="/admin/dashboard" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i>Back</a>
+  </div>
+
+  <h4 class="mt-4">Ride Offers (Drivers)</h4>
+  <div class="table-responsive mb-5">
+    <table class="table table-hover">
+      <thead class="table-light"><tr><th>Driver</th><th>School</th><th>Pickup</th><th>Seats</th><th>Notes</th></tr></thead>
+      <tbody>
+        <% if (rideOffers.length === 0) { %>
+          <tr><td colspan="5" class="text-center text-muted">No offers found.</td></tr>
+        <% } %>
+        <% rideOffers.forEach(o => { %>
+          <tr>
+            <td><%= o.driver_name %></td>
+            <td><%= o.school %></td>
+            <td><%= new Date(o.pickup_time).toLocaleString() %></td>
+            <td><%= o.remaining_seats %> / <%= o.available_seats %></td>
+            <td><%= o.notes || '—' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+
+  <h4 class="mt-4">Ride Requests (Passengers)</h4>
+  <div class="table-responsive">
+    <table class="table table-striped">
+      <thead class="table-light"><tr><th>Child</th><th>Parent</th><th>Pickup</th><th>Dropoff</th><th>Status</th><th>Driver</th></tr></thead>
+      <tbody>
+        <% if (rideRequests.length === 0) { %>
+          <tr><td colspan="6" class="text-center text-muted">No requests found.</td></tr>
+        <% } %>
+        <% rideRequests.forEach(r => { %>
+          <tr>
+            <td><%= r.child_name %></td>
+            <td><%= r.parent_name %></td>
+            <td><%= r.pickup_location %></td>
+            <td><%= r.dropoff_location || '—' %></td>
+            <td><%= r.status || 'Pending' %></td>
+            <td><%= r.driver_name || '—' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('../partials/footer1') %>
