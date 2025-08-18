@@ -1,0 +1,11 @@
+<%- include('../partials/header1') %>
+<%- include('../partials/navbar1') %>
+<div class="container py-5">
+  <div class="mb-3" id="staticContent">
+    <%- html %>
+  </div>
+  <% if (canEdit) { %>
+    <a href="<%= editUrl %>" class="btn btn-outline-primary"><i class="fas fa-edit me-1"></i>Edit Page</a>
+  <% } %>
+</div>
+<%- include('../partials/footer1') %>

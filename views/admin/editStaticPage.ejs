@@ -1,0 +1,20 @@
+<%- include('../partials/header1') %>
+<%- include('../partials/navbar2') %>
+<div class="container py-5">
+  <% if (session.success) { %>
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+      <i class="fas fa-check-circle me-1"></i><%= session.success %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    <% session.success = null; %>
+  <% } %>
+  <h2 class="mb-4 text-primary"><i class="fas fa-edit me-2"></i>Edit <%= slug.charAt(0).toUpperCase()+slug.slice(1) %> Page</h2>
+  <form method="POST" action="/admin/pages/<%= slug %>/edit">
+    <div class="mb-3">
+      <textarea name="content" class="form-control" rows="15" required><%= content %></textarea>
+    </div>
+    <button type="submit" class="btn btn-success"><i class="fas fa-save me-1"></i>Save</button>
+    <a href="/<%= slug %>" class="btn btn-secondary ms-2">Cancel</a>
+  </form>
+</div>
+<%- include('../partials/footer1') %>

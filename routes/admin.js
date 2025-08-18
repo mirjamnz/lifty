@@ -1470,4 +1470,19 @@ router.post('/children/:childId/unlink-parent/:parentId', async (req,res)=>{
   }
 });
 
+// ===== Static Pages editing =====
+router.get('/pages/:slug/edit', isAdmin, async (req, res) => {
+  const { slug } = req.params;
+  const [[page]] = await db.query('SELECT content FROM StaticPages WHERE slug = ?', [slug]);
+  res.render('admin/editStaticPage', { slug, content: page ? page.content : '', session: req.session });
+});
+
+router.post('/pages/:slug/edit', isAdmin, async (req, res) => {
+  const { slug } = req.params;
+  const { content } = req.body;
+  await db.query('INSERT INTO StaticPages (slug, content) VALUES (?, ?) ON DUPLICATE KEY UPDATE content = VALUES(content)', [slug, content]);
+  req.session.success = 'Page saved';
+  res.redirect(`/admin/pages/${slug}/edit`);
+});
+
 module.exports = router;
