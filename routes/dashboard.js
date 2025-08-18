@@ -60,9 +60,17 @@ router.get('/dashboard', async (req, res) => {
     
     // Get ride offers where user is the driver (RideOffers)
     const [rideOffers] = await db.query(`
-      SELECT ro.id, ro.pickup_time, ro.school as dropoff_location, 'Home' as pickup_location, 'offer' as type
-      FROM RideOffers ro 
+      SELECT ro.id,
+             ro.pickup_time,
+             ro.school AS dropoff_location,
+             'Home' AS pickup_location,
+             'offer' AS type,
+             GROUP_CONCAT(c.name ORDER BY c.name SEPARATOR ', ') AS passengers
+      FROM RideOffers ro
+      LEFT JOIN RideBookings rb ON rb.offer_id = ro.id AND rb.status = 'confirmed'
+      LEFT JOIN Children c      ON c.id = rb.child_id
       WHERE ro.user_id = ? AND ro.pickup_time >= NOW()
+      GROUP BY ro.id
     `, [userId]);
 
     console.log('Ride offers found:', rideOffers.length);
@@ -206,12 +214,13 @@ router.get('/dashboard', async (req, res) => {
     calendarEvents = [
       ...rideOffers.map(offer => ({
         id: `offer_${offer.id}`,
-        title: `Drive: To ${offer.dropoff_location}`,
+        title: offer.passengers ? `Drive: ${offer.passengers}` : `Drive: To ${offer.dropoff_location}`,
         start: offer.pickup_time,
         description: `${offer.pickup_location} → ${offer.dropoff_location}`,
         backgroundColor: '#dc3545',
         borderColor: '#c82333',
-        type: offer.type
+        type: offer.type,
+        passengers: offer.passengers
       })),
       ...assignedRides.map(ride => ({
         id: `ride_${ride.id}`,
