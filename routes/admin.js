@@ -577,7 +577,7 @@ router.get('/groups', async (req, res) => {
 router.get('/rides', async (req, res) => {
   if (!req.session.userId || !req.session.is_admin) return res.redirect('/login');
   try {
-    const [rideOffers] = await db.query(`
+    const [rideOffersRaw] = await db.query(`
       SELECT ro.*, u.name AS driver_name,
         (ro.available_seats - COALESCE(booked.total_booked,0)) as remaining_seats
       FROM RideOffers ro
@@ -588,15 +588,27 @@ router.get('/rides', async (req, res) => {
       ) booked ON ro.id = booked.offer_id
       ORDER BY ro.pickup_time DESC`);
 
-    const [rideRequests] = await db.query(`
+    const [rideRequestsRaw] = await db.query(`
       SELECT rr.*, u.name AS parent_name, c.name AS child_name, d.name AS driver_name
       FROM RideRequests rr
       JOIN Users u ON rr.user_id = u.id
       JOIN Children c ON rr.child_id = c.id
       LEFT JOIN Users d ON rr.assigned_user_id = d.id
-      ORDER BY rr.created_at DESC`);
+      ORDER BY rr.pickup_time DESC`);
 
-    res.render('admin/rides', { rideOffers, rideRequests, session: req.session });
+    const now = new Date();
+    const upcomingRideOffers = rideOffersRaw.filter(r => new Date(r.pickup_time) >= now);
+    const pastRideOffers = rideOffersRaw.filter(r => new Date(r.pickup_time) < now);
+    const upcomingRideRequests = rideRequestsRaw.filter(r => new Date(r.pickup_time) >= now);
+    const pastRideRequests = rideRequestsRaw.filter(r => new Date(r.pickup_time) < now);
+
+    res.render('admin/rides', {
+      upcomingRideOffers,
+      pastRideOffers,
+      upcomingRideRequests,
+      pastRideRequests,
+      session: req.session
+    });
   } catch (err) {
     console.error('Admin rides error:', err);
     res.status(500).send('Failed to load rides');

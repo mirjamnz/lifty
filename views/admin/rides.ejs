@@ -7,19 +7,20 @@
     <a href="/admin/dashboard" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i>Back</a>
   </div>
 
-  <h4 class="mt-4">Ride Offers (Drivers)</h4>
-  <div class="table-responsive mb-5">
+  <h4 class="mt-4">Upcoming Ride Offers</h4>
+  <div class="table-responsive mb-4">
     <table class="table table-hover">
-      <thead class="table-light"><tr><th>Driver</th><th>School</th><th>Pickup</th><th>Seats</th><th>Notes</th></tr></thead>
+      <thead class="table-light"><tr><th>Date</th><th>Driver</th><th>School</th><th>Pickup</th><th>Seats</th><th>Notes</th></tr></thead>
       <tbody>
-        <% if (rideOffers.length === 0) { %>
-          <tr><td colspan="5" class="text-center text-muted">No offers found.</td></tr>
+        <% if (upcomingRideOffers.length === 0) { %>
+          <tr><td colspan="6" class="text-center text-muted">No upcoming offers found.</td></tr>
         <% } %>
-        <% rideOffers.forEach(o => { %>
+        <% upcomingRideOffers.forEach(o => { %>
           <tr>
+            <td><%= new Date(o.pickup_time).toLocaleDateString() %></td>
             <td><%= o.driver_name %></td>
             <td><%= o.school %></td>
-            <td><%= new Date(o.pickup_time).toLocaleString() %></td>
+            <td><%= new Date(o.pickup_time).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) %></td>
             <td><%= o.remaining_seats %> / <%= o.available_seats %></td>
             <td><%= o.notes || '—' %></td>
           </tr>
@@ -28,19 +29,64 @@
     </table>
   </div>
 
-  <h4 class="mt-4">Ride Requests (Passengers)</h4>
-  <div class="table-responsive">
-    <table class="table table-striped">
-      <thead class="table-light"><tr><th>Child</th><th>Parent</th><th>Pickup</th><th>Dropoff</th><th>Status</th><th>Driver</th></tr></thead>
+  <h4 class="mt-4">Past Ride Offers</h4>
+  <div class="table-responsive mb-5">
+    <table class="table table-sm table-striped">
+      <thead class="table-light"><tr><th>Date</th><th>Driver</th><th>School</th><th>Pickup</th><th>Seats</th></tr></thead>
       <tbody>
-        <% if (rideRequests.length === 0) { %>
-          <tr><td colspan="6" class="text-center text-muted">No requests found.</td></tr>
+        <% if (pastRideOffers.length === 0) { %>
+          <tr><td colspan="5" class="text-center text-muted">No past offers.</td></tr>
         <% } %>
-        <% rideRequests.forEach(r => { %>
+        <% pastRideOffers.forEach(o=>{ %>
           <tr>
+            <td><%= new Date(o.pickup_time).toLocaleDateString() %></td>
+            <td><%= o.driver_name %></td>
+            <td><%= o.school %></td>
+            <td><%= new Date(o.pickup_time).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) %></td>
+            <td><%= o.available_seats %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+
+  <h4 class="mt-4">Upcoming Ride Requests</h4>
+  <div class="table-responsive mb-4">
+    <table class="table table-striped">
+      <thead class="table-light"><tr><th>Date</th><th>Child</th><th>Parent</th><th>Pickup</th><th>Dropoff</th><th>Status</th><th>Driver</th></tr></thead>
+      <tbody>
+        <% if (upcomingRideRequests.length === 0) { %>
+          <tr><td colspan="7" class="text-center text-muted">No upcoming requests.</td></tr>
+        <% } %>
+        <% upcomingRideRequests.forEach(r=>{ %>
+          <tr>
+            <td><%= new Date(r.pickup_time).toLocaleDateString() %></td>
             <td><%= r.child_name %></td>
             <td><%= r.parent_name %></td>
-            <td><%= r.pickup_location %></td>
+            <td><%= new Date(r.pickup_time).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) %></td>
+            <td><%= r.dropoff_location || '—' %></td>
+            <td><%= r.status || 'Pending' %></td>
+            <td><%= r.driver_name || '—' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+
+  <h4 class="mt-4">Past Ride Requests</h4>
+  <div class="table-responsive">
+    <table class="table table-sm table-striped">
+      <thead class="table-light"><tr><th>Date</th><th>Child</th><th>Parent</th><th>Pickup</th><th>Dropoff</th><th>Status</th><th>Driver</th></tr></thead>
+      <tbody>
+        <% if (pastRideRequests.length === 0) { %>
+          <tr><td colspan="7" class="text-center text-muted">No past requests.</td></tr>
+        <% } %>
+        <% pastRideRequests.forEach(r=>{ %>
+          <tr>
+            <td><%= new Date(r.pickup_time).toLocaleDateString() %></td>
+            <td><%= r.child_name %></td>
+            <td><%= r.parent_name %></td>
+            <td><%= new Date(r.pickup_time).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) %></td>
             <td><%= r.dropoff_location || '—' %></td>
             <td><%= r.status || 'Pending' %></td>
             <td><%= r.driver_name || '—' %></td>

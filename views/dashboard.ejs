@@ -1142,7 +1142,7 @@ function initLiftyMaps() {
   <!-- Debug -->
   <script>console.log('showProfileWizard:', <%= showProfileWizard ? 'true' : 'false' %>);</script>
 
-  <% if (showProfileWizard) { %>
+  <!-- Wizard JS now always included -->
   <script>
   document.addEventListener('DOMContentLoaded', function() {
     // Add Child Only Mode
@@ -1418,7 +1418,7 @@ function initLiftyMaps() {
     }
   });
   </script>
-  <% } %>
+  <!-- End wizard JS -->
 
   <!-- Add Child Button Handler - Always Loaded (not conditional) -->
   <script>
