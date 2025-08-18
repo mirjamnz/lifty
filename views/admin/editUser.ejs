@@ -12,6 +12,12 @@
           <h5 class="mb-3">
             <span class="fw-bold"><%= user.name %></span> <span class="badge bg-secondary"><%= user.email %></span><br>
             <small class="text-muted">Address: <%= user.home_address || '—' %></small>
+            <% if(user.is_blocked){ %>
+              <span class="badge bg-danger ms-2">Blocked</span>
+            <% } %>
+            <form action="/admin/users/<%= user.id %>/<%= user.is_blocked? 'unblock':'block' %>" method="POST" style="display:inline;">
+              <button type="submit" class="btn btn-sm btn-outline-warning ms-2"><i class="fas fa-ban"></i> <%= user.is_blocked? 'Unblock':'Block' %></button>
+            </form>
           </h5>
 
           <% if (user.role === 'child' && parents && parents.length>0) { %>
@@ -19,7 +25,11 @@
               <strong>Linked Parents:</strong>
               <ul class="list-group list-group-flush">
                 <% parents.forEach(p=>{ %>
-                  <li class="list-group-item px-0"><%= p.name %> <small class="text-muted">(<%= p.email %>)</small></li>
+                  <li class="list-group-item px-0 d-flex justify-content-between align-items-center"><%= p.name %> <small class="text-muted">(<%= p.email %>)</small>
+                    <form action="/admin/children/<%= user.child_profile_id %>/unlink-parent/<%= p.id %>" method="POST" onsubmit="return confirm('Remove parent <%= p.name %>?');">
+                      <button class="btn btn-sm btn-outline-danger"><i class="fas fa-unlink"></i></button>
+                    </form>
+                  </li>
                 <% }) %>
               </ul>
             </div>
@@ -50,7 +60,7 @@
             <!-- Affiliations Section -->
             <h6 class="mt-4">Affiliations</h6>
             <div class="mb-2">
-              <input type="text" class="form-control" id="orgSearch" placeholder="Search organizations..." autocomplete="off">
+              <input type="text" class="form-control" id="orgSearch" placeholder="Search organizations..." autocomplete="on">
               <div id="orgSuggestions" class="position-absolute bg-white border rounded shadow-sm w-100" style="display:none; max-height:200px; overflow-y:auto; z-index:1000;"></div>
             </div>
             <div id="selectedOrgs" class="d-flex flex-wrap mb-3">
@@ -95,38 +105,34 @@
       .then(r=>r.json())
       .then(arr=>{
         if(!arr.length){ suggestions.style.display='none'; return; }
-        suggestions.innerHTML = arr.map(o=>`<div class="list-group-item list-group-item-action" data-id="${o.id}" data-name="${o.name}">${o.name}</div>`).join('');
+        suggestions.innerHTML = arr.map(o=>`<div class="list-group-item list-group-item-action" data-id="${o.id}" data-name="${o.name}">${o.name}${o.address?`<br><small class='text-muted'>${o.address}</small>`:''}</div>`).join('');
         suggestions.style.display='block';
-      })
-      .catch(()=>{ suggestions.style.display='none'; }),300);
+      }).catch(()=>{ suggestions.style.display='none'; }),300);
   });
 
-  suggestions.addEventListener('click', e=>{
+  suggestions.addEventListener('click',e=>{
     const item=e.target.closest('[data-id]');
     if(!item) return;
-    const id=item.getAttribute('data-id');
-    const name=item.getAttribute('data-name');
-    // prevent duplicates
+    const id=item.dataset.id, name=item.dataset.name;
     if(selectedWrap.querySelector(`span[data-id="${id}"]`)) return;
-    const span=document.createElement('span');
-    span.className='badge bg-info text-dark m-1';
-    span.setAttribute('data-id',id);
-    span.innerHTML=`${name} <button type="button" class="btn-close btn-close-white btn-sm ms-1 remove-org" aria-label="Remove"></button>`;
-    const input=document.createElement('input');
-    input.type='hidden';
-    input.name='organization_ids';
-    input.value=id;
-    span.appendChild(input);
-    selectedWrap.appendChild(span);
+    const badge=document.createElement('span');
+    badge.className='badge bg-info text-dark m-1';
+    badge.dataset.id=id;
+    badge.innerHTML=`${name} <button type="button" class="btn-close btn-close-white btn-sm ms-1 remove-org" aria-label="Remove"></button>`;
+    const hidden=document.createElement('input');
+    hidden.type='hidden';
+    hidden.name='organization_ids';
+    hidden.value=id;
+    badge.appendChild(hidden);
+    selectedWrap.appendChild(badge);
     suggestions.style.display='none';
     searchInput.value='';
   });
 
-  selectedWrap.addEventListener('click', e=>{
+  selectedWrap.addEventListener('click',e=>{
     if(e.target.classList.contains('remove-org')){
-      const badge=e.target.closest('span');
-      badge.remove();
+      e.target.closest('span[data-id]').remove();
     }
   });
 })();
-</script> 
+</script>

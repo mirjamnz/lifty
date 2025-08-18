@@ -121,6 +121,10 @@
               <p class="text-muted">No user/child relationships found.</p>
             </div>
           <% } else { %>
+            <!-- Search bar -->
+            <div class="mb-3">
+              <input type="text" id="relationshipSearch" class="form-control" placeholder="Search parents, children or email...">
+            </div>
             <div class="table-responsive">
               <table class="table table-hover">
                 <thead>
@@ -215,6 +219,20 @@
                 </tbody>
               </table>
             </div>
+            <script>
+              document.addEventListener('DOMContentLoaded', function(){
+                const searchInput=document.getElementById('relationshipSearch');
+                const table=document.querySelector('#relationshipSearch').closest('.card-body').querySelector('table tbody');
+                if(!searchInput||!table) return;
+                const rows=Array.from(table.querySelectorAll('tr'));
+                searchInput.addEventListener('input',function(){
+                  const term=this.value.toLowerCase();
+                  rows.forEach(r=>{
+                    r.style.display=r.textContent.toLowerCase().includes(term)?'':'none';
+                  });
+                });
+              });
+            </script>
           <% } %>
         </div>
       </div>

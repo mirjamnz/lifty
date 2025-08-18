@@ -500,6 +500,7 @@ router.get('/children/:id/edit', async (req, res) => {
   const [[child]] = await db.query('SELECT * FROM Children WHERE id = ?', [childId]);
   const [organizations] = await db.query('SELECT * FROM Organizations ORDER BY name ASC');
   const [affiliations] = await db.query('SELECT * FROM UserAffiliations WHERE child_id = ?', [childId]);
+  const [users] = await db.query('SELECT id, name FROM Users WHERE role="parent" ORDER BY name');
   const [parents] = await db.query(`
       SELECT u.id, u.name, u.email FROM Users u
       JOIN ParentChild pc ON pc.parent_id = u.id
@@ -1452,6 +1453,20 @@ router.post('/children/:childId/remove-parent', async (req, res) => {
     console.error('Admin remove parent from child error:', err);
     req.session.error = `Failed to remove parent from child: ${err.message}`;
     res.redirect('/admin/dashboard');
+  }
+});
+
+// Remove parent-child link
+router.post('/children/:childId/unlink-parent/:parentId', async (req,res)=>{
+  const {childId, parentId}=req.params;
+  try{
+    await db.query('DELETE FROM ParentChild WHERE child_id=? AND parent_id=?',[childId,parentId]);
+    req.session.success='Parent unlinked from child.';
+    res.redirect(`/admin/children/${childId}/edit`);
+  }catch(err){
+    console.error('Unlink parent error:',err);
+    req.session.error='Failed to unlink parent.';
+    res.redirect(`/admin/children/${childId}/edit`);
   }
 });
 

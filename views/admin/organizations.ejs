@@ -276,7 +276,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Search and Filter functionality
-    const searchInput = document.getElementById('searchInput');
+    const searchInput = document.getElementById('organizationSearch'); // may be null (old UI removed)
     const typeFilter = document.getElementById('typeFilter');
     const sortBy = document.getElementById('sortBy');
     const table = document.getElementById('organizationsTable');
@@ -284,9 +284,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const rows = Array.from(tbody.querySelectorAll('tr'));
 
     function filterAndSortTable() {
-      const searchTerm = searchInput.value.toLowerCase();
-      const selectedType = typeFilter.value;
-      const sortOption = sortBy.value;
+      const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+      const selectedType = typeFilter ? typeFilter.value : '';
+      const sortOption = sortBy ? sortBy.value : 'name';
 
       // Filter rows
       rows.forEach(row => {
@@ -378,12 +378,11 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     }
 
-    // Event listeners
-    searchInput.addEventListener('input', filterAndSortTable);
-    typeFilter.addEventListener('change', filterAndSortTable);
-    sortBy.addEventListener('change', filterAndSortTable);
+    // Event listeners only if old controls still exist
+    if(searchInput){ searchInput.addEventListener('input', filterAndSortTable); }
+    if(typeFilter){ typeFilter.addEventListener('change', filterAndSortTable); }
+    if(sortBy){ sortBy.addEventListener('change', filterAndSortTable); }
 
-    // Initialize with default sorting
     filterAndSortTable();
   });
 </script> 
