@@ -324,10 +324,22 @@ router.post('/cancel-booking/:bookingId', async (req, res) => {
     }
 
     // Cancel booking
-    await db.query(
-      'UPDATE RideBookings SET status = "cancelled" WHERE id = ?',
-      [bookingId]
-    );
+    await db.query('UPDATE RideBookings SET status = "cancelled" WHERE id = ?', [bookingId]);
+
+    // Fetch driver and details for message
+    const [[row]] = await db.query(`
+      SELECT ro.user_id AS driver_id, u.name AS driver_name, c.name AS child_name, ro.pickup_time, ro.school AS dropoff
+      FROM RideBookings rb
+      JOIN RideOffers ro ON rb.offer_id = ro.id
+      JOIN Users u ON ro.user_id = u.id
+      JOIN Children c ON rb.child_id = c.id
+      WHERE rb.id = ? LIMIT 1`, [bookingId]);
+
+    if(row){
+      const message = `❌ Booking cancelled!\n${row.child_name}'s ride on ${new Date(row.pickup_time).toLocaleString()} has been cancelled by the parent.`;
+      await db.query('INSERT INTO Messages (sender_id, recipient_id, content, related_type, related_id, sent_at) VALUES (?, ?, ?, ?, ?, NOW())',
+        [userId, row.driver_id, message, 'booking', bookingId]);
+    }
 
     res.redirect('/rides?success=booking_cancelled');
   } catch (err) {

@@ -23,6 +23,9 @@ router.get('/dashboard', async (req, res) => {
       WHERE pc.parent_id = ?
     `, [userId]);
 
+    // Will fill after childIds defined
+    let childOrgMap = {};
+
     // Get all parents for each child
     for (let child of children) {
       const [parents] = await db.query(`
@@ -31,6 +34,7 @@ router.get('/dashboard', async (req, res) => {
         WHERE pc.child_id = ?
       `, [child.id]);
       child.parents = parents;
+      child.orgs = childOrgMap[child.id] || [];
     }
 
     // Get other users with locations (for map display) - only show public addresses
@@ -53,6 +57,19 @@ router.get('/dashboard', async (req, res) => {
 
     // Get calendar events for the user and their children
     const childIds = children.map(c => c.id);
+
+    if(childIds.length){
+      const [orgRows] = await db.query(`
+        SELECT ua.child_id, o.id as org_id, o.name
+        FROM UserAffiliations ua
+        JOIN Organizations o ON o.id = ua.organization_id
+        WHERE ua.child_id IN (?) AND ua.role='child'`, [childIds]);
+      orgRows.forEach(r=>{
+        if(!childOrgMap[r.child_id]) childOrgMap[r.child_id]=[];
+        childOrgMap[r.child_id].push({id:r.org_id,name:r.name});
+      });
+    }
+    
     let calendarEvents = [];
     
     // Define today for date calculations
@@ -724,6 +741,34 @@ router.post('/children/:id/invite-parent', async (req, res) => {
     req.session.error = "Something went wrong while inviting the parent.";
     res.redirect('/dashboard');
   }
+});
+
+// POST /children/:id/add-org
+router.post('/children/:id/add-org', async (req,res)=>{
+  const childId=req.params.id;
+  const parentId=req.session.userId;
+  const {org_id}=req.body;
+  if(!parentId) return res.redirect('/login');
+  if(!org_id) return res.redirect('/dashboard');
+  try{
+    await db.query(
+      'INSERT IGNORE INTO UserAffiliations (user_id, child_id, organization_id, role, created_at) VALUES (?,?,?,?,NOW())',
+      [parentId, childId, org_id, 'child']
+    );
+    res.redirect('/dashboard');
+  }catch(err){console.error('Add org error',err);res.redirect('/dashboard');}
+});
+
+// POST /children/:id/unlink-org/:orgId
+router.post('/children/:id/unlink-org/:orgId', async (req,res)=>{
+  const childId=req.params.id;
+  const orgId=req.params.orgId;
+  const parentId=req.session.userId;
+  if(!parentId) return res.redirect('/login');
+  try{
+    await db.query('DELETE FROM UserAffiliations WHERE child_id=? AND organization_id=?', [childId, orgId]);
+    res.redirect('/dashboard');
+  }catch(err){console.error('Unlink org error',err);res.redirect('/dashboard');}
 });
 
 // GET /api/calendar-events

@@ -199,6 +199,10 @@
   z-index: 2000 !important; /* Higher than Bootstrap modal (1050) and backdrop (1060) */
 }
 </style>
+<style>
+/* Ensure autocomplete input keeps full width inside responsive columns */
+.autoComplete_wrapper{min-width:100%;}
+</style>
 
 <script>
 function initLiftyMaps() {
@@ -297,6 +301,47 @@ function initLiftyMaps() {
     console.error('Google Maps not loaded or map element not found');
   }
 }
+</script>
+<script>
+function addOrg(childId){
+  const input=document.getElementById('orgId_'+childId);
+  if(!input.value) return alert('Select organization first');
+  const form=document.createElement('form');
+  form.method='POST';
+  form.action='/children/'+childId+'/add-org';
+  const hidden=document.createElement('input');hidden.type='hidden';hidden.name='org_id';hidden.value=input.value;form.appendChild(hidden);
+  document.body.appendChild(form);form.submit();
+}
+
+// autocomplete for each child input
+ document.addEventListener('DOMContentLoaded',()=>{
+   document.querySelectorAll('input[id^="orgSearch_"]').forEach(inp=>{
+     let debounce;
+     const sugg=document.createElement('div');
+     sugg.className='position-absolute bg-white border rounded shadow-sm';
+     sugg.style.zIndex='1000';sugg.style.display='none';
+     inp.parentNode.appendChild(sugg);
+     inp.addEventListener('input',()=>{
+       clearTimeout(debounce);
+       const q=inp.value.trim();
+       if(q.length<2){sugg.style.display='none';return;}
+       debounce=setTimeout(()=>fetch(`/organizations/api/search?q=${encodeURIComponent(q)}`)
+         .then(r=>r.json()).then(arr=>{
+           if(!arr.length){sugg.style.display='none';return;}
+           sugg.innerHTML=arr.map(o=>`<div class='list-group-item list-group-item-action' data-id='${o.id}' data-name='${o.name}'>${o.name}</div>`).join('');
+           sugg.style.display='block';
+         }).catch(()=>{sugg.style.display='none';}),300);
+     });
+     sugg.addEventListener('click',e=>{
+       const item=e.target.closest('[data-id]');
+       if(!item) return;
+       const id=item.dataset.id,name=item.dataset.name;
+       document.getElementById('orgSearch_'+inp.dataset.child).value=name;
+       document.getElementById('orgId_'+inp.dataset.child).value=id;
+       sugg.style.display='none';
+     });
+   });
+ });
 </script>
 
 <div class="container py-5">
@@ -480,22 +525,7 @@ function initLiftyMaps() {
                       </button>
                     </form>
                   </div>
-                  <div class="collapse mt-2" id="editForm<%= child.id %>">
-                    <form action="/edit-child/<%= child.id %>" method="POST" class="row g-2">
-                      <div class="col-md-4">
-                        <input type="text" name="name" value="<%= child.name %>" class="form-control rounded-pill" required autocomplete="name">
-                      </div>
-                      <div class="col-md-4">
-                        <input name="school" type="text" class="form-control mb-2 autocomplete" data-type="school" placeholder="School Name" required autocomplete="off" value="<%= child.school %>">
-                      </div>
-                      <div class="col-md-3">
-                        <input type="text" name="club" class="form-control autocomplete rounded-pill" data-type="club" placeholder="Club" autocomplete="off" value="<%= child.club %>">
-                      </div>
-                      <div class="col-md-1">
-                        <button type="submit" class="btn btn-primary w-100">💾</button>
-                      </div>
-                    </form>
-                  </div>
+                  <!-- Edit collapse now only contains org affiliations (handled below) -->
                   <% if (child.parents && child.parents.some(p => p.id === session.userId)) { %>
                     <form action="/children/<%= child.id %>/invite-parent" method="POST" class="row g-2 mt-2">
                       <div class="col">
@@ -706,7 +736,8 @@ function initLiftyMaps() {
   </div>
 
   <!-- Dependencies -->
-  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@5.11.3/main.global.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@5.11.3/main.global.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/locales-all.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/timegrid@5.11.3/main.global.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -1475,5 +1506,7 @@ function initLiftyMaps() {
   </script>
 
   <script async defer src="https://maps.googleapis.com/maps/api/js?key=<%= GMAPS_API_KEY %>&libraries=places&callback=initLiftyMaps"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/locales-all.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/timegrid@5.11.3/main.global.min.js"></script>
 
   <%- include('partials/footer1') %>

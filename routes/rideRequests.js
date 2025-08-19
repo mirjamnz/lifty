@@ -63,10 +63,23 @@ router.post('/cancel-request/:id', async (req, res) => {
   if (!userId) return res.redirect('/login');
 
   try {
-    await db.query(
-      `DELETE FROM RideRequests WHERE id = ? AND user_id = ?`,
-      [requestId, userId]
-    );
+    // fetch request before delete
+    const [[reqRow]] = await db.query(`
+      SELECT rr.*, c.name AS child_name, d.id AS driver_id, d.name AS driver_name
+      FROM RideRequests rr
+      JOIN Children c ON c.id = rr.child_id
+      LEFT JOIN Users d ON d.id = rr.assigned_user_id
+      WHERE rr.id = ? AND rr.user_id = ?`, [requestId, userId]);
+
+    await db.query('DELETE FROM RideRequests WHERE id = ? AND user_id = ?', [requestId, userId]);
+
+    // notify driver if there was one
+    if(reqRow && reqRow.driver_id){
+      const note=`❌ Ride request for ${reqRow.child_name} on ${new Date(reqRow.pickup_time).toLocaleString()} was cancelled by the parent.`;
+      await db.query('INSERT INTO Messages (sender_id, recipient_id, content, related_type, related_id, sent_at) VALUES (?, ?, ?, ?, ?, NOW())',
+        [userId, reqRow.driver_id, note, 'request', requestId]);
+    }
+
     res.redirect('/rides');
   } catch (err) {
     console.error('❌ Cancel Ride Request Error:', err);
